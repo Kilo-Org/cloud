@@ -434,12 +434,14 @@ describe('request cost admission', () => {
     jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue(preferredOrder);
     const vercel = await getVercelPricingMetadata();
 
-    expect(pickerModelPricing(catalogEntry, { [id]: routeModel }, preferredOrder, vercel)).toEqual({
+    expect(
+      pickerModelPricing(catalogEntry, { [id]: routeModel }, preferredOrder, vercel, 'shortContext')
+    ).toEqual({
       prompt: '0.000001',
       completion: '0.000002',
     });
     expect(
-      pickerModelPricing(catalogEntry, { [id]: routeModel }, preferredOrder, vercel, true)
+      pickerModelPricing(catalogEntry, { [id]: routeModel }, preferredOrder, vercel, 'worstCase')
     ).toEqual({ prompt: '0.000004', completion: '0.000008' });
     // The bound is about 2200 microdollars at the first tier and about 8700 at the highest
     await expect(enforceRequestCostLimit('4000', id, body, 2_000_000)).resolves.toMatch(

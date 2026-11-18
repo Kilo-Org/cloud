@@ -247,11 +247,13 @@ describe('getProviderDisplayPricing', () => {
     });
     const openRouterPricing = { prompt: '0.0000004', completion: '0.0000025' };
 
-    expect(getProviderDisplayPricing('alibaba', openRouterPricing, vercel)).toEqual({
-      prompt: '0.0000005',
-      completion: '0.000003',
-    });
-    expect(getProviderDisplayPricing('alibaba', openRouterPricing, vercel, true)).toEqual({
+    expect(getProviderDisplayPricing('alibaba', openRouterPricing, vercel, 'shortContext')).toEqual(
+      {
+        prompt: '0.0000005',
+        completion: '0.000003',
+      }
+    );
+    expect(getProviderDisplayPricing('alibaba', openRouterPricing, vercel, 'worstCase')).toEqual({
       prompt: '0.000002',
       completion: '0.000006',
     });

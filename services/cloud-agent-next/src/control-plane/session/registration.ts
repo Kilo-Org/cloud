@@ -279,6 +279,12 @@ export function buildControlPlaneSessionRegistration(
     Object.keys(profile.modelContextLimits).length > 0
       ? { modelContextLimits: profile.modelContextLimits }
       : {}),
+    ...(!metadata.identity.orgId && profile.webSearchDisabled
+      ? { webSearchDisabled: profile.webSearchDisabled }
+      : {}),
+    ...(!metadata.identity.orgId && profile.webSearchProvider
+      ? { webSearchProvider: profile.webSearchProvider }
+      : {}),
     ...(!readOnlyBitbucketReview && profile.kiloCommands?.length
       ? { kiloCommands: profile.kiloCommands }
       : {}),

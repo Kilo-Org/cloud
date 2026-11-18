@@ -5008,6 +5008,8 @@
     "modelsDescription": "Vypnutím modelu ho zablokujete pro všechny členy. Modely od povolených poskytovatelů jsou ve výchozím stavu zapnuté.",
     "modelsDeniedOnly": "Jen zakázané",
     "modelsEmpty": "Hledání neodpovídají žádné modely.",
+    "modelsDeniedEmpty": "Žádný model není zakázaný.",
+    "modelsDeniedSearchEmpty": "Hledání neodpovídá žádný zakázaný model.",
     "providersDescription": "Po vypnutí poskytovatele k němu Kilo pro tuto organizaci přestane směrovat požadavky.",
     "providersNeedCatalog": "Přepínače poskytovatelů zůstanou jen pro čtení, dokud se nenačte celý katalog modelů. Pokud je chcete upravit, klepněte výše na Zkusit znovu.",
     "providersEmpty": "Hledání neodpovídají žádní poskytovatelé.",

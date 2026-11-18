@@ -7,6 +7,8 @@ import {
   RUNTIME_HARNESSES,
   RUNTIME_INSTRUCTIONS_HEADER,
   RUNTIME_INSTRUCTIONS_VERSION,
+  RUNTIME_WEB_SEARCH_HEADER,
+  RUNTIME_WEB_SEARCH_VERSION,
   type RuntimeHarness,
   WORKSPACE_CONFIGURATION_HEADER,
   WORKSPACE_CONFIGURATION_VERSION,
@@ -545,6 +547,7 @@ const wrapperSocketAttachmentSchema = z.object({
   transferGrants: z.literal(true).optional(),
   workspaceConfiguration: z.literal(true).optional(),
   runtimeInstructions: z.literal(true).optional(),
+  runtimeWebSearch: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
   runtimeHarness: z.enum(RUNTIME_HARNESSES).optional(),
   kiloCliVersion: SandboxRuntimeVersionSchema.optional(),
@@ -759,10 +762,13 @@ export type ControlRuntimeCredentialProxyFence = {
   wrapperInstanceId: string;
 };
 
+/** Why an adopted handle cannot serve the caller's canonical scope view. */
+export type RuntimeProxyScopeViewUnavailableReason = 'scope_mismatch' | 'missing_canonical_grant';
+
 /** The fence plus, for an adopted handle, the current scope view or the reason it is unavailable. */
 export type ControlRuntimeCredentialProxyFenceScope = ControlRuntimeCredentialProxyFence & {
   scopeView?: ScopeGrantView;
-  scopeViewUnavailable?: string;
+  scopeViewUnavailable?: RuntimeProxyScopeViewUnavailableReason;
 };
 
 /** The adopted-handle state a scope is already serving, if any. */
@@ -2579,14 +2585,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (scopeGrantId(grant) !== match.scopeGrantId) {
         return {
           ...fence,
-          scopeViewUnavailable: 'Accepted scope handle does not belong to the caller grant',
+          scopeViewUnavailable: 'scope_mismatch',
         };
       }
       const scopeGrant = readScopeGrant(this.db, match.scopeGrantId);
       if (scopeGrant === null) {
         return {
           ...fence,
-          scopeViewUnavailable: 'Accepted scope handle has no canonical grant',
+          scopeViewUnavailable: 'missing_canonical_grant',
         };
       }
       return { ...fence, scopeView: readScopeGrantView(this.db, scopeGrant) };
@@ -2927,6 +2933,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
           : {}),
         ...(request.headers.get(RUNTIME_INSTRUCTIONS_HEADER) === RUNTIME_INSTRUCTIONS_VERSION
           ? { runtimeInstructions: true as const }
+          : {}),
+        ...(request.headers.get(RUNTIME_WEB_SEARCH_HEADER) === RUNTIME_WEB_SEARCH_VERSION
+          ? { runtimeWebSearch: true as const }
           : {}),
         ...runtimeHarnessField(parseRuntimeHarness(request.headers.get(RUNTIME_HARNESS_HEADER))),
         ...(observedRuntime.kiloCliVersion === null
@@ -4760,6 +4769,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
     // Pre-deploy wrappers reject unknown fields in both prepare and attach frames.
     if (attachment?.runtimeInstructions !== true) delete wireSpec.runtimeInstructions;
+    if (attachment?.runtimeWebSearch !== true) {
+      if (wireSpec.webSearchDisabled && attachment?.runtimeHarness === 'kilo2') {
+        wireSpec.permission = { ...wireSpec.permission, websearch: 'deny' };
+      }
+      delete wireSpec.webSearchDisabled;
+      delete wireSpec.webSearchProvider;
+    }
     // A restored workspace tail runs no commands, so the frame carries none. A
     // non-tail start sends the environment build boundary and start list.
     if (snapshotFrame.workspaceSnapshot !== undefined) {
@@ -7064,6 +7080,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.transferGrants ? { transferGrants: true } : {}),
         ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
         ...(attachment?.runtimeInstructions ? { runtimeInstructions: true } : {}),
+        ...(attachment?.runtimeWebSearch ? { runtimeWebSearch: true } : {}),
         ...runtimeHarnessField(attachment?.runtimeHarness),
       });
       logControlDiagnostic('workspace_snapshot_capability', {

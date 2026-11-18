@@ -38,7 +38,6 @@ export function SessionPermanentError({
   message,
   retry,
   isRetrying,
-  copyText,
   restoredRouteOpen,
 }: Readonly<SessionPermanentErrorProps>) {
   const router = useRouter();

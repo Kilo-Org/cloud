@@ -943,7 +943,14 @@
     "council": {
       "title": "審查小組審查",
       "subtitle": "多位專家分別審查每個提取要求，他們的投票會彙整成一項決定。",
-      "unavailable": "此組織無法使用審查小組審查。",
+      "unavailablePersonallyTitle": "需要 Enterprise 組織",
+      "unavailablePersonally": "審查小組審查不包含在個人帳戶中。",
+      "unavailablePersonallyAction": "建立組織",
+      "unavailablePersonallySwitchAction": "切換組織",
+      "unavailableOrganizationTitle": "審查小組審查目前無法使用",
+      "unavailableForOrganization": "審查小組審查需要具備使用中的訂閱或試用的 Enterprise 方案。此組織目前並未具備此功能。",
+      "unavailableForOrganizationNeutral": "此組織目前無法使用審查小組審查。請稍後再試。",
+      "unavailableOnBitbucket": "審查小組審查不適用於 Bitbucket 存放庫。",
       "noRepositories": "尚未選取任何存放庫。請先在存放庫設定中選取存放庫。",
       "specialists": "專家",
       "labels": "觸發審查小組審查的標籤",
@@ -4703,6 +4710,7 @@
     "superseded": "此連結已在其他裝置上被取代，因此已失效。"
   },
   "sharedSession": {
+    "startedAt": "開始於 {{time}}",
     "title": "已分享的工作階段",
     "someone": "某位使用者",
     "sharedBy": "由 {{owner}} 分享",
@@ -4858,6 +4866,8 @@
     "modelsDescription": "關閉模型即可對所有成員封鎖該模型。來自允許供應商的模型預設為開啟。",
     "modelsDeniedOnly": "僅顯示已拒絕",
     "modelsEmpty": "沒有符合此搜尋的模型。",
+    "modelsDeniedEmpty": "沒有已拒絕的模型。",
+    "modelsDeniedSearchEmpty": "沒有已拒絕的模型符合此搜尋。",
     "providersDescription": "關閉供應商即可停止 Kilo 為此組織將請求路由至該供應商。",
     "providersNeedCatalog": "在完整模型目錄載入完成前，供應商開關為唯讀狀態。點一下上方的再試一次即可編輯。",
     "providersEmpty": "沒有符合此搜尋的供應商。",

@@ -1486,7 +1486,14 @@
     "council": {
       "title": "Ráðsyfirferð",
       "subtitle": "Nokkrir sérfræðingar fara yfir hverja samrunabeiðni og atkvæði þeirra sameinast í eina ákvörðun.",
-      "unavailable": "Ráðsyfirferð er ekki í boði fyrir þetta fyrirtæki.",
+      "unavailablePersonallyTitle": "Þarf Enterprise stofnun",
+      "unavailablePersonally": "Ráðsyfirferð er ekki hluti af persónulegum reikningi.",
+      "unavailablePersonallyAction": "Stofna félag",
+      "unavailablePersonallySwitchAction": "Skipta um stofnun",
+      "unavailableOrganizationTitle": "Ráðsyfirferð er ekki í boði eins og er",
+      "unavailableForOrganization": "Ráðsyfirferð þarf Enterprise-áætlun með virkri áskrift eða virku próftímabili. Þetta félag hefur hana ekki núna.",
+      "unavailableForOrganizationNeutral": "Ráðsyfirferð er ekki í boði fyrir þetta félag eins og er. Reyndu aftur síðar.",
+      "unavailableOnBitbucket": "Ráðsyfirferð er ekki í boði fyrir Bitbucket-geymslur.",
       "noRepositories": "Engar geymslur valdar ennþá. Veldu geymslur í stillingum geymslna fyrst.",
       "specialists": "Sérfræðingar",
       "labels": "Merki sem kveikja á ráðsyfirferð",
@@ -4703,6 +4710,7 @@
     "superseded": "Þessum tengli var skipt út annars staðar og því virkar hann ekki lengur."
   },
   "sharedSession": {
+    "startedAt": "Byrjaði kl. {{time}}",
     "title": "Samnýtt lota",
     "someone": "Einhver",
     "sharedBy": "Deilt af {{owner}}",
@@ -4858,6 +4866,8 @@
     "modelsDescription": "Slökktu á líkani til að loka því fyrir hvern meðlim. Líkön frá leyfðum veitendum eru virk sjálfgefið.",
     "modelsDeniedOnly": "Aðeins synjað",
     "modelsEmpty": "Engin líkön passa við þessa leit.",
+    "modelsDeniedEmpty": "Ekkert líkan er synjað.",
+    "modelsDeniedSearchEmpty": "Ekkert synjað líkan passar við þessa leit.",
     "providersDescription": "Slökktu á veitanda til að koma í veg fyrir að Kilo beini beiðnum til hans fyrir þessi samtök.",
     "providersNeedCatalog": "Rofar veitenda verða skrifvarðir þar til öll líkanaskráin hefur hlaðist inn. Ýttu á Reyna aftur hér að ofan til að breyta þeim.",
     "providersEmpty": "Engir veitendur passa við þessa leit.",

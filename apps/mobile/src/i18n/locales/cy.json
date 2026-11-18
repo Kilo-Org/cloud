@@ -1586,7 +1586,14 @@
     "council": {
       "title": "Adolygiad cyngor",
       "subtitle": "Mae sawl arbenigwr yn adolygu pob cais tynnu, ac mae eu pleidleisiau'n cyfuno'n un penderfyniad.",
-      "unavailable": "Nid yw adolygiad cyngor ar gael i'r sefydliad hwn.",
+      "unavailablePersonallyTitle": "Angen sefydliad Enterprise",
+      "unavailablePersonally": "Nid yw adolygiad cyngor yn rhan o gyfrif personol.",
+      "unavailablePersonallyAction": "Creu sefydliad",
+      "unavailablePersonallySwitchAction": "Newid sefydliad",
+      "unavailableOrganizationTitle": "Nid yw adolygiad cyngor ar gael",
+      "unavailableForOrganization": "Mae angen y cynllun Enterprise gyda thanysgrifiad gweithredol neu dreial ar gyfer adolygiad cyngor. Nid oes gan y sefydliad hwn ef ar hyn o bryd.",
+      "unavailableForOrganizationNeutral": "Nid yw adolygiad cyngor ar gael i'r sefydliad hwn ar hyn o bryd. Ceisiwch eto yn nes ymlaen.",
+      "unavailableOnBitbucket": "Nid yw adolygiad cyngor ar gael ar gyfer ystorfeydd Bitbucket.",
       "noRepositories": "Dim ystorfeydd wedi'u dewis eto. Dewiswch ystorfeydd yng ngosodiadau'r ystorfeydd yn gyntaf.",
       "specialists": "Arbenigwyr",
       "labels": "Labeli sy'n sbarduno adolygiad cyngor",
@@ -4987,6 +4994,7 @@
     "superseded": "Disodlwyd y ddolen hon mewn man arall, felly nid yw'n gweithio mwyach."
   },
   "sharedSession": {
+    "startedAt": "Dechreuwyd am {{time}}",
     "title": "Sesiwn a rannwyd",
     "someone": "Rhywun",
     "sharedBy": "Rhannwyd gan {{owner}}",
@@ -5142,6 +5150,8 @@
     "modelsDescription": "Diffoddwch fodel i'w flocio i bob aelod. Mae modelau gan ddarparwyr a ganiateir wedi'u troi ymlaen i ddechrau.",
     "modelsDeniedOnly": "Wedi'u gwrthod yn unig",
     "modelsEmpty": "Does dim modelau'n cyfateb i'r chwiliad hwn.",
+    "modelsDeniedEmpty": "Does dim model wedi'i wrthod.",
+    "modelsDeniedSearchEmpty": "Does dim model wedi'i wrthod yn cyfateb i'r chwiliad hwn.",
     "providersDescription": "Diffoddwch ddarparwr i atal Kilo rhag anfon ceisiadau ato ar gyfer y sefydliad hwn.",
     "providersNeedCatalog": "Bydd switshis darparwyr yn aros yn ddarllen-yn-unig nes i'r catalog modelau llawn lwytho. Tapiwch Rhoi cynnig eto uchod i'w golygu.",
     "providersEmpty": "Does dim darparwyr yn cyfateb i'r chwiliad hwn.",

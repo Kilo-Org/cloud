@@ -20,7 +20,7 @@
     // Stall hedge to the global queue: README.md#stall-hedge-to-the-global-queue.
     "USAGE_INGEST_HEDGE_MODE": "on",
     "USAGE_INGEST_HEDGE_DELAY_MS": "1000",
-    "USAGE_INGEST_HEDGE_PERCENT": "50",
+    "USAGE_INGEST_HEDGE_PERCENT": "100",
   },
   "queues": {
     "producers": [

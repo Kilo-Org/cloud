@@ -943,7 +943,14 @@
     "council": {
       "title": "合議レビュー",
       "subtitle": "複数のスペシャリストが各プルリクエストをレビューし、その投票が1つの判定にまとめられます。",
-      "unavailable": "この組織では合議レビューを利用できません。",
+      "unavailablePersonallyTitle": "Enterprise 組織が必要です",
+      "unavailablePersonally": "合議レビューは個人アカウントには含まれません。",
+      "unavailablePersonallyAction": "組織を作成",
+      "unavailablePersonallySwitchAction": "組織を切り替え",
+      "unavailableOrganizationTitle": "合議レビューはご利用いただけません",
+      "unavailableForOrganization": "合議レビューには、有効なサブスクリプションまたはトライアル付きのエンタープライズプランが必要です。この組織には現在それがありません。",
+      "unavailableForOrganizationNeutral": "この組織では現在、合議レビューはご利用いただけません。後でもう一度お試しください。",
+      "unavailableOnBitbucket": "合議レビューは Bitbucket リポジトリでは利用できません。",
       "noRepositories": "リポジトリがまだ選択されていません。先にリポジトリ設定で選択してください。",
       "specialists": "スペシャリスト",
       "labels": "合議レビューを開始するラベル",
@@ -4703,6 +4710,7 @@
     "superseded": "このリンクは別のデバイスで置き換えられたため、使用できなくなりました。"
   },
   "sharedSession": {
+    "startedAt": "{{time}} に開始",
     "title": "共有セッション",
     "someone": "不明なユーザー",
     "sharedBy": "共有者：{{owner}}",
@@ -4858,6 +4866,8 @@
     "modelsDescription": "モデルをオフにすると、すべてのメンバーに対してそのモデルをブロックします。許可されたプロバイダーのモデルはオンで開始します。",
     "modelsDeniedOnly": "拒否のみ",
     "modelsEmpty": "この検索に一致するモデルはありません。",
+    "modelsDeniedEmpty": "拒否されたモデルはありません。",
+    "modelsDeniedSearchEmpty": "この検索に一致する拒否されたモデルはありません。",
     "providersDescription": "プロバイダーをオフにすると、この組織でKiloがそのプロバイダーへルーティングするのを停止します。",
     "providersNeedCatalog": "モデルカタログ全体が読み込まれるまで、プロバイダーのスイッチは読み取り専用です。編集するには、上の再試行をタップしてください。",
     "providersEmpty": "この検索に一致するプロバイダーはありません。",

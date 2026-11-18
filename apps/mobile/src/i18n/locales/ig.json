@@ -1486,7 +1486,14 @@
     "council": {
       "title": "Nyocha otu ndị nyocha",
       "subtitle": "Ọtụtụ ndị ọkachamara na-enyocha PR ọ bụla, ntuli aka ha na-ejikọta ọnụ wee bụrụ otu mkpebi.",
-      "unavailable": "Nyocha otu ndị nyocha adịghị maka nzukọ a.",
+      "unavailablePersonallyTitle": "Ọ chọrọ ọgbakọ Enterprise",
+      "unavailablePersonally": "Nyocha otu ndị nyocha abụghị akụkụ nke akaụntụ onwe onye.",
+      "unavailablePersonallyAction": "Mepụta nzukọ",
+      "unavailablePersonallySwitchAction": "Gbanwee otu",
+      "unavailableOrganizationTitle": "Nyocha otu ndị nyocha adịghị ugbu a",
+      "unavailableForOrganization": "Nyocha otu ndị nyocha chọrọ atụmatụ Enterprise nwere ndebanye aha na-arụ ọrụ ma ọ bụ oge ule. Nzukọ a enweghị ya ugbu a.",
+      "unavailableForOrganizationNeutral": "Nyocha otu ndị nyocha adịghị maka nzukọ a ugbu a. Nwaa ọzọ ma emechaa.",
+      "unavailableOnBitbucket": "Nyocha otu ndị nyocha adịghị maka ebe nchekwa Bitbucket.",
       "noRepositories": "Ahọrọbeghị ebe nchekwa ọ bụla. Buru ụzọ họrọ ebe nchekwa na ntọala ebe nchekwa.",
       "specialists": "Ndị ọkachamara",
       "labels": "Mkpado na-akpalite nyocha otu ndị nyocha",
@@ -4703,6 +4710,7 @@
     "superseded": "E dochiela njikọ a n'ebe ọzọ, ya mere ọ naghịzi arụ ọrụ."
   },
   "sharedSession": {
+    "startedAt": "Malitere na {{time}}",
     "title": "Nnọkọ ekesara",
     "someone": "Otu onye",
     "sharedBy": "{{owner}} kesara ya",
@@ -4858,6 +4866,8 @@
     "modelsDescription": "Gbanyụọ otu ihe nlere iji gbochie ya maka ndị otu niile. Ihe nlere sitere na ndị na-enye ọrụ ekwenyere na-amalite ka agbanyere.",
     "modelsDeniedOnly": "Naanị ndị a jụrụ",
     "modelsEmpty": "Ọnweghị ihe nlere dabara na nchọta a.",
+    "modelsDeniedEmpty": "Ọnweghị ihe nlere a jụrụ.",
+    "modelsDeniedSearchEmpty": "Ọnweghị ihe nlere a jụrụ dabara na nchọta a.",
     "providersDescription": "Gbanyụọ onye na-enye ọrụ iji kwụsị Kilo ịga na ya maka nzukọ a.",
     "providersNeedCatalog": "Mgba ọkụ ndị na-enye ọrụ ga-anọgide naanị maka ịgụ ruo mgbe katalọgụ ụdị niile ebudatara. Nwaa ọzọ n'elu iji dezie ha.",
     "providersEmpty": "Ọnweghị onye na-enye ọrụ dabara na nchọta a.",

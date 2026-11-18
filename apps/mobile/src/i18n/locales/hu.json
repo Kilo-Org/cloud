@@ -1486,7 +1486,14 @@
     "council": {
       "title": "Tanácsellenőrzés",
       "subtitle": "Több szakértő ellenőrzi az egyes PR-eket, és szavazataik egyetlen döntéssé állnak össze.",
-      "unavailable": "A tanácsellenőrzés nem érhető el ennél a szervezetnél.",
+      "unavailablePersonallyTitle": "Enterprise szervezet szükséges",
+      "unavailablePersonally": "A tanácsellenőrzés nem része a személyes fióknak.",
+      "unavailablePersonallyAction": "Szervezet létrehozása",
+      "unavailablePersonallySwitchAction": "Szervezet váltása",
+      "unavailableOrganizationTitle": "A tanácsellenőrzés jelenleg nem érhető el",
+      "unavailableForOrganization": "A tanácsellenőrzéshez aktív előfizetéssel vagy próbaidőszakkal rendelkező Enterprise csomag szükséges. Ez a szervezet jelenleg nem rendelkezik vele.",
+      "unavailableForOrganizationNeutral": "A tanácsellenőrzés jelenleg nem érhető el ennél a szervezetnél. Kérjük, próbálja újra később.",
+      "unavailableOnBitbucket": "A tanácsellenőrzés nem érhető el Bitbucket-adattárakhoz.",
       "noRepositories": "Még nincs kiválasztott adattár. Először válassz adattárakat az adattárbeállításokban.",
       "specialists": "Szakértők",
       "labels": "A tanácsellenőrzést kiváltó címkék",
@@ -4703,6 +4710,7 @@
     "superseded": "Ezt a linket máshol lecserélték, ezért már nem működik."
   },
   "sharedSession": {
+    "startedAt": "Indítva: {{time}}",
     "title": "Megosztott munkamenet",
     "someone": "Valaki",
     "sharedBy": "Megosztotta: {{owner}}",
@@ -4858,6 +4866,8 @@
     "modelsDescription": "Kapcsoljon ki egy modellt, hogy az minden tag számára le legyen tiltva. Az engedélyezett szolgáltatóktól származó modellek bekapcsolva indulnak.",
     "modelsDeniedOnly": "Csak letiltottak",
     "modelsEmpty": "Nincs a keresésnek megfelelő modell.",
+    "modelsDeniedEmpty": "Nincs letiltott modell.",
+    "modelsDeniedSearchEmpty": "Nincs a keresésnek megfelelő letiltott modell.",
     "providersDescription": "Kapcsoljon ki egy szolgáltatót, hogy a Kilo ne irányítson hozzá kéréseket ennél a szervezetnél.",
     "providersNeedCatalog": "A szolgáltatók kapcsolói csak olvashatók maradnak, amíg a teljes modellkatalógus be nem töltődik. A szerkesztésükhöz koppintson fent az Újrapróbálkozás gombra.",
     "providersEmpty": "Nincs a keresésnek megfelelő szolgáltató.",

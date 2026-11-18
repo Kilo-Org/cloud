@@ -12,6 +12,7 @@ const {
   mergeProfileConfigurationMock,
   getBuiltinAgentSettingsMock,
   getModelContextLimitsMock,
+  getWebSearchPreferenceMock,
   loadEnvironmentForSessionMock,
   assertKiloModelAvailableMock,
   assertRepositoryAccessMock,
@@ -25,6 +26,7 @@ const {
   mergeProfileConfigurationMock: vi.fn(),
   getBuiltinAgentSettingsMock: vi.fn(),
   getModelContextLimitsMock: vi.fn(),
+  getWebSearchPreferenceMock: vi.fn(async () => 'default'),
   loadEnvironmentForSessionMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
   assertRepositoryAccessMock: vi.fn(),
@@ -42,6 +44,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
     mergeProfileConfiguration: mergeProfileConfigurationMock,
     getBuiltinAgentSettings: getBuiltinAgentSettingsMock,
     getModelContextLimits: getModelContextLimitsMock,
+    getWebSearchPreference: getWebSearchPreferenceMock,
     loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
 });
@@ -1405,6 +1408,61 @@ describe('user model context limits', () => {
     expect(resolved.profile?.resolved?.modelContextLimits).toEqual({
       'openai/gpt-6.1-sol': 300_000,
     });
+  });
+
+  it('carries the saved web search opt-out into personal workspace creation', async () => {
+    getWebSearchPreferenceMock.mockResolvedValueOnce('off');
+    const resolved = await preflightSessionCreation(
+      request({ options: { createdOnPlatform: 'cloud-agent-web' } }),
+      context,
+      'prepareSession'
+    );
+    expect(getWebSearchPreferenceMock).toHaveBeenCalledWith(db, context.userId);
+    expect(resolved.profile?.resolved?.webSearchDisabled).toBe(true);
+  });
+
+  it('carries an explicit web search provider into personal workspace creation', async () => {
+    getWebSearchPreferenceMock.mockResolvedValueOnce('parallel');
+    const resolved = await preflightSessionCreation(
+      request({ options: { createdOnPlatform: 'cloud-agent-web' } }),
+      context,
+      'prepareSession'
+    );
+    expect(resolved.profile?.resolved?.webSearchProvider).toBe('parallel');
+    expect(resolved.profile?.resolved?.webSearchDisabled).toBeUndefined();
+  });
+
+  it('does not read the personal web search setting for organization workspaces', async () => {
+    const resolved = await preflightSessionCreation(
+      request({
+        options: {
+          createdOnPlatform: 'cloud-agent-web',
+          kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+        },
+      }),
+      context,
+      'prepareSession'
+    );
+    expect(getWebSearchPreferenceMock).not.toHaveBeenCalled();
+    expect(resolved.profile?.resolved?.webSearchDisabled).toBeUndefined();
+  });
+
+  it('uses the web search default when the preference read fails', async () => {
+    getWebSearchPreferenceMock.mockRejectedValueOnce(new Error('database unavailable'));
+    const childLogger = logger.withFields({});
+    const warn = vi.spyOn(childLogger, 'warn').mockImplementation(() => {});
+    const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(childLogger);
+
+    const resolved = await preflightSessionCreation(
+      request({ options: { createdOnPlatform: 'cloud-agent-web' } }),
+      context,
+      'prepareSession'
+    );
+
+    expect(resolved.profile?.resolved?.webSearchDisabled).toBeUndefined();
+    expect(resolved.profile?.resolved?.webSearchProvider).toBeUndefined();
+    expect(withFields).toHaveBeenCalledWith({ userId: context.userId, errorClass: 'Error' });
+    expect(warn).toHaveBeenCalledWith('Unable to load web search preferences; using defaults');
   });
 
   it('injects the user caps even when the origin skips default profile resolution', async () => {

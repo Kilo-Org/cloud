@@ -1,5 +1,5 @@
 {
-  "id": "73a11c02-2239-4f64-bfa5-9247e7133d06",
+  "id": "e7b9957b-099e-45fd-b59f-f302a88d8dae",
   "prevId": "2045b350-4045-4dbd-bb5d-19d62eb5770f",
   "version": "7",
   "dialect": "postgresql",
@@ -8516,6 +8516,19 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
+        },
+        "web_search_enabled": {
+          "name": "web_search_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "web_search_provider": {
+          "name": "web_search_provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -35218,33 +35231,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_session_step_up_proofs_user_session_binding": {
-          "name": "idx_session_step_up_proofs_user_session_binding",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "session_id_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "action_binding_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

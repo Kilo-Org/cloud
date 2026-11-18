@@ -73,7 +73,12 @@ export function buildNativeEgressAllowlist(
 type EgressPin = { egressAllowlist?: readonly string[]; egressAudit?: boolean };
 type EgressRequest = { egressMode?: EgressMode; egressAllowlist?: string[]; egressAudit?: boolean };
 
-/** Match the deployed baseline only for an immutable active pin. Never rewrite that pin or broaden its access. */
+/**
+ * Match the deployed baseline only for an immutable active pin. Never rewrite that pin or broaden its access.
+ * The pre-facade reconstruction uses the current backend, provider and ingest URLs and the session token.
+ * If a deployment changes one of them, an active pre-facade allocation fails prepare with
+ * `invalid_configuration`. The next allocation after it stops uses the facade baseline.
+ */
 export function matchesActiveEgressPolicy(
   input: AllowlistContext & {
     stored: EgressPin | null;

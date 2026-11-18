@@ -761,6 +761,12 @@ function withoutCachedScmCapability(scm: ScmGrant | undefined): ScmGrant | undef
   return scm ? { ...scm, capability: undefined } : undefined;
 }
 
+/**
+ * Returns `existingScm` unchanged while its cached capability is current for this container
+ * (a GitHub grant must also record its app type).
+ * Otherwise issues a new capability and keeps the existing alias and pinned SCM identity.
+ * To force a renewal, pass the grant without its capability (`withoutCachedScmCapability`).
+ */
 export async function refreshScmCapability(
   env: Partial<Pick<Env, 'GIT_TOKEN_SERVICE'>>,
   grant: { userId: string; orgId?: string; sandboxId: string },

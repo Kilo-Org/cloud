@@ -62,6 +62,9 @@ async function refreshAppleKeys(): Promise<AppleJWK[]> {
     if (cachedKeys && now - cachedKeys.fetchedAt <= STALE_CACHE_MAX_AGE_MS) {
       return cachedKeys.keys;
     }
+    // Propagating hands the error to a route or the framework handler,
+    // which reports it; the attempt must not be reported again.
+    lastRefreshErrorReported = true;
     throw lastRefreshError instanceof Error
       ? lastRefreshError
       : new Error('Apple JWKS is unavailable');
@@ -148,8 +151,10 @@ export async function verifyAppleJwtWithJwks(
       // the stale fallback (a success clears lastRefreshError): the missing
       // kid may be a rotated one that a healthy fetch would resolve. A fetch
       // failure is a server fault, not a caller error, so it propagates and
-      // routes answer 500 instead of misreporting an invalid token.
+      // routes answer 500 instead of misreporting an invalid token. The
+      // receiving route reports it, so the attempt is marked reported here.
       if (lastRefreshError !== null) {
+        lastRefreshErrorReported = true;
         throw lastRefreshError instanceof Error
           ? lastRefreshError
           : new Error('Apple JWKS is unavailable');

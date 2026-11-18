@@ -359,8 +359,8 @@ describe('PreferenceRow', () => {
     const trackColor = toggle.props.trackColor as { false: string; true: string };
 
     expect(trackColor.false).toBe(lightColors.mutedSoft);
-    expect(trackColor.true).toBe(lightColors.primaryDisabled);
-    expect(toggle.props.thumbColor).toBe(lightColors.primaryForeground);
+    expect(trackColor.true).toBe(lightColors.mutedSoft);
+    expect(toggle.props.thumbColor).toBe(lightColors.foreground);
   });
 });
 

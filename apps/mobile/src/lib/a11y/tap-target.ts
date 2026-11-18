@@ -186,23 +186,38 @@ export const SECTION_ACTION_HIT_SLOP = {
 export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify-center';
 
 /**
- * The side of {@link COMPACT_CONTROL_BOX_CLASS} in dp. A native control whose
- * size is a `style` object rather than a class — the `Switch` a row hosts —
- * reads the same box from here, so the row keeps its frame whatever it ends in.
+ * A settings row's content band: the row's 48pt frame
+ * (`ROW_FRAME_CLASS`) less its 10.5pt vertical padding a side. A trailing
+ * control that contributes more than this sets the row's height, so it must
+ * cancel down to it.
  */
-const COMPACT_CONTROL_BOX_DP = 32;
+export const ROW_FRAME_CONTENT_DP = 27;
 
 /**
  * The vertical margin a full {@link TOUCH_TARGET_DP} control cancels per side
- * when it is hosted in a compact 32dp row:
- * `(44 - 32) / 2 = 6`. A control-size audit reads the control's own node rect,
- * so `hitSlop` cannot lift a compact box and the node itself must render the
- * target; the negative margin then keeps the node from setting the row's
- * height, contributing the compact box instead. A row must pad by at least this
- * much vertically (`ROW_FRAME_CLASS` pads 10.5) so the overhang stays inside the
- * row's bounds, because Android drops a touch outside a parent view.
+ * when it is hosted in a {@link ROW_FRAME_CONTENT_DP}-tall row:
+ * `(44 - 27) / 2 = 8.5`. A control-size audit reads the control's own node
+ * rect, so `hitSlop` cannot lift a compact box and the node itself must render
+ * the target; the negative margin then keeps the node from setting the row's
+ * height, contributing the content band instead. The measured Android switch
+ * node is 44.19dp tall, so the row lands on the same 48pt frame as the
+ * `KvRow` beside it instead of the 53pt one a 32dp contribution produced. The
+ * row's 10.5pt padding keeps the overhang inside the row's bounds, because
+ * Android drops a touch outside a parent view.
  */
-export const TOUCH_TARGET_OVERHANG_DP = (TOUCH_TARGET_DP - COMPACT_CONTROL_BOX_DP) / 2;
+export const TOUCH_TARGET_OVERHANG_DP = (TOUCH_TARGET_DP - ROW_FRAME_CONTENT_DP) / 2;
+
+/**
+ * Per-side vertical `hitSlop` of the label pressable inside a
+ * `ROW_FRAME_CLASS` row: the 27pt content band plus 8.5pt a side reaches
+ * {@link TOUCH_TARGET_DP}. The frame owns the 48pt row, so the pressable must
+ * not carry a floor of its own — a `min-h-[48px]` inside the padded frame made
+ * every preference row 69pt tall beside a 48pt `KvRow`.
+ */
+export const ROW_FRAME_CONTENT_HIT_SLOP = {
+  top: TOUCH_TARGET_OVERHANG_DP,
+  bottom: TOUCH_TARGET_OVERHANG_DP,
+} as const;
 
 /**
  * Per-side `hitSlop` for {@link COMPACT_CONTROL_BOX_CLASS}, so the touch region

@@ -246,11 +246,13 @@ describe('FormField label-to-input gap', () => {
       throw new Error('renderer was not created');
     }
     // The block root carries `gap-1.5`; the wrapper carries the caller's gap
-    // class and wraps the label row and the input.
+    // class and wraps the label row and the input. `findAllByType` is
+    // self-inclusive and pre-order, so the root can also match the default
+    // class — exclude it to hold the pair's own node.
     const root = renderer.root.findByType('View');
     const wrapper = root
       .findAllByType('View')
-      .find(node => String(node.props.className) === (gapClassName ?? 'gap-1.5'));
+      .find(node => node !== root && String(node.props.className) === (gapClassName ?? 'gap-1.5'));
     if (wrapper === undefined) {
       throw new Error('the label-to-input wrapper was not rendered');
     }
@@ -259,8 +261,10 @@ describe('FormField label-to-input gap', () => {
 
   it('keeps the compact default on the label-to-input pair', () => {
     // An ordinary field's label row and input sit one small gap apart: the
-    // wrapper's own default is the compact gap, same as the block root's.
+    // wrapper's own default is the compact gap, distinct from the block
+    // root's gap to the message slot below.
     const { root, wrapper } = mountField();
+    expect(wrapper).not.toBe(root);
     expect(String(wrapper.props.className)).toContain('gap-1.5');
     expect(String(root.props.className)).toContain('gap-1.5');
   });

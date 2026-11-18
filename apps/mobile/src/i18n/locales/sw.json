@@ -26,6 +26,7 @@
     "creditHistory": "Historia ya salio",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Ghairi",
     "done": "Nimemaliza",
     "retry": "Jaribu tena",
@@ -482,7 +483,14 @@
       "viewReceipt": "Angalia risiti"
     },
     "changelog": "Mapya",
-    "changelogVersionPending": "Maelezo ya toleo hili yatakuja na sasisho lijalo."
+    "changelogVersionPending": "Maelezo ya toleo {{version}} yatakuja na sasisho lijalo la programu.",
+    "changelogGroupNew": "Mpya",
+    "changelogFixesIn": "Marekebisho na maboresho katika {{areas}}.",
+    "changelogFixesPolish": "Marekebisho na maboresho katika programu nzima.",
+    "changelogAreas": {
+      "signIn": "Kuingia",
+      "profileOrganizations": "Wasifu na mashirika"
+    }
   },
   "preferences": {
     "general": "Jumla",
@@ -3328,6 +3336,7 @@
       "manageOnWeb": "Mipangilio ya malipo kwenye wavuti",
       "changePlan": "Badilisha mpango",
       "buySeats": "Nunua nafasi",
+      "managedOnWeb": "Mpango, nafasi na kuongeza salio kiotomatiki vinasimamiwa kwenye wavuti.",
       "setupAutoTopUp": "Weka uongezaji salio kiotomatiki",
       "manageAutoTopUp": "Dhibiti uongezaji salio kiotomatiki",
       "opensOnWeb": "Hufunguka kwenye wavuti"
@@ -3476,12 +3485,10 @@
       "requestLogs": "Kumbukumbu za maombi"
     },
     "requestLogs": {
-      "hint": "Maombi ya saa moja kabla ya mwisho wa kipindi, mapya kwanza.",
       "older": "Saa iliyotangulia",
       "newer": "Saa inayofuata",
       "truncated": "Saa hii ina maombi mengi kuliko yanayoonyeshwa kwenye orodha.",
       "emptyTitle": "Hakuna maombi",
-      "emptyDescription": "Hakuna maombi ya lango katika saa hii.",
       "loadError": "Imeshindwa kupakia kumbukumbu za maombi.",
       "permissionDenied": "Ni mmiliki, msimamizi au meneja wa malipo wa shirika pekee anayeweza kusoma kumbukumbu zake za maombi.",
       "tokens": "{{input}} ndani · {{output}} nje",
@@ -4285,8 +4292,7 @@
       "repoValue": "Hazina: {{name}}",
       "profileValue": "Wasifu: {{name}}",
       "profileUnavailable": "Wasifu huu haupatikani tena. Chagua mwingine.",
-      "pickerEmptyDescriptionOrganization": "Unda wasifu wa shirika ili kutumia tena vigezo vya mazingira, amri za usanidi na ujuzi katika vipindi vyote.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Mmiliki au msimamizi wa shirika anaweza kuunda wasifu wa shirika."
+      "pickerEmptyDescriptionOrganization": "Unda wasifu wa shirika ili kutumia tena vigezo vya mazingira, amri za usanidi na ujuzi katika vipindi vyote."
     },
     "variablesDeleteFailed": "Haikuweza kufuta kigeu",
     "deleteVariable": "Futa kigeu {{key}}",
@@ -4472,7 +4478,6 @@
     "dismiss": "Puuza ripoti",
     "offline": "Nje ya mtandao · ripoti iliyohifadhiwa",
     "cached": "Ripoti iliyohifadhiwa · haiwezi kuonyeshwa upya",
-    "window": "{{start}} – {{end}}",
     "summary": "Muhtasari wa AI",
     "summaryPending": "Muhtasari wa AI unaandaliwa. Utaambatishwa hapa ukiwa tayari.",
     "summaryUnavailable": "Muhtasari wa AI haupatikani. Ripoti yako iliyopangwa bado inapatikana.",
@@ -4591,6 +4596,7 @@
       "title": "Vichocheo na ndoano za wavuti",
       "subtitle": "Endesha utekelezaji wa Cloud Agent kiotomatiki kutoka kwa mwito wa ndoano ya wavuti au kwa ratiba.",
       "new": "Kichocheo kipya",
+      "create": "Unda kichocheo",
       "emptyTitle": "Hakuna vichocheo bado",
       "emptyDescription": "Unda kichocheo ili kuanzisha utekelezaji wa Cloud Agent kutoka mwito wa ndoano ya wavuti au kwa ratiba.",
       "loadFailedTitle": "Imeshindwa kupakia vichocheo",
@@ -4644,6 +4650,8 @@
       "created": "Kichocheo kimeundwa",
       "saved": "Kichocheo kimehifadhiwa",
       "statusArrived": "Umefika",
+      "defaultPromptWebhook": "Eleza mwili wa ombi la mwito wa ndoano ya wavuti:\n\n{{body}}",
+      "defaultPromptScheduled": "Tekeleza kazi iliyoratibiwa. Ilianzishwa {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Weka jina.",
         "nameTooShort": "Tumia angalau herufi 8.",

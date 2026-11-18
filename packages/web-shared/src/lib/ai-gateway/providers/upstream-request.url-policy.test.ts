@@ -1,5 +1,14 @@
 import { lookup } from 'node:dns/promises';
+import type { LookupAddress } from 'node:dns';
+import type { Dispatcher } from 'undici';
+import { captureException } from '@sentry/nextjs';
 import { buildDirectProvider } from './build-direct-provider';
+import {
+  UpstreamAddressUnverifiedError,
+  clearUpstreamConnectionCache,
+  lookupPinnedUpstreamAddress,
+  upstreamDispatcherFor,
+} from './upstream-connection';
 import { UPSTREAM_DURATION_BUDGET_MS, upstreamRequest } from './upstream-request';
 import { clearUpstreamUrlPolicyCache } from './upstream-url-policy';
 
@@ -66,7 +75,19 @@ function send(provider: ReturnType<typeof directProvider>, signal?: AbortSignal)
   });
 }
 
-const lookupMock = jest.mocked(lookup);
+type LookupAll = (hostname: string, options: { all: true }) => Promise<LookupAddress[]>;
+
+// The policy awaits the `{ all: true }` overload, so the mock is typed for that
+// one; `jest.mocked` would otherwise pick a single-address overload.
+const lookupMock = jest.mocked(lookup as unknown as LookupAll);
+
+function pinnedAddressOf(hostname: string) {
+  const calls: Array<[unknown, unknown, unknown]> = [];
+  lookupPinnedUpstreamAddress(hostname, { all: false }, (error, address, family) => {
+    calls.push([error, address, family]);
+  });
+  return calls;
+}
 
 function setTargetEnv(value: string | undefined) {
   if (value === undefined) delete process.env.VERCEL_TARGET_ENV;
@@ -76,7 +97,9 @@ function setTargetEnv(value: string | undefined) {
 describe('upstreamRequest upstream URL policy', () => {
   beforeEach(() => {
     clearUpstreamUrlPolicyCache();
+    clearUpstreamConnectionCache();
     lookupMock.mockReset();
+    jest.mocked(captureException).mockReset();
   });
 
   afterEach(() => {
@@ -99,6 +122,131 @@ describe('upstreamRequest upstream URL policy', () => {
       const [url, init] = fetchMock.mock.calls[0];
       expect(url).toBe(`${PUBLIC_IP_URL}/chat/completions`);
       expect(init?.redirect).toBe('manual');
+    });
+
+    it('pins the checked address the request dials', async () => {
+      lookupMock.mockResolvedValue([{ address: '104.18.2.115', family: 4 }]);
+      const fetchMock = mockFetch();
+
+      await send(directProvider('https://llm.example.com/v1'));
+
+      expect(pinnedAddressOf('llm.example.com')).toEqual([[null, '104.18.2.115', 4]]);
+      const [, init] = fetchMock.mock.calls[0];
+      const dispatcher = (init as (RequestInit & { dispatcher?: Dispatcher }) | undefined)
+        ?.dispatcher;
+      // undici exposes the connect options of an Agent only behind private
+      // symbols, so the pool's identity is the public proof that this request
+      // dials the checked host with the address pinned above.
+      expect(dispatcher).toBe(upstreamDispatcherFor('llm.example.com', ['104.18.2.115']));
+    });
+
+    it('reports a refused connection apart from an upstream failure', async () => {
+      lookupMock.mockResolvedValue([{ address: '104.18.2.115', family: 4 }]);
+      // A refused pin reaches the request as a fetch error whose cause is the
+      // refusal, which `upstream-connection.test.ts` shows on this runtime.
+      const refusal = new UpstreamAddressUnverifiedError(
+        'llm.example.com',
+        'the refreshed check could not verify the host'
+      );
+      mockFetch().mockRejectedValue(
+        Object.assign(new TypeError('fetch failed'), { cause: refusal })
+      );
+
+      const result = await send(directProvider('https://llm.example.com/v1'));
+
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.response.status).toBe(503);
+      expect((await result.response.json()).error_type).toBe('upstream_disconnect');
+      expect(captureException).toHaveBeenCalledTimes(1);
+      expect(captureException).toHaveBeenCalledWith(
+        refusal,
+        expect.objectContaining({
+          tags: expect.objectContaining({ source: 'ai-gateway-upstream-connection' }),
+        })
+      );
+    });
+
+    it('pins the proxy host for a secure proxy request', async () => {
+      lookupMock.mockImplementation(async hostname => [
+        {
+          address: hostname.startsWith('proxy.') ? '104.18.2.115' : '104.18.3.116',
+          family: 4,
+        },
+      ]);
+      const fetchMock = mockFetch();
+
+      await send(
+        secureProxyProvider('https://proxy.example.com/api', 'https://llm.example.com/v1')
+      );
+
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://proxy.example.com/api');
+      const dispatcher = (init as (RequestInit & { dispatcher?: Dispatcher }) | undefined)
+        ?.dispatcher;
+      // The request dials the proxy; the relayed upstream URL travels in the
+      // body.
+      expect(dispatcher).toBe(upstreamDispatcherFor('proxy.example.com', ['104.18.2.115']));
+      expect(dispatcher).not.toBe(upstreamDispatcherFor('llm.example.com', ['104.18.3.116']));
+    });
+
+    it('keeps the first checked address when a second resolution would answer another', async () => {
+      lookupMock
+        .mockResolvedValueOnce([{ address: '104.18.2.115', family: 4 }])
+        .mockResolvedValue([{ address: '10.1.2.3', family: 4 }]);
+      mockFetch();
+
+      await send(directProvider('https://llm.example.com/v1'));
+      await send(directProvider('https://llm.example.com/v1'));
+
+      expect(lookupMock).toHaveBeenCalledTimes(1);
+      expect(pinnedAddressOf('llm.example.com')).toEqual([[null, '104.18.2.115', 4]]);
+    });
+
+    it('re-checks the host when the request dials after the pin expired', async () => {
+      lookupMock
+        .mockResolvedValueOnce([{ address: '104.18.2.115', family: 4 }])
+        .mockResolvedValue([{ address: '104.18.9.9', family: 4 }]);
+      const fetchMock = mockFetch();
+
+      await send(directProvider('https://llm.example.com/v1'));
+      expect(lookupMock).toHaveBeenCalledTimes(1);
+
+      // The pin outlives a connection but not the request budget, so a request
+      // that dials after the TTL asks the URL policy for a fresh check and
+      // dials what that check approved.
+      jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_001);
+      await send(directProvider('https://llm.example.com/v1'));
+
+      expect(lookupMock).toHaveBeenCalledTimes(2);
+      expect(pinnedAddressOf('llm.example.com')).toEqual([[null, '104.18.9.9', 4]]);
+      const [, init] = fetchMock.mock.calls[1];
+      expect((init as (RequestInit & { dispatcher?: Dispatcher }) | undefined)?.dispatcher).toBe(
+        upstreamDispatcherFor('llm.example.com', ['104.18.9.9'])
+      );
+      jest.restoreAllMocks();
+    });
+
+    it('reports the second request when a re-check fails after both caches expired', async () => {
+      lookupMock
+        .mockResolvedValueOnce([{ address: '104.18.2.115', family: 4 }])
+        .mockRejectedValue(new Error('getaddrinfo ENOTFOUND'));
+      const fetchMock = mockFetch();
+
+      await send(directProvider('https://llm.example.com/v1'));
+      jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_001);
+      const result = await send(directProvider('https://llm.example.com/v1'));
+
+      // Past both cache windows the request-start check runs again and its
+      // failure answers the caller: the fetch never ran and the answer stays
+      // the generic upstream failure. The connect-time refusal, where the
+      // check succeeds but the connection is not verified, is covered in
+      // `upstream-connection.test.ts` (stale-pin refresh and refusals) and by
+      // the refused-connection reporting test above.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      if (result.type !== 'error') throw new Error('expected an error result');
+      expect(result.response.status).toBe(503);
+      expect((await result.response.json()).error_type).toBe('temporarily_unavailable');
+      jest.restoreAllMocks();
     });
 
     it.each([
@@ -200,6 +348,7 @@ describe('upstreamRequest upstream URL policy', () => {
       const [url, init] = fetchMock.mock.calls[0];
       expect(url).toBe('http://localhost:8080/v1/chat/completions');
       expect(init?.redirect).toBe('follow');
+      expect((init as { dispatcher?: unknown } | undefined)?.dispatcher).toBeUndefined();
     }
   );
 });

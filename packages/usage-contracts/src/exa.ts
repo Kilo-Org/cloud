@@ -28,6 +28,17 @@ export const EXA_USAGE_FEATURE_ID_MAX_LENGTH = 64;
 export const EXA_USAGE_TYPE_MAX_LENGTH = 128;
 
 /**
+ * One call returns at most 100 requested pages (`ids`, or `numResults` for a search), each with up
+ * to 100 crawled subpages, and bills every returned page once per content type the request asked
+ * for. At the published rates that is about $30 for the largest real call. The constant is $100,
+ * a deliberate 3x headroom over that worst case so a pricing change or an unexpected page count
+ * cannot reject a real record; it stays a plausible per-call maximum rather than a price list: a
+ * larger value is not one Exa call's cost and must not reach the ledger or a balance. A real Exa
+ * request never produces a record this schema rejects.
+ */
+export const EXA_MAX_COST_MICRODOLLARS_PER_CALL = 100_000_000;
+
+/**
  * Wire contract for `POST /api/internal/exa-usage/record`.
  *
  * `id` and `occurredAt` are fixed once per upstream Exa response and are the
@@ -45,7 +56,7 @@ export const ExaUsageRecordSchema = z.strictObject({
   userId: z.string().min(1),
   organizationId: z.uuid().nullable(),
   path: z.enum(EXA_ALLOWED_PATHS),
-  costMicrodollars: z.number().int().positive().safe(),
+  costMicrodollars: z.number().int().positive().safe().max(EXA_MAX_COST_MICRODOLLARS_PER_CALL),
   chargedToBalance: z.boolean(),
   freeAllowanceMicrodollars: z.number().int().nonnegative().safe(),
   featureId: z.string().min(1).max(EXA_USAGE_FEATURE_ID_MAX_LENGTH).optional(),
@@ -57,9 +68,11 @@ export type ExaUsageRecord = z.infer<typeof ExaUsageRecordSchema>;
 /**
  * `duplicate` means a record with this `id` and `occurredAt` was already
  * committed, so the caller must treat it as success without a second charge.
+ * `rejected` means the writer could not resolve the payer the record names, so
+ * nothing was recorded and the sender must not send it again.
  */
 export const ExaUsageWriteResponseSchema = z.strictObject({
-  status: z.enum(['recorded', 'duplicate']),
+  status: z.enum(['recorded', 'duplicate', 'rejected']),
   usageId: z.uuid(),
 });
 

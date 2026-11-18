@@ -13,6 +13,17 @@ import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './t
 import { isChatGptUsageLimitCurrent, type ChatGptUsageLimit } from './usage-limit';
 
 /**
+ * The clean usage-limit column state. A save, a reconnect, and a successful
+ * delegated request each leave no recorded limit, so the three writes must
+ * spell the same columns and nulls.
+ */
+const NO_USAGE_LIMIT = {
+  usage_limit_reached_at: null,
+  usage_limit_resets_at: null,
+  usage_limit_error_code: null,
+} as const;
+
+/**
  * The delegated "Sign in with ChatGPT" tokens are the OpenAI BYOK credential.
  * The integration is inherently personal, so a connection is owned by one
  * person and scoped to one account: their personal account (`organizationId`
@@ -171,9 +182,7 @@ export async function saveOpenAiChatGptConnection(
     encrypted_connection,
     is_enabled: true,
     created_by: createdBy,
-    usage_limit_reached_at: null,
-    usage_limit_resets_at: null,
-    usage_limit_error_code: null,
+    ...NO_USAGE_LIMIT,
   };
 
   // Each owner shape upserts through its own partial unique index.
@@ -211,9 +220,7 @@ export async function saveOpenAiChatGptConnection(
         created_by: values.created_by,
         encrypted_connection,
         is_enabled: true,
-        usage_limit_reached_at: null,
-        usage_limit_resets_at: null,
-        usage_limit_error_code: null,
+        ...NO_USAGE_LIMIT,
       },
     });
 }
@@ -327,11 +334,7 @@ export async function clearOpenAiChatGptUsageLimit(
   await withConnectionHoldingToken(owner, accessToken, async tx => {
     await tx
       .update(openai_chatgpt_connections)
-      .set({
-        usage_limit_reached_at: null,
-        usage_limit_resets_at: null,
-        usage_limit_error_code: null,
-      })
+      .set({ ...NO_USAGE_LIMIT })
       .where(
         and(
           openAiChatGptOwnerWhere(owner),

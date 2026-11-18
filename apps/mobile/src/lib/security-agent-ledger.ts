@@ -12,6 +12,8 @@
 import { i18n } from '@/i18n';
 import {
   SECURITY_CONFIG_CONFLICT_CODE,
+  SECURITY_REMEDIATION_REJECTED_MESSAGE,
+  SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
   SECURITY_SYNC_PRECONDITION_CODES,
   type SecuritySyncPrecondition,
   securitySyncPreconditionForCode,
@@ -39,8 +41,10 @@ export const SECURITY_LEDGER_SETTLE_FAILED_MESSAGE =
 export const SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE =
   'We could not record this action. Please try again later.';
 // The manual-sync Worker URL or internal secret is unset server-side, so no
-// resubmit can succeed until the deployment is reconfigured.
-export const SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE = 'Security service is not configured';
+// resubmit can succeed until the deployment is reconfigured. The sentence is
+// shared with the server (stable-error-messages); re-exported so existing
+// imports keep resolving.
+export { SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE };
 // The server provably never reached the security Worker: nothing was enqueued,
 // so the intent is over even though a later attempt can succeed.
 export const SECURITY_SERVICE_UNAVAILABLE_MESSAGE = 'Security service is unavailable';
@@ -205,6 +209,11 @@ function markerKeyFor(error: Error): string | null {
     }
     case SECURITY_SERVICE_UNAVAILABLE_MESSAGE: {
       return 'securityAgent.mutations.serviceUnavailable';
+    }
+    // The remediation client's definitive non-5xx rejection: a stable server
+    // sentence, mapped so a non-English device does not render it verbatim.
+    case SECURITY_REMEDIATION_REJECTED_MESSAGE: {
+      return 'securityAgent.mutations.actionBlocked';
     }
     default: {
       // The subscription gate and the organization procedures refuse a write

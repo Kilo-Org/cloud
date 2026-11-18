@@ -26,6 +26,7 @@
     "creditHistory": "ક્રેડિટ ઇતિહાસ",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "રદ કરો",
     "done": "પૂર્ણ",
     "retry": "ફરી પ્રયાસ કરો",
@@ -482,7 +483,14 @@
       "viewReceipt": "રસીદ જુઓ"
     },
     "changelog": "નવું શું છે",
-    "changelogVersionPending": "આ સંસ્કરણની નોંધો આગામી ઍપ અપડેટ સાથે આવશે."
+    "changelogVersionPending": "{{version}} સંસ્કરણની નોંધો આગામી ઍપ અપડેટ સાથે આવશે.",
+    "changelogGroupNew": "નવું",
+    "changelogFixesIn": "{{areas}} માં ભૂલ સુધારા અને સુધારણાઓ.",
+    "changelogFixesPolish": "સમગ્ર એપમાં ભૂલ સુધારા અને સુધારણાઓ.",
+    "changelogAreas": {
+      "signIn": "સાઇન-ઇન",
+      "profileOrganizations": "પ્રોફાઇલ અને સંસ્થાઓ"
+    }
   },
   "preferences": {
     "general": "સામાન્ય",
@@ -3328,6 +3336,7 @@
       "manageOnWeb": "વેબ પર બિલિંગ સેટિંગ્સ",
       "changePlan": "પ્લાન બદલો",
       "buySeats": "સીટો ખરીદો",
+      "managedOnWeb": "પ્લાન, સીટો અને ઑટો ટોપ-અપનું સંચાલન વેબ પર થાય છે.",
       "setupAutoTopUp": "ઑટો ટોપ-અપ સેટ કરો",
       "manageAutoTopUp": "ઑટો ટોપ-અપ મેનેજ કરો",
       "opensOnWeb": "વેબ પર ખુલે છે"
@@ -3476,12 +3485,10 @@
       "requestLogs": "રિક્વેસ્ટ લૉગ"
     },
     "requestLogs": {
-      "hint": "વિન્ડો પૂરી થાય તે પહેલાંના કલાકની રિક્વેસ્ટ, સૌથી નવી પહેલાં.",
       "older": "પહેલાંનો કલાક",
       "newer": "પછીનો કલાક",
       "truncated": "આ કલાકમાં સૂચિમાં બતાવેલી કરતાં વધુ રિક્વેસ્ટ છે.",
       "emptyTitle": "કોઈ રિક્વેસ્ટ નથી",
-      "emptyDescription": "આ કલાકમાં કોઈ ગેટવે રિક્વેસ્ટ નથી.",
       "loadError": "રિક્વેસ્ટ લૉગ લોડ કરી શકાયા નહીં.",
       "permissionDenied": "સંસ્થાના રિક્વેસ્ટ લૉગ ફક્ત તેના માલિક, એડમિન અથવા બિલિંગ મેનેજર જ જોઈ શકે છે.",
       "tokens": "{{input}} ઇનપુટ · {{output}} આઉટપુટ",
@@ -4285,8 +4292,7 @@
       "repoValue": "રિપોઝિટરી: {{name}}",
       "profileValue": "પ્રોફાઇલ: {{name}}",
       "profileUnavailable": "આ પ્રોફાઇલ હવે ઉપલબ્ધ નથી. બીજી પસંદ કરો.",
-      "pickerEmptyDescriptionOrganization": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ આદેશ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે સંસ્થા પ્રોફાઇલ બનાવો.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "સંસ્થા માલિક અથવા એડમિન સંસ્થા પ્રોફાઇલ બનાવી શકે છે."
+      "pickerEmptyDescriptionOrganization": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ આદેશ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે સંસ્થા પ્રોફાઇલ બનાવો."
     },
     "variablesDeleteFailed": "ચલ કાઢી શકાયું નથી",
     "deleteVariable": "ચલ {{key}} કાઢી નાખો",
@@ -4472,7 +4478,6 @@
     "dismiss": "રિપોર્ટ ખારિજ કરો",
     "offline": "ઑફલાઇન · સાચવેલ રિપોર્ટ",
     "cached": "સાચવેલ રિપોર્ટ · રિફ્રેશ ઉપલબ્ધ નથી",
-    "window": "{{start}} – {{end}}",
     "summary": "AI સારાંશ",
     "summaryPending": "AI સારાંશ તૈયાર થઈ રહ્યો છે. તૈયાર થયે અહીં જોડાશે.",
     "summaryUnavailable": "AI સારાંશ ઉપલબ્ધ નથી. તમારો માળખાગત રિપોર્ટ હજુ ઉપલબ્ધ છે.",
@@ -4591,6 +4596,7 @@
       "title": "ટ્રિગર્સ અને વેબહૂક્સ",
       "subtitle": "વેબહૂક કૉલ અથવા શેડ્યૂલમાંથી Cloud Agent રન્સને ઑટોમેટ કરો।",
       "new": "નવું ટ્રિગર",
+      "create": "ટ્રિગર બનાવો",
       "emptyTitle": "હજી કોઈ ટ્રિગર નથી",
       "emptyDescription": "વેબહૂક કૉલથી અથવા શેડ્યૂલ પર Cloud Agent રન શરૂ કરવા માટે ટ્રિગર બનાવો।",
       "loadFailedTitle": "ટ્રિગર્સ લોડ કરી શકાયા નથી",
@@ -4644,6 +4650,8 @@
       "created": "ટ્રિગર બન્યો",
       "saved": "ટ્રિગર સાચવ્યો",
       "statusArrived": "આવ્યું",
+      "defaultPromptWebhook": "આ વેબહૂક વિનંતીની બોડીનું વર્ણન કરો:\n\n{{body}}",
+      "defaultPromptScheduled": "નિર્ધારિત કાર્ય ચલાવો. રન {{scheduledTime}} પર શરૂ થયું.",
       "problems": {
         "nameRequired": "નામ દાખલ કરો।",
         "nameTooShort": "ઓછામાં ઓછા 8 અક્ષરો વાપરો।",

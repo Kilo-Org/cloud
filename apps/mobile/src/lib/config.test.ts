@@ -58,10 +58,19 @@ describe('KILO_MCP_URL', () => {
     await expect(mcpUrl()).resolves.toBeUndefined();
   });
 
-  it('uses KILO_MCP_URL when the build supplies one', async () => {
+  it('rejects an insecure KILO_MCP_URL override in a production build', async () => {
     state.extra = {
       ...REQUIRED_EXTRA,
       isProductionBuild: true,
+      kiloMcpUrl: 'http://localhost:8815',
+    };
+    await expect(mcpUrl()).rejects.toThrow(/scheme/);
+  });
+
+  it('accepts the local KILO_MCP_URL override in a development bundle', async () => {
+    vi.stubGlobal('__DEV__', true);
+    state.extra = {
+      ...REQUIRED_EXTRA,
       kiloMcpUrl: 'http://localhost:8815',
     };
     await expect(mcpUrl()).resolves.toBe('http://localhost:8815');

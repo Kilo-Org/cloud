@@ -47,9 +47,9 @@ const createSession = (
 };
 
 const targetHandlers = (overrides: Record<string, () => Record<string, unknown>> = {}) => ({
-  'DOM.describeNode': () => ({ node: { frameId: 'f1' } }),
   'DOM.resolveNode': () => ({ object: { objectId: 'obj-9' } }),
   'Page.createIsolatedWorld': () => ({ executionContextId: 9 }),
+  'Page.getFrameTree': () => ({ frameTree: { frame: { id: 'main' } } }),
   'Runtime.callFunctionOn': () => ({ result: { value: PASSWORD } }),
   ...overrides,
 });
@@ -98,9 +98,9 @@ describe('sensitive classification', () => {
   it('treats every target-probe failure as sensitive', async () => {
     const failures = [
       createSession(targetHandlers(), () => Promise.reject(new Error('resolve failed'))),
-      createSession(targetHandlers({ 'DOM.describeNode': () => ({ node: {} }) })),
-      createSession(targetHandlers({ 'Page.createIsolatedWorld': () => ({}) })),
       createSession(targetHandlers({ 'DOM.resolveNode': () => ({ object: {} }) })),
+      createSession(targetHandlers({ 'Page.createIsolatedWorld': () => ({}) })),
+      createSession(targetHandlers({ 'Page.getFrameTree': () => ({}) })),
       createSession(targetHandlers({ 'Runtime.callFunctionOn': () => ({ result: {} }) })),
       createSession(
         targetHandlers({ 'Runtime.callFunctionOn': () => ({ result: { value: '{x' } }) })

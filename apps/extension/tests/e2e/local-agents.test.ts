@@ -352,3 +352,119 @@ test('a session gets its own tab from the first navigate, without touching the u
     await rm(userDataDir, { force: true, recursive: true });
   }
 });
+
+test('the first navigate loads a single-use destination once', async () => {
+  test.setTimeout(60_000);
+  const hub = await startFakeHub();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+
+    await enableLocalAgents(sidePanel, extensionId);
+    await pairAndHandshake({ context, extensionId, hub, sidePanel });
+
+    const controllerId = crypto.randomUUID();
+    hub.send({ controllerId, type: 'controller.connected' });
+    const opened = await sendAgentRpc(hub, controllerId, 1, 'session.open', {
+      cliVersion: '1.4.0',
+      cwd: '/Users/igor/Projects/kilo-bridge-e2e',
+      sessionId: 'session-once',
+      title: 'Single-use session',
+    });
+    const { sessionHandle } = z.object({ sessionHandle: z.string() }).parse(opened.result);
+    const origin = `http://127.0.0.1:${String(hub.port)}`;
+
+    expect(hub.oncePageHits()).toBe(0);
+
+    const navigated = await sendAgentRpc(hub, controllerId, 2, 'tools.call', {
+      arguments: { url: hub.onceUrl },
+      authorized: [
+        { class: 'navigate', origin },
+        { class: 'read', origin },
+      ],
+      name: 'browser_navigate',
+      sessionHandle,
+    });
+
+    expect(navigated.error).toBeUndefined();
+    expect(toolResultOf(navigated).isError).toBeUndefined();
+    // The tool reports the page it settled on, not the request it made.
+    expect(toolTextOf(navigated)).toContain(hub.onceUrl);
+
+    // The tab was opened at the destination, and the navigate did not request the same URL again.
+    await expect.poll(() => hub.oncePageHits(), { timeout: 10_000 }).toBe(1);
+
+    const snapshot = await sendAgentRpc(hub, controllerId, 3, 'tools.call', {
+      arguments: {},
+      authorized: [{ class: 'read', origin }],
+      name: 'browser_snapshot',
+      sessionHandle,
+    });
+
+    expect(toolTextOf(snapshot)).toContain('Bridge page');
+    expect(hub.oncePageHits()).toBe(1);
+  } finally {
+    await context.close();
+    await hub.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('a session refuses a first navigate to a URL no grant can name', async () => {
+  test.setTimeout(60_000);
+  const hub = await startFakeHub();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+
+    await enableLocalAgents(sidePanel, extensionId);
+    await pairAndHandshake({ context, extensionId, hub, sidePanel });
+
+    const controllerId = crypto.randomUUID();
+    hub.send({ controllerId, type: 'controller.connected' });
+    const opened = await sendAgentRpc(hub, controllerId, 1, 'session.open', {
+      cliVersion: '1.4.0',
+      cwd: '/Users/igor/Projects/kilo-bridge-e2e',
+      sessionId: 'session-off-grant',
+      title: 'Off-grant session',
+    });
+    const { sessionHandle } = z.object({ sessionHandle: z.string() }).parse(opened.result);
+    const origin = `http://127.0.0.1:${String(hub.port)}`;
+
+    const before = z
+      .array(z.object({ id: z.number(), url: z.string() }))
+      .parse(await listOpenTabs(sidePanel));
+
+    const refused = await sendAgentRpc(hub, controllerId, 2, 'tools.call', {
+      arguments: { url: 'data:text/html,<h1>off-grant</h1>' },
+      authorized: [{ class: 'navigate', origin }],
+      name: 'browser_navigate',
+      sessionHandle,
+    });
+
+    // Fail closed: a URL the debugger could never attach to is refused as blocked, before any tab exists.
+    expect(refused.error).toMatchObject({ code: -32_011 });
+
+    const after = z
+      .array(z.object({ id: z.number(), url: z.string() }))
+      .parse(await listOpenTabs(sidePanel));
+
+    expect(after.filter(tab => !before.some(previous => previous.id === tab.id))).toHaveLength(0);
+  } finally {
+    await context.close();
+    await hub.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});

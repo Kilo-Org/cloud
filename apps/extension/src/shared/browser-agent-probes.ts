@@ -52,33 +52,14 @@ const frameTreeSchema = z.object({
   frameTree: z.object({ frame: z.object({ id: z.string() }) }),
 });
 
-const describeNodeSchema = z.object({
-  node: z.object({ frameId: z.string().optional() }).optional(),
-});
-
-/** The frame a resolved target lives in, so the probe can run in that frame's isolated world. */
-const targetFrameId = async (
-  session: ProbeSession,
-  resolved:
-    | { readonly kind: 'ref'; readonly backendNodeId: number }
-    | { readonly kind: 'selector'; readonly nodeId: number }
-): Promise<string | undefined> => {
-  try {
-    const parsed = describeNodeSchema.safeParse(
-      await session.send(
-        'DOM.describeNode',
-        resolved.kind === 'ref'
-          ? { backendNodeId: resolved.backendNodeId }
-          : { nodeId: resolved.nodeId }
-      )
-    );
-
-    return parsed.success ? parsed.data.node?.frameId : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
+/**
+ * The world a target is probed in: the tab's own frame. `DOM.describeNode`
+ * reports a frame id only for frame-owner elements, so a node's own frame
+ * cannot be read from the node; it does not matter here, because a node from a
+ * child document resolves into this world as a handle of this world, whose
+ * `Node` prototype page script cannot shadow. Where the node lives is decided
+ * by the gate's grant check, not by this probe.
+ */
 const mainFrameId = async (
   session: Pick<BrowserToolPageSession, 'send'>
 ): Promise<string | undefined> => {
@@ -481,7 +462,7 @@ export const classifyTargetElement = async (
       return { cause: 'the selector matches several elements', kind: 'unknown' };
     }
 
-    const frameId = await targetFrameId(session, resolved);
+    const frameId = await mainFrameId(session);
 
     if (frameId === undefined) {
       return { cause: 'the target frame could not be read', kind: 'unknown' };

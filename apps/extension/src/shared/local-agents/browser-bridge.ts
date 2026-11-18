@@ -8,7 +8,7 @@ import {
 } from '../browser-agent-checks';
 import type { BrowserCaller } from '../browser-caller';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
-import { navigateDestinationItem, tabsNewDestinationItem } from '../browser-agent-gate';
+import { navigateDestinationCheck, tabsNewDestinationCheck } from '../browser-agent-gate';
 import type { BrowserRuntime } from '../browser-runtime';
 import { BROWSER_TOOL_CONTRACT } from '../browser-tool-contract';
 import { boundBrowserToolText } from '../browser-tool-snapshot';
@@ -274,8 +274,14 @@ export const createRuntimeBrowserBridge = ({
   const runOnTab = async (
     parsed: z.infer<typeof toolCallSchema>,
     input: LocalAgentBrowserSessionRef,
-    tabId: number
+    /**
+     * The tab the call runs on. `navigationCommitted` means the caller opened
+     * that tab at this call's destination and it has committed, so the tool
+     * must read the settled page instead of navigating again.
+     */
+    tab: { readonly navigationCommitted?: boolean; readonly tabId: number }
   ): Promise<JsonRpcResult> => {
+    const { tabId } = tab;
     const caller = sessionCaller(input);
     const outcome = await runtime()
       .runTool({
@@ -285,6 +291,7 @@ export const createRuntimeBrowserBridge = ({
         },
         arguments: parsed.arguments,
         caller,
+        ...(tab.navigationCommitted === true ? { navigationCommitted: true } : {}),
         tabId,
         toolName: parsed.name,
       })
@@ -367,14 +374,18 @@ export const createRuntimeBrowserBridge = ({
         throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, NO_TAB_ERROR);
       }
 
-      // The page tools gate `new` on the destination origin; with no tab to gate on, that check runs here.
-      const missing = tabsNewDestinationItem(parsed.arguments, parsed.authorized);
+      // The page tools gate `new` on the destination origin; with no tab to gate on, that check runs here — and a destination no grant can name is refused rather than opened.
+      const check = tabsNewDestinationCheck(parsed.arguments, parsed.authorized);
 
-      if (missing !== undefined) {
+      if (check.kind === 'blocked') {
+        throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, check.error);
+      }
+
+      if (check.kind === 'needs_permission') {
         throw new LocalAgentRpcError(
           LOCAL_AGENT_ERROR_CODES.needsPermission,
           NEEDS_PERMISSION_ERROR,
-          { items: [missing] }
+          { items: [check.item] }
         );
       }
 
@@ -410,13 +421,17 @@ export const createRuntimeBrowserBridge = ({
     }
 
     // The gate's navigate check runs first: a refused navigation must not leave a tab behind.
-    const missing = navigateDestinationItem(parsed.arguments, parsed.authorized);
+    const check = navigateDestinationCheck(parsed.arguments, parsed.authorized);
 
-    if (missing !== undefined) {
+    if (check.kind === 'blocked') {
+      throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, check.error);
+    }
+
+    if (check.kind === 'needs_permission') {
       throw new LocalAgentRpcError(
         LOCAL_AGENT_ERROR_CODES.needsPermission,
         NEEDS_PERMISSION_ERROR,
-        { items: [missing] }
+        { items: [check.item] }
       );
     }
 
@@ -430,7 +445,8 @@ export const createRuntimeBrowserBridge = ({
       throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.blocked, NO_TAB_ERROR);
     }
 
-    return runOnTab(parsed, input, opened.tabId);
+    // The navigation already happened: the tab was opened at this URL and committed, so the tool only reads the settled page. Requesting the same URL twice would spend a single-use destination (a reset link, an OAuth callback) before the call that was approved.
+    return runOnTab(parsed, input, { navigationCommitted: true, tabId: opened.tabId });
   };
 
   return {
@@ -460,7 +476,7 @@ export const createRuntimeBrowserBridge = ({
       // An agent gets its own tab rather than taking the user's; only the two tools that can start one do.
       return existing === undefined
         ? callOnOwnTab(parsed.data, input)
-        : runOnTab(parsed.data, input, existing);
+        : runOnTab(parsed.data, input, { tabId: existing });
     },
 
     closeSession: closeOne,

@@ -5,6 +5,7 @@ import { createBrowserRuntime } from './browser-runtime';
 import type { BrowserRuntime } from './browser-runtime';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from './browser-caller';
 import type { BrowserCaller } from './browser-caller';
+import type { BrowserToolTabsApi } from './browser-tool-session';
 import type {
   BrowserTabInfo,
   BrowserTabsApi,
@@ -393,5 +394,29 @@ describe('browser runtime', () => {
     });
     expect(debugger_.attachCalls()).toBe(2);
     expect(debugger_.detachCalls()).toBe(1);
+  });
+});
+
+describe('opening a session tab', () => {
+  it('reports the requested url when the browser reports an empty one', async () => {
+    // `tabs.create` resolves with `url: ''` while the navigation is pending; the requested url is the honest answer.
+    const tabsApi: BrowserTabsApi & { create: NonNullable<BrowserToolTabsApi['create']> } = {
+      create: async () => ({ id: 21, title: '', url: '' }),
+      get: async () => ({ id: 21, status: 'complete', url: 'about:blank' }) as BrowserTabInfo,
+      query: async () => [{ active: true, id: TAB_ID, windowId: 1 }],
+    };
+    const runtime = createBrowserRuntime({
+      debuggerApi: undefined,
+      leases: createTabLeaseRegistry({}),
+      scriptingApi: undefined,
+      tabsApi,
+    });
+
+    const opened = await runtime.openSessionTab({
+      sessionHandle: 'session-1',
+      url: 'https://once.example/reset?t=1',
+    });
+
+    expect(opened?.url).toBe('https://once.example/reset?t=1');
   });
 });

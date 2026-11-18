@@ -93,8 +93,7 @@ const createSession = ({
         const frameId = params?.['frameId'];
 
         return {
-          nodes:
-            (typeof frameId === 'string' ? axNodesByFrame?.[frameId] : undefined) ?? axNodes,
+          nodes: (typeof frameId === 'string' ? axNodesByFrame?.[frameId] : undefined) ?? axNodes,
         };
       }
 

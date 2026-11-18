@@ -284,6 +284,8 @@ describe('local agent browser bridge', () => {
     expect(fake.run).toHaveLength(1);
     expect(fake.run[0]).toMatchObject({
       caller: { sessionHandle: HANDLE },
+      // The tab was opened at the destination: the tool reads the settled page instead of requesting the same URL twice.
+      navigationCommitted: true,
       tabId: 77,
       toolName: 'browser_navigate',
     });
@@ -291,6 +293,26 @@ describe('local agent browser bridge', () => {
     // A tab the agent opens for itself is not a share: the user's active tab is never even read.
     expect(activeTabId).not.toHaveBeenCalled();
     expect(fake.disposedTabs).toStrictEqual([]);
+  });
+
+  it('refuses a first navigate to a URL no grant can name and opens nothing', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
+
+    const blocked = await rejectionOf(
+      bridge.callTool(CONTROLLER, {
+        ...navigateParams(),
+        arguments: { url: 'data:text/html,<h1>off-grant</h1>' },
+        authorized: [],
+      })
+    );
+
+    expect(blocked).toMatchObject({ code: LOCAL_AGENT_ERROR_CODES.blocked });
+    // No grant can cover a page the debugger could not attach to, so no tab is left behind.
+    expect(fake.ownTabs).toStrictEqual([]);
+    expect(fake.run).toStrictEqual([]);
   });
 
   it('opens no tab at all when the navigate is refused', async () => {
@@ -377,6 +399,25 @@ describe('local agent browser bridge', () => {
       code: LOCAL_AGENT_ERROR_CODES.needsPermission,
       data: { items: [{ class: 'navigate', origin: 'https://pay.example.com' }] },
     });
+    expect(fake.ownTabs).toStrictEqual([]);
+  });
+
+  it('refuses browser_tabs new at a URL no grant can name', async () => {
+    const fake = createFakeRuntime();
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await bridge.openSession({ controllerId: CONTROLLER, sessionHandle: HANDLE, title: 'Work' });
+
+    const blocked = await rejectionOf(
+      bridge.callTool(CONTROLLER, {
+        arguments: { action: 'new', url: 'view-source:https://app.example.com/' },
+        authorized: [{ class: 'navigate', origin: 'https://app.example.com' }],
+        name: 'browser_tabs',
+        sessionHandle: HANDLE,
+      })
+    );
+
+    expect(blocked).toMatchObject({ code: LOCAL_AGENT_ERROR_CODES.blocked });
     expect(fake.ownTabs).toStrictEqual([]);
   });
 

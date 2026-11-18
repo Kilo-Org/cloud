@@ -23,6 +23,9 @@ export type FakeHub = {
   close(): Promise<void>;
   connected: boolean;
   frames: FakeHubFrame[];
+  /** A single-use page: its document loads are counted, so a second request is visible. */
+  oncePageHits(): number;
+  onceUrl: string;
   origin: string | undefined;
   /** A plain HTML page the agent can navigate to; same loopback host as the pairing URL. */
   pageUrl: string;
@@ -50,6 +53,8 @@ export const FAKE_HUB_ID = HUB_ID;
 type PairingState = {
   allowedOrigin: string | null;
   key: string | null;
+  /** Document requests the one-time page has served: a second load would mean the URL was requested twice. */
+  oncePageHits: number;
   token: string | null;
   wsUrl: string;
 };
@@ -154,6 +159,15 @@ const startServer = async (state: PairingState): Promise<Server> => {
       return;
     }
 
+    // A single-use destination: the first document load is the one the agent asked for, a second one would spend it again.
+    if (url.pathname === '/once') {
+      state.oncePageHits += 1;
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      response.end(AGENT_PAGE_HTML);
+
+      return;
+    }
+
     response.writeHead(404);
     response.end();
   };
@@ -168,7 +182,13 @@ const startServer = async (state: PairingState): Promise<Server> => {
 };
 
 export const startFakeHub = async (): Promise<FakeHub> => {
-  const state: PairingState = { allowedOrigin: null, key: null, token: null, wsUrl: '' };
+  const state: PairingState = {
+    allowedOrigin: null,
+    key: null,
+    oncePageHits: 0,
+    token: null,
+    wsUrl: '',
+  };
   const server = await startServer(state);
   const address = server.address();
   const port = typeof address === 'object' && address !== null ? address.port : 0;
@@ -180,6 +200,8 @@ export const startFakeHub = async (): Promise<FakeHub> => {
     },
     connected: false,
     frames: [],
+    oncePageHits: () => state.oncePageHits,
+    onceUrl: `http://127.0.0.1:${port}/once`,
     origin: undefined,
     pageUrl: `http://127.0.0.1:${port}/page`,
     setAllowedOrigin: () => {

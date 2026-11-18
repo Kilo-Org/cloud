@@ -53,6 +53,12 @@ export interface BrowserToolRunInput {
   readonly agent?: BrowserAgentCallContext | undefined;
   readonly arguments: unknown;
   readonly caller: BrowserCaller;
+  /**
+   * The caller opened this tab at the call's destination and the tab has
+   * committed: a `browser_navigate` reads the settled page instead of
+   * requesting the same URL again.
+   */
+  readonly navigationCommitted?: boolean | undefined;
   readonly options?:
     | Pick<BrowserToolDispatchOptions, 'now' | 'webMcpDiscover' | 'webMcpExecute'>
     | undefined;
@@ -179,6 +185,10 @@ export interface BrowserRuntime {
   readonly shareActiveTab: (input: BrowserShareTabInput) => Promise<BrowserShareTabResult>;
 }
 
+/** How long a session waits for a tab it opened to commit, and how often it re-reads the tab while it waits. */
+const TAB_COMMIT_TIMEOUT_MS = 10_000;
+const TAB_COMMIT_POLL_MS = 50;
+
 const disposeBrowserToolSession = async (
   sessions: Map<number, BrowserToolSession>,
   tabId: number
@@ -278,10 +288,95 @@ export const createBrowserRuntime = ({
     }
   };
 
+  /** A tab's commit progress: `status`/`pendingUrl` say whether a navigation is still in flight. */
+  interface TabProgress {
+    readonly pendingUrl?: string;
+    readonly status?: string;
+    readonly url?: string;
+  }
+  type TabUpdateListener = (tabId: number, changeInfo: TabProgress, tab?: TabProgress) => void;
+
+  /** One tab's commit state; undefined when the tab is gone. */
+  const tabProgressOf = async (tabId: number): Promise<TabProgress | undefined> => {
+    const get = tabsApi.get?.bind(tabsApi);
+
+    if (get === undefined) {
+      return undefined;
+    }
+
+    try {
+      // `chrome.tabs.Tab` carries `status` and `pendingUrl`, which the narrow tabs interface does not model.
+      const tab: TabProgress = await get(tabId);
+
+      return tab;
+    } catch {
+      // A closed or never-existing tab id.
+      return undefined;
+    }
+  };
+
+  /**
+   * Waits until the tab's own document has committed to a page the debugger can
+   * attach to. Chrome creates a tab on `about:blank` and commits the requested
+   * navigation a moment later — on a loaded CI runner longer than any fixed
+   * sleep — so this wakes on `tabs.onUpdated` and re-reads the tab as a safety
+   * net when the event is missed. Bounded: a tab that never commits yields
+   * `undefined`, and a loaded tab at a URL no grant can name is final at once.
+   */
+  const committedTabUrl = async (tabId: number): Promise<string | undefined> => {
+    const updated = tabsApi.onUpdated;
+    const deadline = Date.now() + TAB_COMMIT_TIMEOUT_MS;
+
+    for (;;) {
+      // eslint-disable-next-line no-await-in-loop -- one read per round trip, in commit order
+      const tab = await tabProgressOf(tabId);
+
+      if (tab === undefined) {
+        return undefined;
+      }
+
+      if (isInspectablePageUrl(tab.url)) {
+        return tab.url;
+      }
+
+      // Only positive evidence of a navigation in flight is worth waiting for: a loaded tab at a URL no grant can name (a `chrome://` page, a user's `about:blank`) will not become inspectable.
+      if (tab.pendingUrl === undefined && tab.status !== 'loading') {
+        return undefined;
+      }
+
+      if (Date.now() >= deadline) {
+        return undefined;
+      }
+
+      const { promise: wake, resolve: signal } = Promise.withResolvers<void>();
+      const listener: TabUpdateListener = changedTabId => {
+        if (changedTabId === tabId) {
+          signal();
+        }
+      };
+      const timer = setTimeout(signal, TAB_COMMIT_POLL_MS);
+
+      updated?.addListener(listener);
+
+      try {
+        // eslint-disable-next-line no-await-in-loop -- one bounded wait for the tab's next change
+        await wake;
+      } finally {
+        clearTimeout(timer);
+        updated?.removeListener(listener);
+      }
+    }
+  };
+
   const reachable = async (tabId: number): Promise<EvalTabResult | undefined> => {
     const reach = await getInspectableTab({ tabId, tabsApi });
 
     if (reach.ok) {
+      return undefined;
+    }
+
+    // A tab the browser opened for a page is `about:blank` until its document commits; that is a page still loading, not a tab out of reach.
+    if ((await committedTabUrl(tabId)) !== undefined) {
       return undefined;
     }
 
@@ -360,6 +455,7 @@ export const createBrowserRuntime = ({
     agent,
     arguments: toolArguments,
     caller,
+    navigationCommitted,
     options,
     tabId,
     takeOver,
@@ -405,9 +501,20 @@ export const createBrowserRuntime = ({
 
       // A taken call stops issuing commands instead of interleaving them with the panel's.
       // The guard is read before every command this call sends.
-      const session = sessionFor(tabId).bindCaller(browserCallerKey(caller), {
+      const tabSession = sessionFor(tabId).bindCaller(browserCallerKey(caller), {
         cancelled: () => taken,
       });
+      // The tab was opened at this call's destination and has committed, so the navigate must read the settled page rather than request the URL a second time: a single-use destination would be spent by the first load. Everything else the tool does (identity, redirect check, withheld frames) runs unchanged.
+      const session =
+        navigationCommitted === true
+          ? {
+              ...tabSession,
+              send: (method: string, params?: Record<string, unknown>, sessionId?: string) =>
+                method === 'Page.navigate'
+                  ? Promise.resolve<Record<string, unknown> | undefined>({})
+                  : tabSession.send(method, params, sessionId),
+            }
+          : tabSession;
 
       try {
         const agentContext = caller.kind === 'agent' ? (agent ?? { authorized: [] }) : undefined;
@@ -648,33 +755,6 @@ export const createBrowserRuntime = ({
   };
 
   /**
-   * The url a just-created tab actually shows. Chrome commits a navigation a
-   * moment after `tabs.create` resolves, and a tab without an http(s) url is not
-   * inspectable, so the first tool call would be refused if it ran too early.
-   * Bounded: a tab that never commits keeps the url it was asked for.
-   */
-  const committedUrl = async (tabId: number, requested: string | undefined): Promise<string> => {
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      // eslint-disable-next-line no-await-in-loop -- the commit is asynchronous; one short read per attempt
-      const tab = await tabsApi.get?.(tabId);
-
-      if (isInspectablePageUrl(tab?.url)) {
-        return tab.url;
-      }
-
-      if (attempt < 19) {
-        const { promise, resolve } = Promise.withResolvers<void>();
-
-        setTimeout(resolve, 100);
-        // eslint-disable-next-line no-await-in-loop -- see above
-        await promise;
-      }
-    }
-
-    return requested ?? 'about:blank';
-  };
-
-  /**
    * Opens the session's own tab: inactive, in the last focused window, and in
    * the session's `Kilo · <title>` group. The user's current tab keeps focus,
    * which is the whole point of an agent never taking a tab it did not make.
@@ -702,11 +782,14 @@ export const createBrowserRuntime = ({
 
     // Sharing the tab is what titles and colours the group; the tab is not activated by it.
     const shared = await groups.shareActiveTab({ sessionHandle, tabId: created.id });
+    // `tabs.create` resolves with `url: ''` while the navigation is pending, so an empty url is absent and the requested one is the honest fallback.
+    const requestedUrl = created.url === undefined || created.url === '' ? url : created.url;
+    const settledUrl = await committedTabUrl(created.id);
 
     return {
       tabId: created.id,
       title: created.title ?? '',
-      url: await committedUrl(created.id, created.url ?? url),
+      url: settledUrl ?? requestedUrl ?? 'about:blank',
       ...(shared.groupId === undefined ? {} : { groupId: shared.groupId }),
     };
   };

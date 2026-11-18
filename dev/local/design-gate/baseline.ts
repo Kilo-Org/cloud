@@ -250,11 +250,11 @@ function generatedFiles(
       : '  const insets = useSafeAreaInsets();\n';
     // A painted diagnostic measures against the window origin, so its top text
     // would draw into the status-bar inset the product screens keep clear; a
-    // hook runs unconditionally first and the pad keeps the component inside
-    // the safe area.
+    // hook runs unconditionally first, and the wrapper fills the window while
+    // the pad lifts the component inside the safe area.
     const screen = presents
       ? `React.createElement(\n      React.Fragment,\n      null,\n      React.createElement(Stack.Screen, { options }),\n      React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}))\n    )`
-      : `React.createElement(\n      View,\n      { style: { paddingTop: insets.top } },\n      React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}))\n    )`;
+      : `React.createElement(\n      View,\n      { style: { flex: 1, paddingTop: insets.top } },\n      React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}))\n    )`;
     files.set(
       file,
       `// Temporary generated design-proof diagnostic, not product source.\n${imports}import ComponentBinding from ${JSON.stringify(componentImport)};\nexport default function DesignProofFixture() {\n${presentation}  if (!__DEV__) return React.createElement(Redirect, { href: '/(auth)/login' });\n  return ${screen};\n}\n`.replace(

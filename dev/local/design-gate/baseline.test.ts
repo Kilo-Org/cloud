@@ -267,7 +267,7 @@ test('a painted diagnostic pads the screen with the top safe-area inset', async 
   );
   assert.match(
     route,
-    /React\.createElement\(\n {6}View,\n {6}\{ style: \{ paddingTop: insets\.top \} \},\n {6}React\.createElement\(Component, JSON\.parse\("\{\\"title\\":\\"Diagnostic data\\"\}"\)\)\n {4}\)/u
+    /React\.createElement\(\n {6}View,\n {6}\{ style: \{ flex: 1, paddingTop: insets\.top \} \},\n {6}React\.createElement\(Component, JSON\.parse\("\{\\"title\\":\\"Diagnostic data\\"\}"\)\)\n {4}\)/u
   );
 });
 

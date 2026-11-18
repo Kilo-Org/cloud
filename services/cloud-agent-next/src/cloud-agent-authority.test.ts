@@ -18,6 +18,7 @@ import {
   validateScopedWorkerPreparation,
   workspaceMcpAnchorSessionId,
 } from './cloud-agent-authority.js';
+import { logger } from './logger.js';
 
 const { renew, seal } = vi.hoisted(() => ({ renew: vi.fn(), seal: vi.fn() }));
 vi.mock('@kilocode/worker-utils/runtime-authorization', async importActual => ({
@@ -641,16 +642,16 @@ describe('Cloud Agent spawn authority', () => {
     { state: 'active', time: scope.expiresAt * 1000, reason: 'delegation_expired' },
     { state: 'revoked', time: now.getTime(), reason: 'stored_authorization_revoked' },
   ] as const)('skips MCP grant issuance for $reason', async ({ state, time, reason }) => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     const { context, authorization } = fixture();
     vi.setSystemTime(time);
     authorization.state = state;
 
     await expect(issueCloudAgentMcpGrant(context)).resolves.toBeUndefined();
     expect(renew).not.toHaveBeenCalled();
-    expect(log).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionId: parentSessionId, stage: 'mcp_grant', reason })
-    );
+    expect(fields).toHaveBeenCalledWith({ sessionId: parentSessionId, stage: 'mcp_grant', reason });
+    expect(warn).toHaveBeenCalledWith('Runtime authorization diagnostic');
   });
 
   it.each([

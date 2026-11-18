@@ -23,7 +23,13 @@ describe('Watchwood browser signup', () => {
   let cleanup: () => void;
   const fetchMock = jest.fn<typeof fetch>();
   const initialize =
-    jest.fn<(options: { org_id: string; safety_identifier: string }) => Promise<unknown>>();
+    jest.fn<
+      (options: {
+        org_id: string;
+        safety_identifier: string;
+        force_ipv4: boolean;
+      }) => Promise<unknown>
+    >();
   const getToken = jest.fn<() => Promise<unknown>>();
 
   function installSdk() {
@@ -157,6 +163,7 @@ describe('Watchwood browser signup', () => {
     expect(initialize).toHaveBeenCalledWith({
       org_id: enabledContext.org_id,
       safety_identifier: enabledContext.safety_identifier,
+      force_ipv4: true,
     });
     expect(getToken).not.toHaveBeenCalled();
     expect(jest.getTimerCount()).toBe(0);
@@ -177,10 +184,13 @@ describe('Watchwood browser signup', () => {
     await submit();
 
     expect(getToken).toHaveBeenCalledTimes(2);
+    const initialized = (context: typeof enabledContext) => [
+      { org_id: context.org_id, safety_identifier: context.safety_identifier, force_ipv4: true },
+    ];
     expect(initialize.mock.calls).toEqual([
-      [{ org_id: enabledContext.org_id, safety_identifier: enabledContext.safety_identifier }],
-      [{ org_id: renewedContext.org_id, safety_identifier: renewedContext.safety_identifier }],
-      [{ org_id: renewedContext.org_id, safety_identifier: renewedContext.safety_identifier }],
+      initialized(enabledContext),
+      initialized(renewedContext),
+      initialized(renewedContext),
     ]);
     const postedBodies = fetchMock.mock.calls
       .filter(([, options]) => options?.method === 'POST')

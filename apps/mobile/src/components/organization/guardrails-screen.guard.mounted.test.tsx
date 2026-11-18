@@ -6,7 +6,7 @@
 // `profile-overview-screen.guard.mounted.test.tsx` drives it. The sections are
 // stubs that forward their `onChange`, so the suite exercises the form's dirty
 // accounting, not the sections' internal editors (they have their own suites).
-import { createElement } from 'react';
+import { createElement, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GuardrailsForm } from './guardrails-form';
@@ -27,6 +27,8 @@ const h = vi.hoisted(() => ({
       | undefined,
   },
   mutateAsync: vi.fn(),
+  /** Assigned by the harness; feeds the form the payload a settled save would deliver. */
+  setData: null as ((next: OrgGuardrails) => void) | null,
   /** The edit callback the stubbed input section forwards to the form. */
   sectionOnChange: null as ((update: (current: GuardrailsDraft) => GuardrailsDraft) => void) | null,
 }));
@@ -234,9 +236,19 @@ function editInputToggle(): void {
 }
 
 async function mountForm() {
-  const { renderer, unmount } = await renderWithProviders(
-    createElement(GuardrailsForm, { organizationId: 'org-1', data: payload() })
-  );
+  // The form reads its saved configuration through `data`, the way production
+  // delivers the mutation's cache write. The holder lets a test feed the new
+  // payload after a save, so the form sees the same prop a refetch would.
+  function Harness() {
+    const [data, setData] = useState(() => payload());
+    h.setData = (next: OrgGuardrails) => {
+      act(() => {
+        setData(next);
+      });
+    };
+    return createElement(GuardrailsForm, { organizationId: 'org-1', data });
+  }
+  const { renderer, unmount } = await renderWithProviders(createElement(Harness));
   openUnmounts.push(unmount);
   return renderer;
 }
@@ -248,6 +260,7 @@ beforeEach(() => {
   h.guard.enabled = false;
   h.guard.handler = undefined;
   h.mutateAsync.mockReset();
+  h.setData = null;
   h.sectionOnChange = null;
 });
 
@@ -320,13 +333,20 @@ describe('GuardrailsForm leave guard', () => {
   });
 
   it('disarms the guard once a save settles, so Back leaves without asking', async () => {
-    h.mutateAsync.mockResolvedValue({ ...payload(), enabled: false });
+    const saved = { ...payload(), enabled: false };
+    h.mutateAsync.mockResolvedValue(saved);
     const renderer = await mountForm();
 
     editInputToggle();
     expect(h.guard.enabled).toBe(true);
 
     pressLabelledButton(renderer.root, i18n.t('common.save'));
+    // Production delivers the saved configuration through the query cache, so
+    // the form's `data` prop moves with it; the holder replays that write.
+    if (!h.setData) {
+      throw new Error('the harness did not mount');
+    }
+    h.setData(saved);
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();

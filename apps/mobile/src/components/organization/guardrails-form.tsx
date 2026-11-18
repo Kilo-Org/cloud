@@ -66,9 +66,9 @@ export function GuardrailsForm({
 
   // A refetch that moved the server's configuration rebases the form, unless
   // the form holds edits of its own: those win, and the next save replaces the
-  // newer settings. The rebase does not change the reader's edits, so the
-  // guard's flag follows the edits it already had: a clean form stays clean
-  // (Back never asks), a dirty form stays dirty against the new baseline.
+  // newer settings. The guard follows the real dirty computation over the new
+  // baseline: edits that the rebased configuration now equals report clean, so
+  // Back never asks about a form whose Save and Cancel are both disabled.
   if (serverKey !== syncedKey) {
     setSyncedKey(serverKey);
     const next = toDraft(config);
@@ -76,10 +76,8 @@ export function GuardrailsForm({
     setBaseline(next);
     if (clean) {
       replaceDraft(next);
-      guard.handleDirtyChange(false);
-    } else {
-      guard.handleDirtyChange(true);
     }
+    guard.handleDirtyChange(!draftsEqual(draft, next, outputAvailable));
   }
 
   const issues = guardrailsIssues(draft, outputAvailable);

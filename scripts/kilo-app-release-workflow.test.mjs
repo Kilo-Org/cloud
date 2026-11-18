@@ -1824,6 +1824,8 @@ test('the changelog history workflow rewrites through the mint and opens a PR', 
   assert.equal(history.on.push, undefined, 'a push must never rewrite the shipped notes');
   assert.equal(history.permissions.contents, 'write');
   assert.equal(history.permissions['pull-requests'], 'write');
+  // `gh pr create --assignee` is an Issues API operation.
+  assert.equal(history.permissions.issues, 'write', 'the PR assignee needs issues: write');
 
   const jobSteps = history.jobs.rewrite.steps;
   const mint = jobSteps.find(item => item.id === 'mint');
@@ -1837,6 +1839,12 @@ test('the changelog history workflow rewrites through the mint and opens a PR', 
   );
   assert.ok(rewrite, 'the history workflow must run the rewrite script');
   assert.equal(rewrite.env.KILO_CHANGELOG_API_KEY, '${{ steps.mint.outputs.token }}');
+  // A partial rewrite (exit 3) is recorded and the PR step still lands what it
+  // has; any other failure code fails the job before the PR is opened.
+  assert.match(rewrite.run, /set \+e/, 'the rewrite step must read the exit code itself');
+  assert.match(rewrite.run, /status=\$\{PIPESTATUS\[0\]\}/);
+  assert.match(rewrite.run, /\[ "\$status" -ne 3 \][\s\S]*exit "\$status"/);
+  assert.match(rewrite.run, />> "\$GITHUB_STEP_SUMMARY"/);
 
   const open = jobSteps.find(item => item.run?.includes('gh pr create'));
   assert.ok(open, 'the history workflow must open the changelog PR');

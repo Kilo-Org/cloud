@@ -399,7 +399,9 @@ const NOTES_PROMPT = [
   'there are none.',
   '',
   `areas: at most 3 product areas the fixes touched, as exact keys from this list:`,
-  `${CURATED_AREAS.join(', ')}. Use [] when the build shipped no fixes.`,
+  `${CURATED_AREAS.join(', ')}. Use [] when the build shipped no fixes, and leave`,
+  'out a fix whose area above reads "app": it belongs to no named area. When no',
+  'fix names one, the notes read "Bug fixes and polish.", so [] is correct then.',
   '',
   'No line may contain a URL, a pull request reference such as (#123), backticks,',
   'an identifier (snake_case, camelCase or a file name), a commit type prefix such',
@@ -472,7 +474,11 @@ const CODE_IN_LINE = [
   /^(?:feat|fix|perf|chore|docs|test|build|ci|refactor|style|revert)(?:\([^)]*\))?!?:/i,
 ];
 const URL_IN_LINE = /https?:\/\/|www\./i;
-const PULL_REQUEST_IN_LINE = /(?:^|\s)\(#\d+\)|\[#\d+\]|\bpull\/\d+\b|#\d+/;
+// The reference shapes a commit subject carries: a linked `([#123](url))`, a
+// bare reference `(#123)`, `[#123]`, a `pull/123` path, and a `#123` that ends
+// the line or closes a parenthesis. A sentence that counts something ("ranked
+// #1 for speed") is not a pull request, so it is left alone.
+const PULL_REQUEST_IN_LINE = /\(#\d+\)|\[#\d+\]|\bpull\/\d+\b|(?:^|\s)#\d+(?=$|\))/;
 
 /** The reason `line` cannot be printed as a note, or null when it can. */
 export function noteLineProblem(line) {
@@ -532,30 +538,32 @@ export function validateCuratedNotes(payload, candidates) {
       return { error: `the answer contained ${problem}: ${line}` };
     }
   }
-  if (lines.length === 0 && areas.length === 0) {
+  const hasFixes = candidates.some(candidate => candidate.kind === 'fix');
+  if (lines.length === 0 && areas.length === 0 && !hasFixes) {
     return { error: 'the answer named no new line, no change and no area' };
   }
-  // A build with fixes names the areas those fixes touched, and a build without
-  // them names none: the fixes line is what the answer replaces, so a wrong
-  // count would tell the reader the release did something it did not.
-  const hasFixes = candidates.some(candidate => candidate.kind === 'fix');
-  if (hasFixes !== areas.length > 0) {
-    return {
-      error: hasFixes
-        ? 'the answer named no area for a build that shipped fixes'
-        : 'the answer named an area for a build that shipped no fixes',
-    };
+  // A build without fixes names no area: the fixes line is what the answer
+  // replaces, so an area there would tell the reader the release did something
+  // it did not. A build with fixes may name none — an unmapped fix belongs to
+  // no product area — and its line then reads as bug fixes and polish.
+  if (!hasFixes && areas.length > 0) {
+    return { error: 'the answer named an area for a build that shipped no fixes' };
   }
   return {
     notes: {
       new: news.map(cleanNoteLine),
       changes: changes.map(cleanNoteLine),
       areas: orderedAreas(new Set(areas)),
+      hasFixes,
     },
   };
 }
 
-/** The block a curated version writes: New, then Changes, then the fixes areas. */
+/**
+ * The block a curated version writes: New, then Changes, then the fixes line.
+ * A build whose fixes name no product area writes the generic `app` tag, which
+ * the screen reads as "Bug fixes and polish.".
+ */
 export function curatedBodyLines(notes) {
   const lines = [];
   if (notes.new.length > 0) {
@@ -567,11 +575,12 @@ export function curatedBodyLines(notes) {
     }
     lines.push('### Changes', '', ...notes.changes.map(change => `- ${change}`));
   }
-  if (notes.areas.length > 0) {
+  if (notes.hasFixes) {
     if (lines.length > 0) {
       lines.push('');
     }
-    lines.push('### Fixes', '', `- areas: ${notes.areas.join(', ')}`);
+    const named = notes.areas.length === 0 ? AREA_MAP.generic : notes.areas.join(', ');
+    lines.push('### Fixes', '', `- areas: ${named}`);
   }
   return lines;
 }

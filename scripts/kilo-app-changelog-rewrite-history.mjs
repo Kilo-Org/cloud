@@ -21,13 +21,17 @@
  * `.github/workflows/kilo-app-changelog-history.yml` runs this script with a
  * token minted from the existing `MCP_CATALOG_TOKEN_SECRET` shared secret and
  * opens the resulting PR. The file is written even when some versions failed
- * validation, so a second run retries only those, and the run exits 1.
+ * validation, so a second run retries only those, and the run exits 3 (partial)
+ * rather than 1 when at least one version was curated.
  *
  * Exit codes:
  *   0 - every reader-facing version is curated
- *   1 - the changelog could not be read or written, or a version failed the
- *       rewrite and was left as it was
+ *   1 - the changelog could not be read or written, or every version that
+ *       needed the rewrite failed it and the file is unchanged
  *   2 - usage error, or KILO_CHANGELOG_API_KEY is not set
+ *   3 - partial success: the versions that did rewrite are in the file and the
+ *       ones named on stderr still carry commit subjects, so a caller may land
+ *       what there is and a second run retries only those
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -198,7 +202,10 @@ async function main() {
     console.error(
       `changelog: ${rewritten.failures.length} version(s) still need the rewrite: ${rewritten.failures.join(', ')}`
     );
-    return 1;
+    // Some versions are curated and in the file, some are not: the run made
+    // progress, so the caller may land what it has and retry the rest. A run
+    // that curated nothing is a failure, not a partial success.
+    return rewritten.curated === 0 ? 1 : 3;
   }
   return 0;
 }

@@ -1,3 +1,4 @@
+/* oxlint-disable max-lines -- one suite for the changelog's reader-facing shape: the shared table, the curated groups, merged builds, and the pending-notes notice */
 import { describe, expect, it } from 'vitest';
 
 import { changelogNotesArePending, changelogSections } from './changelog-sections';
@@ -78,7 +79,9 @@ describe('changelogSections', () => {
 - fix(auth): three
 `);
     expect(sections.map(section => section.version)).toEqual(['1.0.15', '1.0.14']);
-    expect(sections[0]?.newNotes).toEqual(['Two', 'One']);
+    // The file lists the newest build first, so its feature leads the release
+    // and the older build's note follows it.
+    expect(sections[0]?.newNotes).toEqual(['One', 'Two']);
     expect(sections[1]).toEqual({
       version: '1.0.14',
       newNotes: [],
@@ -86,6 +89,81 @@ describe('changelogSections', () => {
       fixesAreas: ['signIn'],
       hasFixes: true,
     });
+  });
+
+  it('keeps the newest features when a version has more than the cap across builds', () => {
+    const merged = `## 1.0.20 (build 800 iOS, 801 Android)
+
+- feat(chat): newest one
+- feat(chat): newest two
+- feat(chat): newest three
+- feat(chat): newest four
+
+## 1.0.20 (build 790 iOS, 791 Android)
+
+- feat(chat): older one
+- feat(chat): older two
+- feat(chat): older three
+- feat(chat): older four
+`;
+    expect(changelogSections(merged)[0]?.newNotes).toEqual([
+      'Newest four',
+      'Newest three',
+      'Newest two',
+      'Newest one',
+      'Older four',
+      'Older three',
+    ]);
+  });
+
+  it('classifies an older build of a version whose newest build carries changes', () => {
+    const markdown = `## 1.0.16 (build 720 iOS, 721 Android)
+
+### Changes
+
+- Paid credits now expire a year after purchase
+
+## 1.0.16 (build 710 iOS, 711 Android)
+
+- feat(chat): keep the composer visible
+- fix(auth): link same-email sign-ins
+`;
+    expect(changelogSections(markdown)).toEqual([
+      {
+        version: '1.0.16',
+        newNotes: ['Keep the composer visible'],
+        changeNotes: ['Paid credits now expire a year after purchase'],
+        fixesAreas: ['signIn'],
+        hasFixes: true,
+      },
+    ]);
+  });
+
+  it('classifies an older build of a version whose newest build ends with fixes', () => {
+    const markdown = `## 1.0.16 (build 720 iOS, 721 Android)
+
+### New
+
+- A curated feature
+
+### Fixes
+
+- areas: chat
+
+## 1.0.16 (build 710 iOS, 711 Android)
+
+- feat(chat): keep the composer visible
+- fix(auth): link same-email sign-ins
+`;
+    expect(changelogSections(markdown)).toEqual([
+      {
+        version: '1.0.16',
+        newNotes: ['A curated feature', 'Keep the composer visible'],
+        changeNotes: [],
+        fixesAreas: ['chat', 'signIn'],
+        hasFixes: true,
+      },
+    ]);
   });
 
   it('names the three busiest areas the fixes touched, map order on a tie', () => {
@@ -266,6 +344,24 @@ describe('changelogSections', () => {
         changeNotes: ['Paid credits now expire a year after purchase'],
         fixesAreas: [],
         hasFixes: false,
+      },
+    ]);
+  });
+
+  it('reads the generic fixes line as fixes without a named area', () => {
+    const generic = `## 1.0.21 (build 820 iOS, 821 Android)
+
+### Fixes
+
+- areas: app
+`;
+    expect(changelogSections(generic)).toEqual([
+      {
+        version: '1.0.21',
+        newNotes: [],
+        changeNotes: [],
+        fixesAreas: [],
+        hasFixes: true,
       },
     ]);
   });

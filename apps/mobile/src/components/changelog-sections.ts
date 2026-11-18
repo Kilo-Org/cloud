@@ -90,15 +90,7 @@ const INTERNAL_TYPES = {
 const FEATURE_TYPES = { feat: true } satisfies Readonly<Record<string, true>>;
 
 /** The three blocks a composed section states its notes under. */
-function groupOf(label: string): 'new' | 'changes' | 'fixes' | null {
-  if (label === 'new') {
-    return 'new';
-  }
-  if (label === 'changes') {
-    return 'changes';
-  }
-  return label === 'fixes' ? 'fixes' : null;
-}
+const GROUPS = ['new', 'changes', 'fixes'] as const;
 
 /** The workflow's bodies for a section that carries no reader-facing change. */
 const NO_CHANGE_NOTES = {
@@ -240,6 +232,9 @@ function areasOfLine(line: string): ChangelogArea[] {
  * the features it has collected, the policy changes it carries, and the areas
  * its fixes named. A generated section states its blocks itself; a
  * commit-subject section is classified from each bullet's type and scope.
+ * `group`, `curated` and `buildNotes` describe the build whose heading was read
+ * last: a later heading of the same version starts a new build, and its older
+ * bullets must not inherit the groups above them.
  */
 type Draft = {
   version: string;
@@ -247,6 +242,8 @@ type Draft = {
   /** A section the workflow composed: its blocks are already curated and ordered. */
   curated: boolean;
   newNotes: string[];
+  /** The features this build has contributed; its notes sit at the front of the list. */
+  buildNotes: number;
   changeNotes: string[];
   /** How many fixes named each area; the line names the busiest few. */
   fixesCounts: Map<ChangelogArea, number>;
@@ -259,6 +256,7 @@ function emptyDraft(version: string): Draft {
     group: null,
     curated: false,
     newNotes: [],
+    buildNotes: 0,
     changeNotes: [],
     fixesCounts: new Map(),
     isFix: false,
@@ -300,14 +298,18 @@ function absorb(draft: Draft, bullet: string): void {
   // The `### Fixes` block returned above, so this bullet is either a composed
   // New bullet (no prefix, so it reads `new`) or a shipped one whose type decides.
   if (note.kind === 'new') {
-    // A shipped version is a commit log read oldest-first, so each feature goes
-    // in front of the one before it; a composed section already lists newest
-    // first and keeps its order.
+    // A shipped build is a commit log read oldest-first, so each feature goes in
+    // front of the ones this build already listed; a composed section already
+    // lists newest first and keeps its order. Either way the list stays
+    // newest-first across the whole version: a later, older build's notes land
+    // after the newer build's, never in front of them, so the cap below cannot
+    // drop the newest features.
     if (draft.curated) {
       draft.newNotes.push(note.text);
     } else {
-      draft.newNotes.unshift(note.text);
+      draft.newNotes.splice(draft.newNotes.length - draft.buildNotes, 0, note.text);
     }
+    draft.buildNotes += 1;
     return;
   }
   draft.isFix = true;
@@ -379,12 +381,20 @@ export function changelogSections(markdown: string): ChangelogSection[] {
         flush();
       }
       draft ??= emptyDraft(next);
+      // A new heading starts a new build even when the version repeats. Without
+      // this reset the older build's commit bullets inherit the newest build's
+      // last `### ` group — they would land in its Changes list, or be counted
+      // as fixes — and its features would join the list ahead of the newer
+      // build's instead of behind them.
+      draft.group = null;
+      draft.curated = false;
+      draft.buildNotes = 0;
     }
     const group = draft === null ? null : GROUP_HEADING.exec(line);
     if (group !== null && draft !== null) {
       const label = (group[1] ?? '').trim().toLocaleLowerCase('en');
       draft.curated = true;
-      draft.group = groupOf(label);
+      draft.group = GROUPS.find(candidate => candidate === label) ?? null;
     }
   }
   flush();
@@ -416,10 +426,7 @@ const FULL_VERSION = /^(\d+)\.(\d+)\.(\d+)$/;
 type Version = readonly [number, number, number];
 
 function parseVersion(text: string | null | undefined): Version | null {
-  if (!text) {
-    return null;
-  }
-  const match = FULL_VERSION.exec(text.trim());
+  const match = text ? FULL_VERSION.exec(text.trim()) : null;
   if (!match) {
     return null;
   }

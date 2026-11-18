@@ -20,6 +20,9 @@ concurrency:
 permissions:
   contents: write # push the rewrite branch
   pull-requests: write # open or refresh its PR
+  # PR assignees are an Issues API operation; pull-requests: write alone does
+  # not cover `gh pr create --assignee` (same grant as kilo-app-release.yml).
+  issues: write
 
 jobs:
   rewrite:
@@ -66,7 +69,27 @@ jobs:
       - name: Rewrite the shipped sections
         env:
           KILO_CHANGELOG_API_KEY: ${{ steps.mint.outputs.token }}
-        run: node scripts/kilo-app-changelog-rewrite-history.mjs
+        run: |
+          set +e
+          node scripts/kilo-app-changelog-rewrite-history.mjs 2>&1 | tee "$RUNNER_TEMP/kilo-app-history.log"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+          # 3 is partial success: the versions it rewrote are in the file, and
+          # the PR below lands them. Only a run that rewrote nothing (1) or
+          # could not start (2) fails the job, so a dispatch never spends its
+          # model calls and then throws the result away.
+          if [ "$status" -ne 3 ]; then
+            exit "$status"
+          fi
+          {
+            echo '### Versions still carrying commit subjects'
+            echo ''
+            grep 'still need the rewrite' "$RUNNER_TEMP/kilo-app-history.log" || true
+            echo ''
+            echo 'They were left as they were; a re-dispatch retries only those.'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Open or refresh the changelog PR
         env:

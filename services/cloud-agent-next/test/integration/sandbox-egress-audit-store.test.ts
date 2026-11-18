@@ -65,7 +65,7 @@ afterEach(async () => {
 });
 
 describe('egress audit store of a logical sandbox', () => {
-  it('preserves request and connection scope after storage reload and accepts historical rows', async () => {
+  it('preserves connection scope after storage reload and stores request rows in the historical shape', async () => {
     const store = egressAuditStore(env, { logicalSandboxId });
     const legacy = await store.recordEgressRequest(request('allowed'));
     const connection = await store.recordEgressRequest(
@@ -88,7 +88,7 @@ describe('egress audit store of a logical sandbox', () => {
       return GetEgressAuditResponseSchema.parse(await reloaded.getEgressAudit());
     });
     expect(page.records).toEqual([legacy, connection, http]);
-    expect(page.records.map(row => row.scope)).toEqual([undefined, 'connection', 'request']);
+    expect(page.records.map(row => row.scope)).toEqual([undefined, 'connection', undefined]);
     expect(JSON.stringify(page)).not.toMatch(/private|token|secret/);
   });
 

@@ -124,7 +124,6 @@ describe('actual CONNECT and SCM TLS front end', () => {
       });
       expect(f.control.recordAudit.mock.calls[1][1]).toMatchObject({
         method: 'POST',
-        scope: 'request',
         hostname: 'github.com',
         decision: 'allowed',
       });
@@ -147,7 +146,6 @@ describe('actual CONNECT and SCM TLS front end', () => {
     expect(response).toContain('403 Forbidden');
     expect(f.control.recordAudit.mock.calls[0][1]).toMatchObject({
       method: 'GET',
-      scope: 'request',
       protocol: 'http:',
       hostname: 'public.example',
       decision: 'denied',

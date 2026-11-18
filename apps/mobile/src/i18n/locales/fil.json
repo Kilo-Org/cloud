@@ -4729,7 +4729,7 @@
     "statusSaved": "Na-save",
     "statusFailed": "Hindi ma-save.",
     "inputTitle": "Mga input guardrail",
-    "inputDescription": "Ini-scan ang bawat input gamit ang Enkrypt AI, kasama ang mga resulta ng tool. Tinatanggihan ng blocking detector ang request kapag hindi available ang Enkrypt.",
+    "inputDescription": "Ini-scan ang bawat input gamit ang Enkrypt AI, kasama ang mga resulta ng tool. Kapag hindi available ang Enkrypt, ipinapadala ang mga request nang hindi na-scan sa halip na tanggihan.",
     "outputTitle": "Mga output guardrail",
     "outputDescription": "Ini-scan ang mga sagot gamit ang Enkrypt AI bago ito matanggap ng mga miyembro. Naka-off maliban kung i-on mo.",
     "detectorsHint": "Tinatanggihan ng Harangin ang na-flag na request. Itinatala lang ito ng Log lang nang hindi naaantala ang request.",

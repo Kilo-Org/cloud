@@ -4871,7 +4871,7 @@
     "statusSaved": "Uložené",
     "statusFailed": "Nepodarilo sa uložiť.",
     "inputTitle": "Vstupné ochranné mechanizmy",
-    "inputDescription": "Skenuje každý vstup pomocou Enkrypt AI vrátane výsledkov nástrojov. Blokujúci detektor odmietne požiadavku, keď je Enkrypt nedostupný.",
+    "inputDescription": "Skenuje každý vstup pomocou Enkrypt AI vrátane výsledkov nástrojov. Keď je Enkrypt nedostupný, požiadavky sa odosielajú bez skenovania namiesto toho, aby boli odmietnuté.",
     "outputTitle": "Výstupné ochranné mechanizmy",
     "outputDescription": "Skenuje odpovede pomocou Enkrypt AI predtým, než ich členovia dostanú. Predvolene vypnuté, kým ich nezapnete.",
     "detectorsHint": "Blokovanie odmietne označenú požiadavku. Voľba Iba zaznamenať ju len zaznamená bez zdržania požiadavky.",

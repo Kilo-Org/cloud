@@ -4729,7 +4729,7 @@
     "statusSaved": "저장됨",
     "statusFailed": "저장하지 못했습니다.",
     "inputTitle": "입력 가드레일",
-    "inputDescription": "도구 결과를 포함하여 모든 입력을 Enkrypt AI로 검사합니다. 차단 탐지기는 Enkrypt AI를 사용할 수 없을 때 요청을 거부합니다.",
+    "inputDescription": "도구 결과를 포함하여 모든 입력을 Enkrypt AI로 검사합니다. Enkrypt AI를 사용할 수 없을 때 요청은 거부되지 않고 검사 없이 전송됩니다.",
     "outputTitle": "출력 가드레일",
     "outputDescription": "구성원이 응답을 받기 전에 Enkrypt AI로 응답을 검사합니다. 직접 켜지 않는 한 꺼져 있습니다.",
     "detectorsHint": "차단은 표시된 요청을 거부합니다. 기록만은 요청을 지연시키지 않고 기록합니다.",

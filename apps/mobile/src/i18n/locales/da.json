@@ -4729,7 +4729,7 @@
     "statusSaved": "Gemt",
     "statusFailed": "Kunne ikke gemme.",
     "inputTitle": "Sikkerhedsgrænser for input",
-    "inputDescription": "Scanner alt input med Enkrypt AI, inklusive værktøjsresultater. En blokerende detektor afviser en anmodning, når Enkrypt ikke er tilgængelig.",
+    "inputDescription": "Scanner alt input med Enkrypt AI, inklusive værktøjsresultater. Når Enkrypt ikke er tilgængelig, sendes anmodninger uden scanning i stedet for at blive afvist.",
     "outputTitle": "Sikkerhedsgrænser for output",
     "outputDescription": "Scanner svar med Enkrypt AI, før medlemmerne modtager dem. Er slået fra, medmindre du slår det til.",
     "detectorsHint": "Bloker afviser en markeret anmodning. Kun log registrerer den uden at forsinke anmodningen.",

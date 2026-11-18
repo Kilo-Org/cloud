@@ -4729,7 +4729,7 @@
     "statusSaved": "Kua tiakina",
     "statusFailed": "Kāore i taea te tiaki.",
     "inputTitle": "Ngā ara tiaki whakaurunga",
-    "inputDescription": "Ka tirotiro i ia whakaurunga mā Enkrypt AI, tae atu ki ngā hua o ngā taputapu. Ka whakakāhoretia e tētahi kaitirotiro ārai tētahi tono ina kāore a Enkrypt e wātea ana.",
+    "inputDescription": "Ka tirotiro i ia whakaurunga mā Enkrypt AI, tae atu ki ngā hua o ngā taputapu. Ina kāore a Enkrypt e wātea ana, ka tukuna ngā tono me te kore tirotiro, kaua e whakakāhoretia.",
     "outputTitle": "Ngā ara tiaki putanga",
     "outputDescription": "Ka tirotiro i ngā whakautu mā Enkrypt AI i mua i te whiwhi a ngā mema i aua whakautu. Kua whakaweto ki te kore koe e whakakā.",
     "detectorsHint": "Ka whakakāhore te Ārai i tētahi tono kua tohua. Ka tuhia noa e te kōwhiringa Tuhi noa, kāore e whakaroa i te tono.",

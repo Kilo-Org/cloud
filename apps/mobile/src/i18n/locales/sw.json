@@ -4729,7 +4729,7 @@
     "statusSaved": "Imehifadhiwa",
     "statusFailed": "Imeshindwa kuhifadhi.",
     "inputTitle": "Vizuizi vya maingizo",
-    "inputDescription": "Huchunguza kila ingizo kwa Enkrypt AI, ikiwa ni pamoja na matokeo ya zana. Kigunduzi kinachozuia hukataa ombi Enkrypt haipopatikana.",
+    "inputDescription": "Huchunguza kila ingizo kwa Enkrypt AI, ikiwa ni pamoja na matokeo ya zana. Enkrypt haipopatikana, maombi hutumwa bila kuchunguzwa badala ya kukataliwa.",
     "outputTitle": "Vizuizi vya matokeo",
     "outputDescription": "Huchunguza majibu kwa Enkrypt AI kabla wanachama hawajayapokea. Imezimwa isipokuwa uwashe.",
     "detectorsHint": "Zuia hukataa ombi lililoalamishwa. Rekodi tu huliandika bila kuchelewesha ombi.",

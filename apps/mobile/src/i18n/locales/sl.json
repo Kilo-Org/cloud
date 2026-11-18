@@ -4871,7 +4871,7 @@
     "statusSaved": "Shranjeno",
     "statusFailed": "Shranjevanje ni uspelo.",
     "inputTitle": "Vhodna varovala",
-    "inputDescription": "Pregleda vsak vhod z Enkrypt AI, vključno z rezultati orodij. Blokirni detektor zavrne zahtevo, ko Enkrypt ni na voljo.",
+    "inputDescription": "Pregleda vsak vhod z Enkrypt AI, vključno z rezultati orodij. Ko Enkrypt ni na voljo, se zahteve pošljejo nepregledane, namesto da bi bile zavrnjene.",
     "outputTitle": "Izhodna varovala",
     "outputDescription": "Pregleda odgovore z Enkrypt AI, preden jih prejmejo člani. Izklopljeno, razen če jih vklopite.",
     "detectorsHint": "Blokiranje zavrne označeno zahtevo. Samo beleženje jo zabeleži, ne da bi zahtevo zakasnilo.",

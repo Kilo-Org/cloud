@@ -4729,7 +4729,7 @@
     "statusSaved": "Tersimpan",
     "statusFailed": "Tidak dapat menyimpan.",
     "inputTitle": "Pagar pengaman masukan",
-    "inputDescription": "Memindai setiap masukan dengan Enkrypt AI, termasuk hasil alat. Detektor pemblokir menolak permintaan saat Enkrypt tidak tersedia.",
+    "inputDescription": "Memindai setiap masukan dengan Enkrypt AI, termasuk hasil alat. Saat Enkrypt tidak tersedia, permintaan dikirim tanpa dipindai alih-alih ditolak.",
     "outputTitle": "Pagar pengaman keluaran",
     "outputDescription": "Memindai respons dengan Enkrypt AI sebelum anggota menerimanya. Nonaktif kecuali Anda mengaktifkannya.",
     "detectorsHint": "Blokir menolak permintaan yang ditandai. Mode Catat saja hanya merekamnya tanpa menunda permintaan.",

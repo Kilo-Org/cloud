@@ -4871,7 +4871,7 @@
     "statusSaved": "Zapisano",
     "statusFailed": "Nie udało się zapisać.",
     "inputTitle": "Zabezpieczenia danych wejściowych",
-    "inputDescription": "Skanuje wszystkie dane wejściowe za pomocą Enkrypt AI, w tym wyniki narzędzi. Detektor blokujący odrzuca żądanie, gdy Enkrypt jest niedostępny.",
+    "inputDescription": "Skanuje wszystkie dane wejściowe za pomocą Enkrypt AI, w tym wyniki narzędzi. Gdy Enkrypt jest niedostępny, żądania są wysyłane bez skanowania zamiast być odrzucane.",
     "outputTitle": "Zabezpieczenia danych wyjściowych",
     "outputDescription": "Skanuje odpowiedzi za pomocą Enkrypt AI, zanim członkowie je otrzymają. Wyłączone, chyba że je włączysz.",
     "detectorsHint": "Blokuj odrzuca oznaczone żądanie. Tylko rejestruj zapisuje je bez opóźniania żądania.",

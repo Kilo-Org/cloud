@@ -4942,7 +4942,7 @@
     "statusSaved": "Sábháilte",
     "statusFailed": "Theip ar an sábháil.",
     "inputTitle": "Ráillí cosanta ionchuir",
-    "inputDescription": "Scanann sé gach ionchur le Enkrypt AI, lena n-áirítear torthaí uirlisí. Diúltaíonn brathadóir blocála d’iarratas nuair nach bhfuil Enkrypt ar fáil.",
+    "inputDescription": "Scanann sé gach ionchur le Enkrypt AI, lena n-áirítear torthaí uirlisí. Nuair nach bhfuil Enkrypt ar fáil, seoltar iarratais gan scanadh seachas iad a dhiúltú.",
     "outputTitle": "Ráillí cosanta aschuir",
     "outputDescription": "Scanann sé freagraí le Enkrypt AI sula bhfaigheann comhaltaí iad. Tá sé as mura gcuireann tú ar siúl é.",
     "detectorsHint": "Diúltaíonn Bloc d’iarratas atá marcáilte. Ní dhéanann Logáil amháin ach é a thaifeadadh gan moill a chur ar an iarratas.",

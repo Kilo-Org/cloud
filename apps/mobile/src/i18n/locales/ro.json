@@ -4800,7 +4800,7 @@
     "statusSaved": "Salvat",
     "statusFailed": "Nu s-a putut salva.",
     "inputTitle": "Bariere de protecție pentru intrare",
-    "inputDescription": "Scanează fiecare intrare cu Enkrypt AI, inclusiv rezultatele instrumentelor. Un detector care blochează respinge o cerere când Enkrypt nu este disponibil.",
+    "inputDescription": "Scanează fiecare intrare cu Enkrypt AI, inclusiv rezultatele instrumentelor. Când Enkrypt nu este disponibil, cererile sunt trimise nescanate, în loc să fie respinse.",
     "outputTitle": "Bariere de protecție pentru ieșire",
     "outputDescription": "Scanează răspunsurile cu Enkrypt AI înainte ca membrii să le primească. Dezactivat dacă nu îl activați.",
     "detectorsHint": "Blochează respinge o cerere semnalată. Doar jurnalizarea o consemnează fără a întârzia cererea.",

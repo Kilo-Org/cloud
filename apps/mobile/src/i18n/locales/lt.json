@@ -4871,7 +4871,7 @@
     "statusSaved": "Išsaugota",
     "statusFailed": "Nepavyko išsaugoti.",
     "inputTitle": "Įvesties apsaugos priemonės",
-    "inputDescription": "Kiekviena įvestis nuskaitoma naudojant Enkrypt AI, įskaitant įrankių rezultatus. Blokuojantis detektorius atmeta užklausą, kai Enkrypt nepasiekiamas.",
+    "inputDescription": "Kiekviena įvestis nuskaitoma naudojant Enkrypt AI, įskaitant įrankių rezultatus. Kai Enkrypt nepasiekiamas, užklausos siunčiamos nenuskaitytos, užuot buvusios atmestos.",
     "outputTitle": "Išvesties apsaugos priemonės",
     "outputDescription": "Atsakymai nuskaitomi naudojant Enkrypt AI, kol nariai jų negauna. Išjungta, nebent įjungsite.",
     "detectorsHint": "Parinktis „Blokuoti“ atmeta pažymėtą užklausą. Parinktis „Tik registruoti“ ją įrašo nevilkdama užklausos.",

@@ -358,4 +358,54 @@ describe('GuardrailsForm leave guard', () => {
     expect(h.confirm).not.toHaveBeenCalled();
     expect(h.repeat).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps the guard disarmed when a refetch rebases a clean draft', async () => {
+    const renderer = await mountForm();
+
+    expect(h.guard.enabled).toBe(false);
+
+    // A refetch that moves the saved configuration under a clean form: the
+    // form rebases onto the new payload without any edit of its own.
+    if (!h.setData) {
+      throw new Error('the harness did not mount');
+    }
+    const rebased = { ...payload(), enabled: false };
+    h.setData(rebased);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Back on the untouched rebased form leaves without a prompt: the guard
+    // must not arm just because the configuration moved.
+    expect(h.guard.enabled).toBe(false);
+    pressBack();
+    expect(h.confirm).not.toHaveBeenCalled();
+    expect(h.repeat).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the guard armed through a rebase when the draft holds edits', async () => {
+    const renderer = await mountForm();
+
+    editInputToggle();
+    expect(h.guard.enabled).toBe(true);
+
+    // The saved configuration moves while the form holds edits that differ
+    // from the new payload: the edits win and stay dirty against the new
+    // baseline.
+    if (!h.setData) {
+      throw new Error('the harness did not mount');
+    }
+    h.setData({
+      ...payload(),
+      enabled: false,
+      detectors: { ...payload().detectors, injection_attack: { enabled: false, action: 'log' } },
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(h.guard.enabled).toBe(true);
+  });
 });

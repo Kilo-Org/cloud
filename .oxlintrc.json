@@ -17,6 +17,7 @@
     "**/node_modules/**",
     "**/*.js",
     "**/*.jsx",
+    "!oxlint-plugin-drizzle.js",
     "build/**",
     "**/dist/**",
     "**/.wrangler/**",
@@ -125,10 +126,12 @@
         "@typescript-eslint/prefer-as-const": "error",
         "@typescript-eslint/prefer-namespace-keyword": "error",
         "@typescript-eslint/triple-slash-reference": "error",
-        "@typescript-eslint/no-var-requires": "error",
         "@typescript-eslint/consistent-type-imports": "error",
         "@typescript-eslint/no-non-null-assertion": "error",
         "@typescript-eslint/no-floating-promises": "error",
+        // Async event handlers and callbacks like onSave or onClick are passed where a
+        // void-returning callback is expected by design; no-floating-promises covers
+        // unawaited promises, so only the void-return half is relaxed.
         "@typescript-eslint/no-misused-promises": [
           "error",
           {

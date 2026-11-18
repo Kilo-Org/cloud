@@ -164,6 +164,7 @@ function configuredPrepareInput(
         { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
       ],
       runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
+      modelContextLimits: { 'example/model': 50_000 },
       kiloCommands: [{ name: 'review', template: 'Review the change' }],
     },
     credentials: { ...input.credentials, scopeId: 'shared-worktree' },
@@ -1293,6 +1294,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(first.spec).not.toHaveProperty('setupCommands');
     expect(first.spec).not.toHaveProperty('runtimeAgents');
     expect(first.spec).not.toHaveProperty('runtimeInstructions');
+    expect(first.spec).not.toHaveProperty('modelContextLimits');
     expect(first.spec).not.toHaveProperty('kiloCommands');
     expect(first.spec).not.toHaveProperty('env');
     expect(first.workspace).toMatchObject({
@@ -1301,6 +1303,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
       ],
       setupCommands: ['echo shared'],
       runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
+      modelContextLimits: { 'example/model': 50_000 },
       kiloCommands: [{ name: 'review', template: 'Review the change' }],
     });
 
@@ -1670,6 +1673,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
       { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
     ]);
     expect(frame.spec.runtimeAgents).toEqual([{ slug: 'helper', name: 'Helper', config: {} }]);
+    expect(frame.spec.modelContextLimits).toEqual({ 'example/model': 50_000 });
     expect(frame.spec.kiloCommands).toEqual([{ name: 'review', template: 'Review the change' }]);
   });
 

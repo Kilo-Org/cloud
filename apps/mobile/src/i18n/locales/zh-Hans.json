@@ -933,13 +933,24 @@
       "empty": "还没有带分析数据的审查",
       "emptyDescription": "在组织启用分析期间，系统会记录已完成的审查。",
       "offTitle": "已关闭 {{platform}} 的分析",
-      "offDescription": "在网页版组织设置中启用分析，即可记录已完成的审查。",
-      "couldNotLoad": "无法加载分析数据"
+      "offDescription": "组织账单角色（所有者、管理员和账单管理员）可以在网页版组织设置中启用分析，以记录已完成的审查。",
+      "couldNotLoad": "无法加载分析数据",
+      "trackedReviewsCaption": "本时间段内启用分析后完成的审查。运行中和失败的审查永不计入。",
+      "trackedReviewsUncounted": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。",
+      "trackedReviewsUncounted_one": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。",
+      "trackedReviewsUncounted_other": "未计入：组织已有 {{displayTotal}} 个已完成的审查，其中 {{displayCount}} 个未捕获结果。"
     },
     "council": {
       "title": "评审团审查",
       "subtitle": "多位专家分别审查每个拉取请求，他们的投票汇总为一个决定。",
-      "unavailable": "此组织无法使用评审团审查。",
+      "unavailablePersonallyTitle": "需要 Enterprise 组织",
+      "unavailablePersonally": "评审团审查不包含在个人账户中。",
+      "unavailablePersonallyAction": "创建组织",
+      "unavailablePersonallySwitchAction": "切换组织",
+      "unavailableOrganizationTitle": "评审团审查目前无法使用",
+      "unavailableForOrganization": "评审团审查需要具备生效订阅或试用期的企业套餐。此组织目前不具备此项。",
+      "unavailableForOrganizationNeutral": "此组织目前无法使用评审团审查。请稍后再试。",
+      "unavailableOnBitbucket": "评审团审查不适用于 Bitbucket 仓库。",
       "noRepositories": "尚未选择任何仓库。请先在仓库设置中选择仓库。",
       "specialists": "专家",
       "labels": "触发评审团审查的标签",
@@ -2590,7 +2601,6 @@
     "completingPurchase": "正在完成购买流程",
     "subscriptionLoading": "Kilo Pass 订阅加载中",
     "retryHint": "重新获取 Kilo Pass 状态。",
-    "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
     "endedOn": "{{date}} 已结束",
     "notAvailableInApp": "Kilo Pass 在应用中不可用。",
     "statusActive": "生效中",
@@ -4700,6 +4710,7 @@
     "superseded": "此链接已在其他设备上被替换，现已失效。"
   },
   "sharedSession": {
+    "startedAt": "开始于 {{time}}",
     "title": "已分享的会话",
     "someone": "某人",
     "sharedBy": "由{{owner}}分享",

@@ -31,7 +31,13 @@ const PAGE_FILE_NAME = `diagram-${MERMAID_VERSION}.html`;
 
 type MermaidHost = { pageUri: string; directoryUri: string };
 
+/** Wait before a failed preparation may run again, keyed to no diagram in
+ * particular: the whole process either has its host or records the failure. */
+export const MERMAID_HOST_RETRY_MS = 30_000;
+
 let mermaidHost: Promise<MermaidHost> | null = null;
+let lastFailedAt: number | null = null;
+let now: () => number = () => Date.now();
 
 async function prepareMermaidHost(): Promise<MermaidHost> {
   const directory = new Directory(Paths.cache, HOST_DIRECTORY_NAME);
@@ -47,15 +53,47 @@ async function prepareMermaidHost(): Promise<MermaidHost> {
   return { pageUri: page.uri, directoryUri: directory.uri };
 }
 
+/**
+ * The prepared host, or the reason it is not: a failure makes every diagram
+ * still mounting draw its source as a code fence, and arms the cooldown so the
+ * next attempt waits `MERMAID_HOST_RETRY_MS` instead of repeating the whole
+ * asset download and copy per mount. A successful preparation clears the
+ * record, so a later failure waits a fresh window.
+ */
 async function loadMermaidHost(): Promise<MermaidHost> {
+  const elapsed = now() - (lastFailedAt ?? 0);
+  if (
+    mermaidHost === null &&
+    lastFailedAt !== null &&
+    elapsed >= 0 &&
+    elapsed < MERMAID_HOST_RETRY_MS
+  ) {
+    // The last preparation attempt just failed, so re-running the whole asset
+    // copy this soon repeats work a broken cache device cannot finish. Every
+    // diagram in the window draws its fence from the rejection instead, and a
+    // diagram after the window starts the next attempt. A negative elapsed
+    // time means the device clock moved backwards, which is not an elapsed
+    // wait, so the next attempt runs rather than holding the old window.
+    throw new Error('mermaid host preparation is cooling down');
+  }
   mermaidHost ??= prepareMermaidHost();
   try {
-    return await mermaidHost;
+    const host = await mermaidHost;
+    lastFailedAt = null;
+    return host;
   } catch (error) {
-    // A failed copy is retried by the next diagram instead of being cached.
+    // A failed copy is retried by a later diagram, spaced by the cooldown,
+    // instead of being cached or repeated per mount.
     mermaidHost = null;
+    lastFailedAt = now();
     throw error;
   }
+}
+
+/** For tests: aim the cooldown's clock, so a case can set it at or past the
+ * window without fake timers. Module state itself resets between cases. */
+export function __setMermaidHostClockForTests(clock: () => number): void {
+  now = clock;
 }
 
 const MIN_HEIGHT = 48;

@@ -1476,13 +1476,24 @@
       "empty": "Akukho kuhlolwa okunezibalo okwamanje",
       "emptyDescription": "Izibalo ziqopha ukuhlolwa okuqediwe ngenkathi zivuliwe enhlanganweni.",
       "offTitle": "Izibalo ze-{{platform}} zivaliwe",
-      "offDescription": "Zivule izibalo kuzilungiselelo zenhlangano kuwebhu ukuqopha ukuhlolwa okuqediwe.",
-      "couldNotLoad": "Ayikwazanga ukulayisha izibalo"
+      "offDescription": "Izindima zokukhokha zenhlangano (abanikazi, abaphathi kanye nabaphathi bezimali) zingavula izibalo ezilungiselelweni zenhlangano kuwebhu ukuze kuqophwe ukuhlolwa okuqediwe.",
+      "couldNotLoad": "Ayikwazanga ukulayisha izibalo",
+      "trackedReviewsCaption": "Ukuhlolwa okuqediwe ngesikhathi sesi sikhathi ngenkathi izibalo zivuliwe. Ukuhlolwa okuqhubekayo nokuwehlulekile akubalwa unaphakade.",
+      "trackedReviewsUncounted": "{{displayCount}} kwe-{{displayTotal}} zokuhlolwa okuqediwe enhlanganweni azibaliwa: isiphumo sawo asiqophwanga.",
+      "trackedReviewsUncounted_one": "{{displayCount}} kwe-{{displayTotal}} zokuhlolwa okuqediwe enhlanganweni azibaliwa: isiphumo sawo asiqophwanga.",
+      "trackedReviewsUncounted_other": "{{displayCount}} kwe-{{displayTotal}} zokuhlolwa okuqediwe enhlanganweni azibaliwa: isiphumo sawo asiqophwanga."
     },
     "council": {
       "title": "Ukuhlola komkhandlu",
       "subtitle": "Ochwepheshe abaningi bahlola i-PR ngayinye, futhi amavoti abo ahlangana abe yisinqumo esisodwa.",
-      "unavailable": "Ukuhlola komkhandlu akutholakali kule nhlangano.",
+      "unavailablePersonallyTitle": "Kudingeka inhlangano ye-Enterprise",
+      "unavailablePersonally": "Ukuhlola komkhandlu akuyingxenye ye-akhawunti yomuntu siqu.",
+      "unavailablePersonallyAction": "Dala inhlangano",
+      "unavailablePersonallySwitchAction": "Shintsha inhlangano",
+      "unavailableOrganizationTitle": "Ukuhlola komkhandlu akutholakali",
+      "unavailableForOrganization": "Ukuhlola komkhandlu kudinga uhlelo lwe-Enterprise olunesibondelo noma isikhathi sokuhlola esisebenzayo. Le nhlangano ayinakho okwamanje.",
+      "unavailableForOrganizationNeutral": "Ukuhlola komkhandlu akutholakali kule nhlangano okwamanje. Zama futhi kamuva.",
+      "unavailableOnBitbucket": "Ukuhlola komkhandlu akutholakali kuzinqolobane ze-Bitbucket.",
       "noRepositories": "Azikho izinqolobane zekhodi ezikhethiwe okwamanje. Khetha izinqolobane zekhodi kuzilungiselelo zenqolobane yekhodi kuqala.",
       "specialists": "Ochwepheshe",
       "labels": "Amalebula avula ukuhlola komkhandlu",
@@ -3133,7 +3144,6 @@
     "completingPurchase": "Kuqedwa ukuthenga",
     "subscriptionLoading": "Ukubhalisa kwe-Kilo Pass kuyalayishwa",
     "retryHint": "Iphinda izame ukulayisha isimo se-Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Iphelile ngomhla ka-{{date}}",
     "notAvailableInApp": "I-Kilo Pass ayitholakali kuhlelo lokusebenza.",
     "statusActive": "Iyasebenza",
@@ -4700,6 +4710,7 @@
     "superseded": "Le linki ithathelwe indawo kwenye indawo, ngakho ayisasebenzi."
   },
   "sharedSession": {
+    "startedAt": "Kuqale ngo-{{time}}",
     "title": "Iseshini eyabiwe",
     "someone": "Othile",
     "sharedBy": "Yabiwe ngu-{{owner}}",

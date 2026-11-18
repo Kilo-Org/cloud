@@ -1144,6 +1144,17 @@ describe('idle workspace disk checkpoint', () => {
       workspaceId: test.workspaceId,
       directory: test.registration.spec.directory,
     });
+    const restoredAllocationId = (await test.sandbox.getAllocationState()).allocationId;
+    wrapper.send({
+      type: 'session.restore_attempt',
+      sessionId: test.sessionId,
+      attempt: 1,
+      durationMs: 54,
+      downloadMs: 20,
+      importMs: 30,
+      outcome: 'restored',
+      willRetry: false,
+    });
     wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
     await test.messageState('m2', 'accepted');
     expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
@@ -1174,6 +1185,19 @@ describe('idle workspace disk checkpoint', () => {
           reason: 'confirmed',
           workspaceId: test.workspaceId,
           sourceAllocationId,
+        }),
+        expect.objectContaining({
+          diagnosticEvent: 'snapshot_restore_attempt_finished',
+          stage: 'wrapper_restore',
+          snapshotKind: 'session',
+          sessionId: test.sessionId,
+          allocationId: restoredAllocationId,
+          attemptId: expect.any(String),
+          durationMs: 54,
+          downloadMs: 20,
+          importMs: 30,
+          outcome: 'restored',
+          willRetry: false,
         }),
         expect.objectContaining({
           diagnosticEvent: 'workspace_snapshot_fenced',

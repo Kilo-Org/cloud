@@ -7,7 +7,7 @@
  * internal network and stream the response back to the caller. Plain HTTP
  * would also expose API keys and prompts to anyone on the network path.
  */
-import { lookup } from 'node:dns/promises';
+import { Resolver } from 'node:dns/promises';
 import { captureMessage } from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { isIpAddress, isPublicIp } from './ip-address';
@@ -25,62 +25,40 @@ export type UpstreamUrlViolation =
 
 type UpstreamUrlRejection = UpstreamUrlViolation | 'redirect';
 
-export type ResolveHostAddresses = (hostname: string) => Promise<string[]>;
+/**
+ * Resolves `hostname` to its addresses. It should stop as soon as `signal`
+ * aborts; the policy stops waiting for it then either way.
+ */
+export type ResolveHostAddresses = (hostname: string, signal: AbortSignal) => Promise<string[]>;
 
 /**
  * The policy's answer for one upstream URL. An allowed decision names the
- * addresses the caller may dial for that host: the caller pins them into its
- * connection, so a later connection uses them instead of resolving the name
- * again.
+ * addresses the caller may dial for that host, and until when they count as
+ * checked: the caller pins them into its connection, so a later connection uses
+ * them instead of resolving the name again.
  */
 export type UpstreamUrlDecision =
-  | { allowed: true; hostname: string; addresses: string[] }
+  | { allowed: true; hostname: string; addresses: string[]; expiresAt: number }
   | { allowed: false; violation: UpstreamUrlViolation };
 
 const UPSTREAM_ADDRESS_CACHE_TTL_MS = 60 * 1000;
 const UPSTREAM_ADDRESS_CACHE_MAX_ENTRIES = 1000;
+/** c-ares waits this long for the first answer and doubles it for each retry. */
+const DNS_QUERY_TIMEOUT_MS = 1_000;
+const DNS_QUERY_TRIES = 2;
+/** Caps one validation's resolution, including the retry below. */
+const DNS_LOOKUP_DEADLINE_MS = 5_000;
 const DNS_LOOKUP_ATTEMPTS = 2;
 const DNS_RETRY_DELAY_MS = 100;
-const DNS_LOOKUP_TIMEOUT_MS = 2_000;
-/**
- * Server-side cap on one shared resolution. It is longer than the caller
- * deadline, so validations of one host keep sharing one lookup. A resolution
- * that settles releases its entry at once; this deadline bounds the entry.
- */
-const DNS_LOOKUP_SETTLE_DEADLINE_MS = 30_000;
-/**
- * Process-wide ceiling on system lookups whose resolver has not settled.
- * `dns.lookup` runs getaddrinfo on the libuv threadpool, so the gateway starts a
- * bounded number of them and reports the retryable lookup failure for the rest.
- */
-const DNS_LOOKUPS_MAX_OUTSTANDING = 2;
+/** Definitive answers that a retry would only repeat. */
+const DNS_NO_RECORDS_CODES = new Set(['ENOTFOUND', 'ENODATA']);
+
 /**
  * The checked address list per normalized hostname. It is the list an allowed
  * decision carries, so a cache hit returns the addresses the first check
  * approved instead of asking the resolver again.
  */
 const checkedUpstreamAddresses = new Map<string, { addresses: string[]; expiresAt: number }>();
-/**
- * Resolutions in flight, keyed by normalized hostname. A validation reuses the
- * entry for its host while that lookup is pending, or until the settle deadline
- * stops new validations from reusing it. Removal only stops the reuse; the
- * outstanding counter follows the resolver call itself. Callers that already
- * hold the promise keep it, with their own signal and deadline.
- */
-const inFlightHostnameResolutions = new Map<string, Promise<string[]>>();
-/**
- * System lookups the process started and whose resolver has not settled yet.
- * The count falls when getaddrinfo returns. The settle deadline can drop a map
- * entry that no validation may reuse any more; capacity belongs to the resolver
- * call itself.
- */
-let outstandingSystemLookups = 0;
-/**
- * The one retry that follows a failed shared resolution. Keyed by that
- * resolution, not by hostname, so every caller that observed the failure
- * awaits the same lookup after the failed attempt has left the in-flight map.
- */
-const retryAfterFailedResolution = new WeakMap<Promise<string[]>, Promise<string[]>>();
 
 const REJECTION_MESSAGES = {
   invalid_url: 'The upstream provider URL is not a valid URL.',
@@ -94,19 +72,59 @@ const REJECTION_MESSAGES = {
 } as const satisfies Record<UpstreamUrlRejection, string>;
 
 /**
- * Enforced on the deployed production and staging gateways. Local development
- * reaches the fake LLM over plain HTTP on localhost, so it stays exempt.
- * `NODE_ENV` is `production` on previews too, so it cannot be used here.
+ * Enforced everywhere except local development and tests, so a deployment whose
+ * environment labels are missing or new still gets the guard. Local development
+ * reaches the fake LLM over plain HTTP on localhost. Next.js inlines `NODE_ENV`
+ * at build time, so every built deployment, previews included, enforces it.
  */
 export function isUpstreamUrlPolicyEnforced(): boolean {
-  const targetEnv = process.env.VERCEL_TARGET_ENV;
-  return targetEnv === 'production' || targetEnv === 'staging';
+  const nodeEnv = process.env.NODE_ENV;
+  return nodeEnv !== 'development' && nodeEnv !== 'test';
 }
 
-async function resolveWithSystemResolver(hostname: string): Promise<string[]> {
-  // The same getaddrinfo resolver fetch uses, so /etc/hosts entries are seen too.
-  const records = await lookup(hostname, { all: true, verbatim: true });
-  return records.map(record => record.address);
+function errorCode(error: unknown): string | undefined {
+  return typeof error === 'object' && error !== null && 'code' in error
+    ? String(error.code)
+    : undefined;
+}
+
+/**
+ * Asks the DNS servers from the system configuration for the A and AAAA records
+ * of `hostname`, with c-ares. Unlike `dns.lookup`, it does not hold a libuv
+ * threadpool worker and it can be cancelled, so a slow upstream DNS server
+ * cannot hold up resolution for other hosts. It skips `/etc/hosts`, which an
+ * SSRF guard has no reason to trust.
+ *
+ * Either family may be missing; the answer holds every address found. It
+ * rejects only when neither family answered an address.
+ */
+async function resolveWithSystemResolver(hostname: string, signal: AbortSignal): Promise<string[]> {
+  signal.throwIfAborted();
+  const resolver = new Resolver({ timeout: DNS_QUERY_TIMEOUT_MS, tries: DNS_QUERY_TRIES });
+  const cancel = () => resolver.cancel();
+  signal.addEventListener('abort', cancel, { once: true });
+  try {
+    const answers = await Promise.allSettled([
+      resolver.resolve4(hostname),
+      resolver.resolve6(hostname),
+    ]);
+    signal.throwIfAborted();
+    const addresses = answers.flatMap(answer =>
+      answer.status === 'fulfilled' ? answer.value : []
+    );
+    if (addresses.length > 0) return addresses;
+    const failures = answers.flatMap(answer =>
+      answer.status === 'rejected' ? [answer.reason as unknown] : []
+    );
+    // Report a transient failure over a definitive "no records", so it is retried.
+    throw (
+      failures.find(failure => !DNS_NO_RECORDS_CODES.has(errorCode(failure) ?? '')) ??
+      failures[0] ??
+      Object.assign(new Error(`no address records for ${hostname}`), { code: 'ENODATA' })
+    );
+  } finally {
+    signal.removeEventListener('abort', cancel);
+  }
 }
 
 function hostOf(url: string): string {
@@ -118,93 +136,32 @@ function hostOf(url: string): string {
 }
 
 /**
- * The checked address list for `hostname`, or null when the entry is missing or
- * expired. It is a copy, so a caller that stores or edits the list it receives
- * cannot change what later checks return. An expired entry is dropped here.
+ * The checked entry for `hostname`, or null when the entry is missing or
+ * expired. The address list is a copy, so a caller that stores or edits the
+ * list it receives cannot change what later checks return. An expired entry is
+ * dropped here.
  */
-function cachedUpstreamAddresses(hostname: string, now: number): string[] | null {
+function cachedUpstreamAddresses(
+  hostname: string,
+  now: number
+): { addresses: string[]; expiresAt: number } | null {
   const entry = checkedUpstreamAddresses.get(hostname);
   if (entry === undefined) return null;
-  if (entry.expiresAt > now) return [...entry.addresses];
+  if (entry.expiresAt > now) return { addresses: [...entry.addresses], expiresAt: entry.expiresAt };
   checkedUpstreamAddresses.delete(hostname);
   return null;
 }
 
-function cacheUpstreamAddresses(hostname: string, addresses: string[], now: number): void {
+function cacheUpstreamAddresses(hostname: string, addresses: string[], expiresAt: number): void {
   if (checkedUpstreamAddresses.size >= UPSTREAM_ADDRESS_CACHE_MAX_ENTRIES) {
     checkedUpstreamAddresses.clear();
   }
-  checkedUpstreamAddresses.set(hostname, {
-    addresses: [...addresses],
-    expiresAt: now + UPSTREAM_ADDRESS_CACHE_TTL_MS,
-  });
-}
-
-/**
- * Removes the entry for `hostname` only if it still holds `resolution`. A
- * stale resolution must not remove a newer entry for the same host.
- */
-function forgetInFlightResolution(hostname: string, resolution: Promise<string[]>): void {
-  if (inFlightHostnameResolutions.get(hostname) === resolution) {
-    inFlightHostnameResolutions.delete(hostname);
-  }
-}
-
-/**
- * Starts one system lookup for `hostname` through `run` and records its entry
- * and its place in the process-wide limit. Returns null without running
- * anything when the process already has `DNS_LOOKUPS_MAX_OUTSTANDING` lookups
- * whose resolver has not settled.
- *
- * The entry stays recorded until the resolution settles or the settle deadline
- * passes, whichever comes first. Every validation of the same host that starts
- * in that window awaits that one resolution. Capacity is separate from the
- * entry: a lookup that outlives its entry still counts against the limit until
- * its resolver settles.
- */
-function startSharedResolution(
-  hostname: string,
-  run: () => Promise<string[]>
-): Promise<string[]> | null {
-  if (outstandingSystemLookups >= DNS_LOOKUPS_MAX_OUTSTANDING) return null;
-
-  const resolution = Promise.resolve().then(run);
-  outstandingSystemLookups += 1;
-  inFlightHostnameResolutions.set(hostname, resolution);
-  const forget = () => forgetInFlightResolution(hostname, resolution);
-  // `dns.lookup` cannot be cancelled, so a stalled lookup can outlive every
-  // caller and holds its worker until getaddrinfo returns. Keep the entry for a
-  // server-side cap longer than the caller deadline, so every validation of the
-  // host shares the one lookup.
-  const settleDeadline = setTimeout(forget, DNS_LOOKUP_SETTLE_DEADLINE_MS);
-  settleDeadline.unref?.();
-  const forgetSettled = () => {
-    outstandingSystemLookups -= 1;
-    clearTimeout(settleDeadline);
-    forget();
-  };
-  void resolution.then(forgetSettled, forgetSettled);
-  return resolution;
-}
-
-/**
- * Returns the resolution already in flight for `hostname`, or starts one.
- * Returns null without starting a lookup when the process limit is full. Each
- * caller applies its own signal and deadline to the promise it receives.
- */
-function resolveSharedHostAddresses(
-  hostname: string,
-  resolveHostAddresses: ResolveHostAddresses
-): Promise<string[]> | null {
-  const pending = inFlightHostnameResolutions.get(hostname);
-  if (pending) return pending;
-  return startSharedResolution(hostname, () => resolveHostAddresses(hostname));
+  checkedUpstreamAddresses.set(hostname, { addresses: [...addresses], expiresAt });
 }
 
 /**
  * Settles with `promise`, or rejects with the abort reason as soon as `signal`
- * aborts. `dns.lookup` cannot be cancelled, so a stalled getaddrinfo keeps its
- * thread-pool slot, but the request no longer waits for it.
+ * aborts, even when the resolver ignores the signal.
  */
 function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) return Promise.reject(signal.reason);
@@ -216,44 +173,11 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 /**
- * The shared retry for `failed`. Every caller that observed that resolution
- * gets this promise, so a caller that resumes after the retry has settled does
- * not start another lookup. A caller that arrives while the retry is still
- * pending joins it through the in-flight map. Returns null without starting a
- * lookup when every place in the process limit is taken.
- */
-function sharedRetry(
-  hostname: string,
-  resolveHostAddresses: ResolveHostAddresses,
-  failed: Promise<string[]>
-): Promise<string[]> | null {
-  const existing = retryAfterFailedResolution.get(failed);
-  if (existing) return existing;
-
-  const current = inFlightHostnameResolutions.get(hostname);
-  if (current !== undefined && current !== failed) return current;
-
-  const retry = startSharedResolution(hostname, () => {
-    const delay = Promise.withResolvers<void>();
-    setTimeout(delay.resolve, DNS_RETRY_DELAY_MS);
-    return delay.promise.then(() => resolveHostAddresses(hostname));
-  });
-  if (!retry) return null;
-  retryAfterFailedResolution.set(failed, retry);
-  return retry;
-}
-
-/**
- * One retry absorbs a transient resolver failure such as `EAI_AGAIN`. Each
- * attempt has its own deadline, and a resolver that does not answer within it
- * ends the validation in `dns_lookup_failed`. An abort of `signal` (client
- * disconnect or the request budget) rejects at once with its reason.
- *
- * Both attempts resolve through `resolveSharedHostAddresses`, so every
- * validation of a host shares its one system lookup. Each caller applies its own
- * signal and deadline to the promise it receives, and the entry stays for the
- * validations that follow. A caller that observed a failed resolution awaits the
- * shared retry of it, so every such caller shares one retry.
+ * Resolves `hostname` within `DNS_LOOKUP_DEADLINE_MS`. One retry absorbs a
+ * transient failure such as SERVFAIL; a definitive "no records" answer is not
+ * retried. Resolves null when no address was found in time. An abort of
+ * `signal` (client disconnect or the request budget) rejects at once with its
+ * reason and cancels the queries.
  */
 async function resolveWithRetry(
   hostname: string,
@@ -261,48 +185,45 @@ async function resolveWithRetry(
   signal: AbortSignal | undefined
 ): Promise<string[] | null> {
   signal?.throwIfAborted();
-  let shared = resolveSharedHostAddresses(hostname, resolveHostAddresses);
-  for (let attempt = 0; attempt < DNS_LOOKUP_ATTEMPTS; attempt += 1) {
-    const deadline = AbortSignal.timeout(DNS_LOOKUP_TIMEOUT_MS);
-    // The process already runs the maximum number of system lookups, so this
-    // validation reports the retryable failure at once.
-    if (!shared) return null;
+  const deadline = AbortSignal.timeout(DNS_LOOKUP_DEADLINE_MS);
+  const combined = signal ? AbortSignal.any([signal, deadline]) : deadline;
+  for (let attempt = 1; ; attempt += 1) {
+    let retryable: boolean;
     try {
       const addresses = await untilAborted(
-        shared,
-        signal ? AbortSignal.any([signal, deadline]) : deadline
+        Promise.resolve().then(() => resolveHostAddresses(hostname, combined)),
+        combined
       );
       if (addresses.length > 0) return addresses;
+      retryable = false;
+    } catch (error) {
+      if (signal?.aborted) throw signal.reason;
+      if (deadline.aborted) return null;
+      retryable = !DNS_NO_RECORDS_CODES.has(errorCode(error) ?? '');
+    }
+    if (!retryable || attempt >= DNS_LOOKUP_ATTEMPTS) return null;
+    try {
+      await untilAborted(new Promise(resolve => setTimeout(resolve, DNS_RETRY_DELAY_MS)), combined);
     } catch {
       if (signal?.aborted) throw signal.reason;
-      // A resolution that reaches this caller's deadline ends this validation
-      // here; the caller reports the retryable `dns_lookup_failed` outcome. The
-      // entry stays, so a later validation reuses the lookup that is still
-      // pending.
-      if (deadline.aborted) return null;
-      // A resolution that finished with a transient failure is retried; the
-      // caller reports dns_lookup_failed once attempts run out.
+      return null;
     }
-    if (attempt + 1 >= DNS_LOOKUP_ATTEMPTS) return null;
-    signal?.throwIfAborted();
-    shared = sharedRetry(hostname, resolveHostAddresses, shared);
   }
-  return null;
 }
 
 /** What one resolution of an upstream host produced for the public check. */
 type UpstreamHostCheck =
-  | { checked: string[] }
+  | { checked: string[]; expiresAt: number }
   | { violation: 'dns_lookup_failed' | 'non_public_address' };
 
 /**
  * Resolves `hostname`, requires every answer to be public, and stores the
  * checked list on success. It never answers from the checked-address cache,
  * because a caller states by running it that the cached list may no longer be
- * trusted. It shares the resolution already in flight for the host. The
- * violation is report-visible only: a non-public answer and a failed lookup
- * leave no checked entry and are answered with different messages. Rejects with
- * the abort reason when `signal` aborts during the lookup.
+ * trusted. The violation is report-visible only: a non-public answer and a
+ * failed lookup leave no checked entry and are answered with different
+ * messages. Rejects with the abort reason when `signal` aborts during the
+ * lookup.
  */
 async function resolveAndCheckUpstreamHost(
   hostname: string,
@@ -314,28 +235,25 @@ async function resolveAndCheckUpstreamHost(
   if (addresses.some(address => !isPublicIp(address))) {
     return { violation: 'non_public_address' };
   }
-  cacheUpstreamAddresses(hostname, addresses, Date.now());
-  return { checked: addresses };
+  const expiresAt = Date.now() + UPSTREAM_ADDRESS_CACHE_TTL_MS;
+  cacheUpstreamAddresses(hostname, addresses, expiresAt);
+  return { checked: addresses, expiresAt };
 }
 
-/**
- * Test hook. Also resets the outstanding-lookup accounting, which a resolver
- * that a test leaves pending keeps.
- */
+/** Test hook. */
 export function clearUpstreamUrlPolicyCache(): void {
   checkedUpstreamAddresses.clear();
-  inFlightHostnameResolutions.clear();
-  outstandingSystemLookups = 0;
 }
 
 /**
  * Decides whether an upstream URL may be requested. The URL must use HTTPS, and
  * its host and every address it resolves to must be publicly routable.
  *
- * An allowed decision carries the checked address list for that host, and the
- * caller connects to those addresses instead of resolving the name again. The
- * check stores that list for the host's cache TTL, so a caller that no longer
- * trusts its own copy asks `refreshUpstreamHostAddresses` for a fresh one.
+ * An allowed decision carries the checked address list for that host and when
+ * that check expires, and the caller connects to those addresses instead of
+ * resolving the name again. The check stores that list for the host's cache
+ * TTL, so a caller that no longer trusts its own copy asks
+ * `refreshUpstreamHostAddresses` for a fresh one.
  *
  * Rejects with the abort reason when `signal` aborts during the DNS lookup.
  */
@@ -367,18 +285,22 @@ export async function findUpstreamUrlViolation(
     // `URL.hostname` keeps the brackets of an IPv6 literal; a dialable address
     // does not have them.
     const literal = hostname.startsWith('[') ? hostname.slice(1, -1) : hostname;
-    return { allowed: true, hostname: literal, addresses: [literal] };
+    return {
+      allowed: true,
+      hostname: literal,
+      addresses: [literal],
+      expiresAt: Date.now() + UPSTREAM_ADDRESS_CACHE_TTL_MS,
+    };
   }
 
-  const now = Date.now();
-  const cached = cachedUpstreamAddresses(hostname, now);
-  if (cached) return { allowed: true, hostname, addresses: cached };
+  const cached = cachedUpstreamAddresses(hostname, Date.now());
+  if (cached) return { allowed: true, hostname, ...cached };
 
   // A public-looking name can still point at a private address, for example
   // `metadata.attacker.example` with an A record of 169.254.169.254.
   const check = await resolveAndCheckUpstreamHost(hostname, resolveHostAddresses, signal);
   if ('violation' in check) return { allowed: false, violation: check.violation };
-  return { allowed: true, hostname, addresses: check.checked };
+  return { allowed: true, hostname, addresses: check.checked, expiresAt: check.expiresAt };
 }
 
 /**
@@ -451,7 +373,13 @@ function rejectionResponse({
  * An allowed URL and the checked addresses its host resolves to. The addresses
  * are the only ones the caller may dial.
  */
-export type AllowedUpstreamUrl = { url: string; hostname: string; addresses: string[] };
+export type AllowedUpstreamUrl = {
+  url: string;
+  hostname: string;
+  addresses: string[];
+  /** When the check behind `addresses` expires. */
+  expiresAt: number;
+};
 
 export type UpstreamUrlPolicyResult =
   | { rejected: NextResponse }
@@ -463,8 +391,9 @@ export type UpstreamUrlPolicyResult =
 
 /**
  * Returns the error response for the first URL that violates the policy, or the
- * checked entry of the hop the caller dials. The secure-proxy relay dials its
- * own hop and runs its own check there, so no further address travels back.
+ * checked entry of the hop the caller dials. The secure-proxy relay dials the
+ * other URL itself without a check of its own; it is an internal service, so
+ * the check here is the only one that URL gets.
  * Rejects with the abort reason when `signal` aborts, exactly like the upstream
  * fetch would, so the caller's fetch-failure handling applies.
  */
@@ -503,6 +432,7 @@ export async function rejectDisallowedUpstreamUrls({
       url: urls[0],
       hostname: dialledDecision.hostname,
       addresses: dialledDecision.addresses,
+      expiresAt: dialledDecision.expiresAt,
     },
   };
 }

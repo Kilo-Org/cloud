@@ -1476,13 +1476,24 @@
       "empty": "Oraindik ez dago analitikadun berrikuspenik",
       "emptyDescription": "Analitikak amaitutako berrikuspenak erregistratzen ditu erakundean gaituta dagoen bitartean.",
       "offTitle": "{{platform}} plataformarako analitika desgaituta dago",
-      "offDescription": "Gaitu analitika erakundearen webean dauden ezarpenetan, amaitutako berrikuspenak erregistratzeko.",
-      "couldNotLoad": "Ezin izan da analitika kargatu"
+      "offDescription": "Erakundeko fakturazio-rolek analitika gaitu dezakete erakundearen webean dauden ezarpenetan, amaitutako berrikuspenak erregistratzeko.",
+      "couldNotLoad": "Ezin izan da analitika kargatu",
+      "trackedReviewsCaption": "Aldi honetan analitika gaituta amaitu diren berrikuspenak. Martxan dauden eta huts egin duten berrikuspenak inoiz ez dira zenbatzen.",
+      "trackedReviewsUncounted": "Zenbatu gabe: {{displayCount}} / {{displayTotal}} berrikuspenetatik beren emaitza jaso gabe.",
+      "trackedReviewsUncounted_one": "Zenbatu gabe: {{displayCount}} / {{displayTotal}} berrikuspenetatik beren emaitza jaso gabe.",
+      "trackedReviewsUncounted_other": "Zenbatu gabe: {{displayCount}} / {{displayTotal}} berrikuspenetatik beren emaitza jaso gabe."
     },
     "council": {
       "title": "Kontseilu-berrikuspena",
       "subtitle": "Hainbat espezialistak berrikusten dute bateratze-eskaera bakoitza, eta haien botoak erabaki bakarrean batzen dira.",
-      "unavailable": "Kontseilu-berrikuspena ez dago erabilgarri erakunde honetan.",
+      "unavailablePersonallyTitle": "Enterprise erakundea behar du",
+      "unavailablePersonally": "Kontseilu-berrikuspena ez da kontu pertsonal baten parte.",
+      "unavailablePersonallyAction": "Sortu erakundea",
+      "unavailablePersonallySwitchAction": "Aldatu erakundea",
+      "unavailableOrganizationTitle": "Kontseilu-berrikuspena ez dago erabilgarri",
+      "unavailableForOrganization": "Kontseilu-berrikuspenak Enterprise plana behar du, harpidetza edo probaldi aktibo batekin. Erakunde honek ez du hura orain.",
+      "unavailableForOrganizationNeutral": "Kontseilu-berrikuspena ez dago erabilgarri erakunde honentzat orain. Saiatu berriro geroago.",
+      "unavailableOnBitbucket": "Kontseilu-berrikuspena ez dago erabilgarri Bitbucket biltegietarako.",
       "noRepositories": "Oraindik ez da biltegirik hautatu. Lehenik, aukeratu biltegiak biltegien ezarpenetan.",
       "specialists": "Espezialistak",
       "labels": "Kontseilu-berrikuspena abiarazten duten etiketak",
@@ -3133,7 +3144,6 @@
     "completingPurchase": "Erosketa amaitzen",
     "subscriptionLoading": "Kilo Pass-en harpidetza kargatzen",
     "retryHint": "Kilo Pass-en egoera berriro kargatzen saiatzen da.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Amaituta {{date}}",
     "notAvailableInApp": "Kilo Pass ez dago aplikazioan erabilgarri.",
     "statusActive": "Aktibo",
@@ -4700,6 +4710,7 @@
     "superseded": "Esteka hau beste nonbait ordeztu da, beraz, jada ez du funtzionatzen."
   },
   "sharedSession": {
+    "startedAt": "Hasiera: {{time}}",
     "title": "Partekatutako saioa",
     "someone": "Norbait",
     "sharedBy": "Partekatzailea: {{owner}}",

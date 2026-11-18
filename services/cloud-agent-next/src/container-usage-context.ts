@@ -180,7 +180,12 @@ export type SandboxBillingAdmissionResult =
   | { success: true }
   | {
       success: false;
-      code: 'insufficient_credits' | 'meter_unavailable' | 'stopping' | 'invalid_configuration';
+      code:
+        | 'container_limit_reached'
+        | 'insufficient_credits'
+        | 'meter_unavailable'
+        | 'stopping'
+        | 'invalid_configuration';
       message: string;
       remainingMicrodollars?: number;
       minimumRequiredMicrodollars?: number;
@@ -350,6 +355,9 @@ export function billingAdmissionFailureFromError(error: unknown): SandboxBilling
     };
   }
   if (error instanceof ContainerUsageAdmissionError) {
+    if (error.code === 'container_limit_reached') {
+      return { success: false, code: error.code, message: error.message };
+    }
     if (error.code === 'insufficient_credits') {
       return {
         success: false,

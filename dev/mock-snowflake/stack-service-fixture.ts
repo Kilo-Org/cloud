@@ -1,0 +1,78 @@
+// Test-only harness for `wireEnvLocal`. `stack-service.ts` resolves the repo
+// root as `path.resolve(import.meta.dirname, '../..')`, so a fixture tree in a
+// temp directory — with the real sources copied into it — is the only way to
+// exercise the writer without touching the developer's own `.env.local`.
+
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+import type { WireResult } from './stack-service';
+
+export type WireEnvLocalFixture = {
+  /** Directory the copied sources treat as the repository root. */
+  root: string;
+  envLocalPath: string;
+  caBundlePath: string;
+  wire(): Promise<WireResult>;
+  restore(): void;
+};
+
+export function wireEnvLocalFixture(envLocal: string | undefined): WireEnvLocalFixture {
+  // Canonicalised because the copied module derives its root from its own
+  // `import.meta.dirname`, which is already a real path: on macOS `mkdtemp`
+  // hands back `/var/...` while that is `/private/var/...`, and the two would
+  // never compare equal.
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mock-snowflake-stack-')));
+  const moduleDir = path.join(root, 'dev', 'mock-snowflake');
+  const sourceDir = import.meta.dirname;
+  const envLocalPath = path.join(root, '.env.local');
+  const caBundlePath = path.join(moduleDir, 'fixtures', 'tls', 'ca-bundle.pem');
+
+  fs.mkdirSync(moduleDir, { recursive: true });
+  fs.mkdirSync(path.join(root, 'dev', 'local'), { recursive: true });
+  for (const name of [
+    'stack-service.ts',
+    'env-file.ts',
+    'tls-env.ts',
+    'server.ts',
+    'warehouse.ts',
+  ]) {
+    fs.copyFileSync(path.join(sourceDir, name), path.join(moduleDir, name));
+  }
+  // The copied stack-service imports `../local/secrets-file`, so the fixture
+  // has to reproduce that layout inside the temp root.
+  fs.copyFileSync(
+    path.join(sourceDir, '../local/secrets-file.ts'),
+    path.join(root, 'dev', 'local', 'secrets-file.ts')
+  );
+  fs.mkdirSync(path.join(moduleDir, 'fixtures', 'tls'), { recursive: true });
+  fs.writeFileSync(path.join(moduleDir, 'fixtures', 'tls', 'cert.pem'), 'CERT');
+  fs.writeFileSync(path.join(moduleDir, 'fixtures', 'tls', 'key.pem'), 'KEY');
+  fs.writeFileSync(
+    path.join(moduleDir, 'fixtures', 'snowflake-env.txt'),
+    'SNOWFLAKE_ACCOUNT_HOST=127.0.0.1:4792\nSNOWFLAKE_USERNAME=local\n'
+  );
+  if (envLocal !== undefined) fs.writeFileSync(envLocalPath, envLocal);
+
+  return {
+    root,
+    envLocalPath,
+    caBundlePath,
+    async wire(): Promise<WireResult> {
+      // The fixture copy of stack-service.ts computes the same `../..` layout
+      // as the real one, so running the real logic here is the point of the
+      // harness. The import target only exists after this harness has copied
+      // the sources into the temp root, so a static import is impossible; tsx
+      // registers an ESM loader, so the dynamic import loads real TypeScript.
+      const mod = (await import(pathToFileURL(path.join(moduleDir, 'stack-service.ts')).href)) as {
+        wireEnvLocal(): WireResult;
+      };
+      return mod.wireEnvLocal();
+    },
+    restore(): void {
+      fs.rmSync(root, { recursive: true, force: true });
+    },
+  };
+}

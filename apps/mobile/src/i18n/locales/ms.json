@@ -1476,13 +1476,24 @@
       "empty": "Belum ada semakan dengan analitik",
       "emptyDescription": "Analitik merekodkan semakan yang selesai selagi ciri ini didayakan untuk organisasi.",
       "offTitle": "Analitik dimatikan untuk {{platform}}",
-      "offDescription": "Dayakannya dalam tetapan organisasi di web untuk merekodkan semakan yang selesai.",
-      "couldNotLoad": "Tidak dapat memuatkan analitik"
+      "offDescription": "Pemilik, pentadbir dan pengurus pengebilan organisasi boleh menghidupkan analitik dalam tetapan organisasi di web untuk merekodkan semakan yang selesai.",
+      "couldNotLoad": "Tidak dapat memuatkan analitik",
+      "trackedReviewsCaption": "Semakan yang selesai dalam tempoh ini semasa analitik dihidupkan. Semakan yang sedang berjalan dan yang gagal tidak pernah dikira.",
+      "trackedReviewsUncounted": "Tidak dikira: {{displayCount}} daripada {{displayTotal}} semakan yang selesai milik organisasi, hasilnya tidak direkodkan.",
+      "trackedReviewsUncounted_one": "Tidak dikira: {{displayCount}} daripada {{displayTotal}} semakan yang selesai milik organisasi, hasilnya tidak direkodkan.",
+      "trackedReviewsUncounted_other": "Tidak dikira: {{displayCount}} daripada {{displayTotal}} semakan yang selesai milik organisasi, hasilnya tidak direkodkan."
     },
     "council": {
       "title": "Semakan panel",
       "subtitle": "Beberapa pakar menyemak setiap permintaan penarikan, dan undian mereka digabungkan menjadi satu keputusan.",
-      "unavailable": "Semakan panel tidak tersedia untuk organisasi ini.",
+      "unavailablePersonallyTitle": "Memerlukan organisasi Enterprise",
+      "unavailablePersonally": "Semakan panel bukan sebahagian daripada akaun peribadi.",
+      "unavailablePersonallyAction": "Cipta organisasi",
+      "unavailablePersonallySwitchAction": "Tukar organisasi",
+      "unavailableOrganizationTitle": "Semakan panel tidak tersedia",
+      "unavailableForOrganization": "Semakan panel memerlukan pelan Enterprise dengan langganan atau percubaan yang aktif. Organisasi ini tidak memilikinya sekarang.",
+      "unavailableForOrganizationNeutral": "Semakan panel tidak tersedia untuk organisasi ini sekarang. Cuba lagi kemudian.",
+      "unavailableOnBitbucket": "Semakan panel tidak tersedia untuk repositori Bitbucket.",
       "noRepositories": "Belum ada repositori dipilih. Pilih repositori dalam tetapan repositori dahulu.",
       "specialists": "Pakar",
       "labels": "Label yang mencetuskan semakan panel",
@@ -3133,7 +3144,6 @@
     "completingPurchase": "Menyelesaikan pembelian",
     "subscriptionLoading": "Sedang memuatkan langganan Kilo Pass",
     "retryHint": "Mencuba semula untuk mendapatkan status Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Berakhir pada {{date}}",
     "notAvailableInApp": "Kilo Pass tidak tersedia dalam aplikasi.",
     "statusActive": "Aktif",
@@ -4700,6 +4710,7 @@
     "superseded": "Pautan ini telah diganti di tempat lain, jadi pautan ini tidak lagi berfungsi."
   },
   "sharedSession": {
+    "startedAt": "Dimulakan pada {{time}}",
     "title": "Sesi dikongsi",
     "someone": "Seseorang",
     "sharedBy": "Dikongsi oleh {{owner}}",

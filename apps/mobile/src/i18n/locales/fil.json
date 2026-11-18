@@ -1476,13 +1476,24 @@
       "empty": "Wala pang pagsusuring may analitika",
       "emptyDescription": "Itinatala ng analitika ang mga natapos na pagsusuri habang pinagana ito para sa organisasyon.",
       "offTitle": "Naka-off ang analitika para sa {{platform}}",
-      "offDescription": "Paganahin ito sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
-      "couldNotLoad": "Hindi ma-load ang analitika"
+      "offDescription": "Maaaring paganahin ng mga role sa pagbabayad ng organisasyon ang analitika sa mga setting ng organisasyon sa web para itala ang mga natapos na pagsusuri.",
+      "couldNotLoad": "Hindi ma-load ang analitika",
+      "trackedReviewsCaption": "Mga natapos na pagsusuri sa panahong ito habang naka-on ang analitika. Hindi kailanman binibilang ang mga pagsusuring tumatakbo o nabigo.",
+      "trackedReviewsUncounted": "Hindi binibilang: {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon na walang naitalang resulta.",
+      "trackedReviewsUncounted_one": "Hindi binibilang: {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon na walang naitalang resulta.",
+      "trackedReviewsUncounted_other": "Hindi binibilang: {{displayCount}} sa {{displayTotal}} natapos na pagsusuri ng organisasyon na walang naitalang resulta."
     },
     "council": {
       "title": "Pagsusuri ng konseho",
       "subtitle": "Sinusuri ng ilang espesyalista ang bawat pull request, at pinagsasama ang kanilang mga boto sa iisang desisyon.",
-      "unavailable": "Hindi magagamit ang pagsusuri ng konseho sa organisasyong ito.",
+      "unavailablePersonallyTitle": "Kailangan ng Enterprise na organisasyon",
+      "unavailablePersonally": "Hindi bahagi ng personal na account ang pagsusuri ng konseho.",
+      "unavailablePersonallyAction": "Gumawa ng organisasyon",
+      "unavailablePersonallySwitchAction": "Lumipat ng organisasyon",
+      "unavailableOrganizationTitle": "Hindi magagamit ang pagsusuri ng konseho",
+      "unavailableForOrganization": "Ang pagsusuri ng konseho ay nangangailangan ng Enterprise plan na may aktibong subscription o trial. Wala ito sa organisasyong ito sa ngayon.",
+      "unavailableForOrganizationNeutral": "Ang pagsusuri ng konseho ay hindi magagamit para sa organisasyong ito sa ngayon. Subukan muli mamaya.",
+      "unavailableOnBitbucket": "Hindi available ang pagsusuri ng konseho para sa mga Bitbucket repositoryo.",
       "noRepositories": "Wala pang napiling repositoryo. Pumili muna ng mga repositoryo sa mga setting ng repositoryo.",
       "specialists": "Mga espesyalista",
       "labels": "Mga label na nagpapasimula ng pagsusuri ng konseho",
@@ -3133,7 +3144,6 @@
     "completingPurchase": "Kinukumpleto ang pagbili",
     "subscriptionLoading": "Nilo-load ang subscription sa Kilo Pass",
     "retryHint": "Sinusubukang kunin muli ang katayuan ng Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Natapos {{date}}",
     "notAvailableInApp": "Hindi magagamit ang Kilo Pass sa app.",
     "statusActive": "Aktibo",
@@ -4700,6 +4710,7 @@
     "superseded": "Pinalitan ang link na ito sa ibang device, kaya hindi na ito gumagana."
   },
   "sharedSession": {
+    "startedAt": "Sinimulan noong {{time}}",
     "title": "Ibinahaging session",
     "someone": "Isang user",
     "sharedBy": "Ibinahagi ng {{owner}}",

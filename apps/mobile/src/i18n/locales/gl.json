@@ -1476,13 +1476,24 @@
       "empty": "Aínda non hai revisións con analítica",
       "emptyDescription": "A analítica rexistra as revisións completadas mentres estea activada para a organización.",
       "offTitle": "A analítica está desactivada para {{platform}}",
-      "offDescription": "Actívaa na configuración da organización na web para rexistrar as revisións completadas.",
-      "couldNotLoad": "Non se puido cargar a analítica"
+      "offDescription": "Os roles de facturación da organización poden activar a analítica nos axustes da organización na web para rexistrar as revisións completadas.",
+      "couldNotLoad": "Non se puido cargar a analítica",
+      "trackedReviewsCaption": "Revisións completadas que remataron neste período coa analítica activada. As revisións en execución e as falladas nunca se contan.",
+      "trackedReviewsUncounted": "Sen contar: {{displayCount}} das {{displayTotal}} revisións rematadas da organización sen resultado gardado.",
+      "trackedReviewsUncounted_one": "Sen contar: {{displayCount}} das {{displayTotal}} revisións rematadas da organización sen resultado gardado.",
+      "trackedReviewsUncounted_other": "Sen contar: {{displayCount}} das {{displayTotal}} revisións rematadas da organización sen resultado gardado."
     },
     "council": {
       "title": "Revisión en consello",
       "subtitle": "Varios especialistas revisan cada pull request e os seus votos combínanse nunha única decisión.",
-      "unavailable": "A revisión en consello non está dispoñible para esta organización.",
+      "unavailablePersonallyTitle": "Precisa unha organización Enterprise",
+      "unavailablePersonally": "A revisión en consello non forma parte dunha conta persoal.",
+      "unavailablePersonallyAction": "Crear unha organización",
+      "unavailablePersonallySwitchAction": "Cambiar de organización",
+      "unavailableOrganizationTitle": "Revisión en consello non está dispoñible",
+      "unavailableForOrganization": "A revisión en consello precisa do plan Enterprise cunha subscrición ou un período de proba activos. Esta organización non o ten neste momento.",
+      "unavailableForOrganizationNeutral": "A revisión en consello non está dispoñible para esta organización neste momento. Téntao de novo máis tarde.",
+      "unavailableOnBitbucket": "A revisión en consello non está dispoñible para repositorios de Bitbucket.",
       "noRepositories": "Aínda non hai repositorios seleccionados. Primeiro escolle repositorios na configuración de repositorios.",
       "specialists": "Especialistas",
       "labels": "Etiquetas que activan a revisión en consello",
@@ -3133,7 +3144,6 @@
     "completingPurchase": "Completando a compra",
     "subscriptionLoading": "Cargando a subscrición de Kilo Pass",
     "retryHint": "Volve consultar o estado de Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Rematado o {{date}}",
     "notAvailableInApp": "Kilo Pass non está dispoñible na aplicación.",
     "statusActive": "Activo",
@@ -4700,6 +4710,7 @@
     "superseded": "Esta ligazón foi substituída desde outro dispositivo, polo que xa non funciona."
   },
   "sharedSession": {
+    "startedAt": "Iniciada ás {{time}}",
     "title": "Sesión compartida",
     "someone": "Alguén",
     "sharedBy": "Compartida por {{owner}}",

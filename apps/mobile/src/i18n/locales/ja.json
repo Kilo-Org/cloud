@@ -933,13 +933,24 @@
       "empty": "分析データのあるレビューはまだありません",
       "emptyDescription": "分析機能は、組織で有効になっている間に完了したレビューを記録します。",
       "offTitle": "{{platform}}の分析がオフになっています",
-      "offDescription": "Webでの組織設定で分析を有効にすると、完了したレビューが記録されます。",
-      "couldNotLoad": "分析を読み込めませんでした"
+      "offDescription": "分析をオンにできるのは、組織のオーナー、管理者、請求マネージャーといった請求ロールです。Web 上の組織設定からオンにすると、完了したレビューが記録されます。",
+      "couldNotLoad": "分析を読み込めませんでした",
+      "trackedReviewsCaption": "分析が有効な状態でこの期間内に完了したレビューです。実行中のレビューと失敗したレビューは決してカウントされません。",
+      "trackedReviewsUncounted": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。",
+      "trackedReviewsUncounted_one": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。",
+      "trackedReviewsUncounted_other": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。"
     },
     "council": {
       "title": "合議レビュー",
       "subtitle": "複数のスペシャリストが各プルリクエストをレビューし、その投票が1つの判定にまとめられます。",
-      "unavailable": "この組織では合議レビューを利用できません。",
+      "unavailablePersonallyTitle": "Enterprise 組織が必要です",
+      "unavailablePersonally": "合議レビューは個人アカウントには含まれません。",
+      "unavailablePersonallyAction": "組織を作成",
+      "unavailablePersonallySwitchAction": "組織を切り替え",
+      "unavailableOrganizationTitle": "合議レビューはご利用いただけません",
+      "unavailableForOrganization": "合議レビューには、有効なサブスクリプションまたはトライアル付きのエンタープライズプランが必要です。この組織には現在それがありません。",
+      "unavailableForOrganizationNeutral": "この組織では現在、合議レビューはご利用いただけません。後でもう一度お試しください。",
+      "unavailableOnBitbucket": "合議レビューは Bitbucket リポジトリでは利用できません。",
       "noRepositories": "リポジトリがまだ選択されていません。先にリポジトリ設定で選択してください。",
       "specialists": "スペシャリスト",
       "labels": "合議レビューを開始するラベル",
@@ -2590,7 +2601,6 @@
     "completingPurchase": "購入手続き中",
     "subscriptionLoading": "Kilo Passのサブスクリプションを読み込み中",
     "retryHint": "Kilo Passの状態の取得を再試行します。",
-    "cardAccessibility": "{{title}}。{{description}}。{{actionLabel}}",
     "endedOn": "{{date}}に終了しました",
     "notAvailableInApp": "Kilo Passはアプリでは利用できません。",
     "statusActive": "有効",
@@ -4700,6 +4710,7 @@
     "superseded": "このリンクは別のデバイスで置き換えられたため、使用できなくなりました。"
   },
   "sharedSession": {
+    "startedAt": "{{time}} に開始",
     "title": "共有セッション",
     "someone": "不明なユーザー",
     "sharedBy": "共有者：{{owner}}",

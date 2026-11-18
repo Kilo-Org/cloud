@@ -1476,13 +1476,24 @@
       "empty": "Kò sí àtúnyẹ̀wò pẹ̀lú ìṣirò",
       "emptyDescription": "Ìṣirò ń gbasilẹ̀ àwọn àtúnyẹ̀wò tó parí nígbà tí ó bá ṣí fún àjọ.",
       "offTitle": "Ìṣirò ti pa fún {{platform}}",
-      "offDescription": "Mú Ìṣirò ṣiṣẹ́ nínú ààtò àjọ lórí wẹ́ẹ̀bù láti gbasilẹ̀ àwọn àtúnyẹ̀wò tó parí.",
-      "couldNotLoad": "A kò lè gbé ìṣirò wọlé"
+      "offDescription": "Àwọn ipò owó-ìnáwó àjọ (àwọn olóhun, àwọn alákòóso àti àwọn olùdarí ìnáwó) lè ṣí ìṣirò sílẹ̀ nínú àwọn ètò àjọ lórí ayélujára láti gbasilẹ̀ àwọn àtúnyẹ̀wò tó parí.",
+      "couldNotLoad": "A kò lè gbé ìṣirò wọlé",
+      "trackedReviewsCaption": "Àwọn àtúnyẹ̀wò tó parí ní àkókò yìí nígbà tí ìṣirò ti ṣí sílẹ̀. A kì í tọpinpin àwọn àtúnyẹ̀wò tí ó ń ṣiṣẹ́ lọ́wọ́ báyìí àti àwọn tí ó kùnà rárá.",
+      "trackedReviewsUncounted": "Kì í ṣe tọpinpin: {{displayCount}} nínú {{displayTotal}} àtúnyẹ̀wò tó parí tí àjọ ní, àbájá wọn kò tíì gbasilẹ̀.",
+      "trackedReviewsUncounted_one": "Kì í ṣe tọpinpin: {{displayCount}} nínú {{displayTotal}} àtúnyẹ̀wò tó parí tí àjọ ní, àbájá wọn kò tíì gbasilẹ̀.",
+      "trackedReviewsUncounted_other": "Kì í ṣe tọpinpin: {{displayCount}} nínú {{displayTotal}} àtúnyẹ̀wò tó parí tí àjọ ní, àbájá wọn kò tíì gbasilẹ̀."
     },
     "council": {
       "title": "Àtúnyẹ̀wò ìgbìmọ̀",
       "subtitle": "Ọ̀pọ̀ àwọn akọ́ṣẹ́mọṣọ́ ń ṣàyẹ̀wò PR kọ̀ọ̀kan, àwọn ìdìbò wọn sì dàpọ̀ di ìpinnu kan.",
-      "unavailable": "Àtúnyẹ̀wò ìgbìmọ̀ kò sí fún àjọ yìí.",
+      "unavailablePersonallyTitle": "Nílò àjọ Enterprise kan",
+      "unavailablePersonally": "Àtúnyẹ̀wò ìgbìmọ̀ kì í ṣe apákan àkántì ẹ̀dá.",
+      "unavailablePersonallyAction": "Dá àjọ sílẹ̀",
+      "unavailablePersonallySwitchAction": "Yí àjọ padà",
+      "unavailableOrganizationTitle": "Àtúnyẹ̀wò ìgbìmọ̀ kò sí",
+      "unavailableForOrganization": "Àtúnyẹ̀wò ìgbìmọ̀ fẹ́r̀ẹ́ ètò Enterprise tó ní ìforúkọsílẹ̀ tó ń ṣiṣẹ́ tàbí àsìkò ìdánwò. Àjọ yìí kò ní i ní báyìí.",
+      "unavailableForOrganizationNeutral": "Àtúnyẹ̀wò ìgbìmọ̀ kò sí fún àjọ yìí ní báyìí. Gbìyànjú lẹ́ẹ̀kan sí i lẹ́yìn.",
+      "unavailableOnBitbucket": "Àtúnyẹ̀wò ìgbìmọ̀ kò sí fún àwọn ibi ìpamọ́ Bitbucket.",
       "noRepositories": "A kò tíì yan ibi ìpamọ́ kankan. Kọ́kọ́ yan àwọn ibi ìpamọ́ nínú àwọn ètò ibi ìpamọ́.",
       "specialists": "Àwọn akọ́ṣẹ́mọṣọ́",
       "labels": "Àwọn àmì tó ń mú àtúnyẹ̀wò ìgbìmọ̀ ṣiṣẹ́",
@@ -3133,7 +3144,6 @@
     "completingPurchase": "A ń parí rírà",
     "subscriptionLoading": "A ń gbé ìforúkọsílẹ̀ Kilo Pass wọlé",
     "retryHint": "Ó tún ń gbìyànjú láti gba ipò Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Ó ti parí ní {{date}}",
     "notAvailableInApp": "Kilo Pass kò sí nínú áàpù.",
     "statusActive": "Ń ṣiṣẹ́",
@@ -4700,6 +4710,7 @@
     "superseded": "A ti rọ́pò ìjápọ̀ yìí ní ibòmíràn, nítorí náà kò ṣiṣẹ́ mọ́."
   },
   "sharedSession": {
+    "startedAt": "Bẹ̀rẹ̀ ní {{time}}",
     "title": "Ìgbà iṣẹ́ tí a pín",
     "someone": "Ẹnìkan",
     "sharedBy": "{{owner}} ló pín in",

@@ -43,10 +43,12 @@ function emptyQueryResult(): Record<string, unknown> {
 
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 
-// The hook reads `useRouter` to open the Bitbucket connect sheet; the real
-// module's expo-runtime import cannot load in the pure project.
+// The hook pushes the Bitbucket connect sheet through `useSinglePushRoute`,
+// which reads `useRouter` and resets its guard on focus; the real module's
+// expo-runtime import cannot load in the pure project.
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: mocks.routerPush }),
+  useFocusEffect: () => undefined,
 }));
 
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
@@ -517,6 +519,21 @@ describe('useNewSessionRepos connect busy state', () => {
     });
     expect(mocks.openAuthorization).not.toHaveBeenCalled();
     expect(requireResult(resultRef).connectingProvider).toBeNull();
+  });
+
+  it('opens the Bitbucket connect sheet once for a double tap', () => {
+    const resultRef = mountRepos('org-1');
+
+    act(() => {
+      requireResult(resultRef).openIntegration('bitbucket');
+      requireResult(resultRef).openIntegration('bitbucket');
+    });
+
+    expect(mocks.routerPush).toHaveBeenCalledTimes(1);
+    expect(mocks.routerPush).toHaveBeenCalledWith({
+      pathname: '/(app)/bitbucket-connect',
+      params: { scope: 'org-1' },
+    });
   });
 
   it('ignores a second tap while a connect flow runs', () => {

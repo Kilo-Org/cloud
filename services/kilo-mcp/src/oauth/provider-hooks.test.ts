@@ -136,6 +136,53 @@ describe('onError', () => {
     }
   });
 
+  it('attributes a failed refresh to the account in the token prefix', () => {
+    const { analytics, calls } = fakeAnalytics();
+    onError(
+      { code: 'invalid_grant', description: 'Grant not found', status: 400, headers: {} },
+      { analytics, tokenUserId: 'user-7' }
+    );
+    expect(calls).toEqual([
+      {
+        phase: 'failed',
+        identity: null,
+        reason: 'invalid_grant',
+        detail: 'grant_not_found',
+        tokenUserId: 'user-7',
+      },
+    ]);
+  });
+
+  it('emits no tokenUserId for an authorization-code failure', () => {
+    const { analytics, calls } = fakeAnalytics();
+    onError(
+      {
+        code: 'invalid_grant',
+        description: 'Invalid authorization code',
+        status: 400,
+        headers: {},
+      },
+      { analytics }
+    );
+    expect(calls).toEqual([
+      {
+        phase: 'failed',
+        identity: null,
+        reason: 'invalid_grant',
+        detail: 'invalid_authorization_code',
+      },
+    ]);
+  });
+
+  it('keeps one failed event per library failure', () => {
+    const { analytics, calls } = fakeAnalytics();
+    onError(
+      { code: 'invalid_grant', description: 'Grant not found', status: 400, headers: {} },
+      { analytics, tokenUserId: 'user-7' }
+    );
+    expect(calls).toHaveLength(1);
+  });
+
   it('is a no-op without an analytics emitter and never throws', () => {
     expect(() =>
       onError({ code: 'server_error', description: 'x', status: 500, headers: {} })

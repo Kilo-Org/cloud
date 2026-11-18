@@ -1123,11 +1123,16 @@ const providerOptions: OAuthProviderOptions<Env> = {
   tokenExchangeCallback: options => tokenExchangeCallback(options),
 };
 
-function fetchWithProvider(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+function fetchWithProvider(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+  tokenUserId: string | null = null
+): Promise<Response> {
   const analytics = createMcpAnalytics({ env, ctx });
   const provider = new OAuthProvider<Env>({
     ...providerOptions,
-    onError: error => onError(error, { analytics }),
+    onError: error => onError(error, { analytics, tokenUserId }),
   });
   return provider.fetch(request, env, ctx);
 }
@@ -1151,8 +1156,8 @@ export class KiloMcpOAuthStore extends OAuthStore {
     // The provider's token route never dispatches a handler or uses ctx beyond
     // our analytics waitUntil. The DO state supplies that request lifetime.
     const tokenContext: Pick<ExecutionContext, 'waitUntil' | 'props'> = this.ctx;
-    return this.forwardToken(request, req =>
-      fetchWithProvider(req, this.env, tokenContext as ExecutionContext)
+    return this.forwardToken(request, (req, context) =>
+      fetchWithProvider(req, this.env, tokenContext as ExecutionContext, context.tokenUserId)
     );
   }
 }

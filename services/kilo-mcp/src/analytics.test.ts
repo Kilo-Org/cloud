@@ -161,6 +161,24 @@ describe('event builders: property allowlists', () => {
     );
     expect(withoutDetail.properties['detail']).toBeUndefined();
   });
+
+  it('oauthSignInEvent carries tokenUserId as a property and stays anonymous', () => {
+    const payload = buildCapturePayload(
+      oauthSignInEvent({
+        identity: null,
+        phase: 'failed',
+        reason: 'invalid_grant',
+        detail: 'grant_not_found',
+        tokenUserId: 'user-7',
+      }),
+      API_KEY
+    );
+    expect(payload.distinct_id).toBe(ANONYMOUS_DISTINCT_ID);
+    expect(payload.properties['tokenUserId']).toBe('user-7');
+    expect(payload.properties['userId']).toBeUndefined();
+    expect(payload.properties['$process_person_profile']).toBe(false);
+    expectExactKeys(payload, [...BASE_ANON, 'phase', 'reason', 'detail', 'tokenUserId']);
+  });
 });
 
 describe('identity binding', () => {

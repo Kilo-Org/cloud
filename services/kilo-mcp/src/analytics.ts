@@ -133,6 +133,12 @@ export type OAuthSignInInput = {
   reason?: string;
   /** Why the reason fired, as a member of the fixed vocabulary; never free text. */
   detail?: OAuthFailureDetail;
+  /**
+   * The account id in the presented refresh token's prefix. Unauthenticated
+   * input: it rides as a property for attribution and never becomes the event
+   * identity, so the event stays anonymous.
+   */
+  tokenUserId?: string;
 };
 
 /** `kilo_mcp_session_started`. */
@@ -189,6 +195,7 @@ export function oauthSignInEvent(input: OAuthSignInInput): McpAnalyticsEvent {
   if (input.clientId !== undefined) properties['clientId'] = input.clientId;
   if (input.reason !== undefined) properties['reason'] = input.reason;
   if (input.detail !== undefined) properties['detail'] = input.detail;
+  if (input.tokenUserId !== undefined) properties['tokenUserId'] = input.tokenUserId;
   return { event: OAUTH_EVENT_BY_PHASE[input.phase], identity: input.identity, properties };
 }
 

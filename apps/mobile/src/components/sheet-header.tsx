@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -7,6 +7,32 @@ import { type SheetHeaderTopInset, useSheetHeaderTopClearance } from '@/lib/form
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { useScreenInsets } from '@/lib/screen-insets';
+
+/**
+ * The padding a sheet's first row takes when the native drag handle already
+ * leaves the room above it. `Sheet` paints the handle above the React content
+ * unless `showHandle` is false, and the handle's own gap differs by platform
+ * (Material3 ~22dp, iOS 16pt), so each platform gets its own split: the row
+ * leaves the top to the host and gives the same room below the title.
+ *
+ * `SheetHeader` applies the `header` pair through `underHandle`: its divider
+ * ends the gap below the title. A sheet that draws its own title row with no
+ * divider uses the `row` pair, because there the first content's own top
+ * padding adds to the gap below the title. On iOS the row pair `pt-3 pb-2.5`
+ * measured 33.3 pt above the title against 26.7 pt below, so it moves 4 pt
+ * back below the title. Android measured balanced with one pair for both
+ * (41 / 43 dp).
+ *
+ * Resolved at render, not at import: the split depends on the platform the row
+ * paints on, and a module-level read freezes whatever platform the first import
+ * happened under.
+ */
+export function sheetUnderHandlePaddingClass(surface: 'header' | 'row'): string {
+  if (Platform.OS !== 'ios') {
+    return 'pb-7 pt-0';
+  }
+  return surface === 'header' ? 'pb-4 pt-1.5' : 'pb-3.5 pt-2';
+}
 
 export function SheetHeader({
   title,
@@ -20,6 +46,7 @@ export function SheetHeader({
   disabled = false,
   doneDisabled = false,
   topInset = 'always',
+  underHandle = false,
   surfaceClassName = 'bg-background',
 }: {
   title: string;
@@ -48,6 +75,15 @@ export function SheetHeader({
   doneDisabled?: boolean;
   topInset?: SheetHeaderTopInset;
   /**
+   * The header is the first content of a `Sheet` that paints its native drag
+   * handle above the React content (`showHandle`, the default). The host
+   * already spends the handle's own padding on the gap above the title
+   * (Material3's is 22dp), so the header drops the `pt-4` it would add on top
+   * of that padding and gives the same room below the title instead. The title
+   * then sits under the handle no farther than it sits above its divider.
+   */
+  underHandle?: boolean;
+  /**
    * The surface the sheet paints behind the header. A sheet that sits on the
    * raised dark surface passes `bg-card` so its top edge separates from the
    * near-black window behind it; the app canvas colour is the default.
@@ -65,6 +101,9 @@ export function SheetHeader({
   // clears the status bar. It is known before the first frame, so the header
   // paints once, already settled, instead of moving by the inset.
   const topInsetHeight = useSheetHeaderTopClearance(topInset);
+  // Resolved at render so each platform reads its own pair, through the same
+  // helper the sheets that draw their own title row use.
+  const underHandlePadding = sheetUnderHandlePaddingClass('header');
   const safeAreaStyle =
     topInsetHeight > 0 || insets.left > 0 || insets.right > 0
       ? {
@@ -81,7 +120,20 @@ export function SheetHeader({
     // flattened header breaks that native pass and the list paints over it.
     <View
       collapsable={false}
-      className={cn('border-b border-border px-4 pb-3 pt-4', surfaceClassName)}
+      className={cn(
+        'border-b border-border px-4',
+        // The centred 48dp action row leaves ~10dp of leading above the title's
+        // line box and the same below it; `pb-3` puts the divider ~21dp under
+        // the title. A native handle already leaves room above the content, so
+        // `pt-4` made the gap over the title about twice the gap below it.
+        // The handle's own gap differs by platform (Material3 ~22dp, iOS 16pt),
+        // so each platform gets its own split: measured 33.9dp above and
+        // 35.9dp below on the Android emulator, and 26.3pt above and 33.7pt
+        // below on iOS with `pb-5 pt-1`. `pb-4 pt-1.5` predicts 28.3pt and
+        // 29.7pt, so the gap over the title is no larger than the gap below it.
+        underHandle ? underHandlePadding : 'pb-3 pt-4',
+        surfaceClassName
+      )}
     >
       <View style={safeAreaStyle}>
         <View className="min-h-[48px] flex-row items-center gap-x-3">

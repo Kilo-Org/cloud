@@ -164,6 +164,7 @@ function configuredPrepareInput(
         { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
       ],
       runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
+      modelContextLimits: { 'example/model': 50_000 },
       kiloCommands: [{ name: 'review', template: 'Review the change' }],
     },
     credentials: { ...input.credentials, scopeId: 'shared-worktree' },
@@ -302,6 +303,7 @@ async function connectAndHello(
   options: {
     workspaceConfiguration?: boolean;
     runtimeInstructions?: boolean;
+    runtimeWebSearch?: boolean;
     runtimeHarness?: string;
   } = {}
 ): Promise<{ wrapper: FakeWrapper; credential: string; allocationId: string }> {
@@ -1293,6 +1295,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(first.spec).not.toHaveProperty('setupCommands');
     expect(first.spec).not.toHaveProperty('runtimeAgents');
     expect(first.spec).not.toHaveProperty('runtimeInstructions');
+    expect(first.spec).not.toHaveProperty('modelContextLimits');
     expect(first.spec).not.toHaveProperty('kiloCommands');
     expect(first.spec).not.toHaveProperty('env');
     expect(first.workspace).toMatchObject({
@@ -1301,6 +1304,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
       ],
       setupCommands: ['echo shared'],
       runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
+      modelContextLimits: { 'example/model': 50_000 },
       kiloCommands: [{ name: 'review', template: 'Review the change' }],
     });
 
@@ -1348,6 +1352,57 @@ describe('SandboxControlV2 routes and forwarding', () => {
         expect(JSON.parse(row?.spec ?? '{}').runtimeInstructions).toEqual([
           { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
         ]);
+        wrapper.send({ type: 'session.ready', sessionId: SESSION });
+        await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+      } finally {
+        wrapper.close();
+      }
+    }
+  );
+
+  it.each([
+    { workspaceConfiguration: false, runtimeWebSearch: false, off: false },
+    { workspaceConfiguration: false, runtimeWebSearch: false, off: true },
+    { workspaceConfiguration: true, runtimeWebSearch: false, off: false },
+    { workspaceConfiguration: true, runtimeWebSearch: false, off: true },
+    { workspaceConfiguration: true, runtimeWebSearch: true, off: false },
+    { workspaceConfiguration: true, runtimeWebSearch: true, off: true },
+  ])(
+    'negotiates web search (attach: $workspaceConfiguration, capability: $runtimeWebSearch, off: $off)',
+    async ({ off, ...options }) => {
+      const preference = off
+        ? { webSearchDisabled: true as const }
+        : { webSearchProvider: 'parallel' as const };
+      const provider = createFakeProvider();
+      const { stub } = await setup(provider);
+      const input = configuredPrepareInput(SESSION, SHARED_DIRECTORY);
+      await stub.prepare({ ...input, spec: { ...input.spec, ...preference } });
+      const { wrapper } = await connectAndHello(provider, 'wr_search', {
+        ...options,
+        runtimeHarness: 'kilo2',
+      });
+      try {
+        const frame = await wrapper.next();
+        expect(frame?.type).toBe(
+          options.workspaceConfiguration ? 'session.attach' : 'session.prepare'
+        );
+        if (frame?.type !== 'session.attach' && frame?.type !== 'session.prepare') {
+          throw new Error('expected a preparation frame');
+        }
+        const workspace = frame.type === 'session.attach' ? frame.workspace : frame.spec;
+        if (options.runtimeWebSearch) {
+          expect(workspace).toMatchObject(preference);
+        } else {
+          expect(workspace).not.toHaveProperty('webSearchDisabled');
+          expect(workspace).not.toHaveProperty('webSearchProvider');
+        }
+        if (frame.type === 'session.attach') {
+          expect(frame.spec).not.toHaveProperty('webSearchDisabled');
+          expect(frame.spec).not.toHaveProperty('webSearchProvider');
+        }
+        expect(frame.spec.permission?.websearch).toBe(
+          !options.runtimeWebSearch && off ? 'deny' : undefined
+        );
         wrapper.send({ type: 'session.ready', sessionId: SESSION });
         await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
       } finally {
@@ -1670,6 +1725,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
       { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
     ]);
     expect(frame.spec.runtimeAgents).toEqual([{ slug: 'helper', name: 'Helper', config: {} }]);
+    expect(frame.spec.modelContextLimits).toEqual({ 'example/model': 50_000 });
     expect(frame.spec.kiloCommands).toEqual([{ name: 'review', template: 'Review the change' }]);
   });
 

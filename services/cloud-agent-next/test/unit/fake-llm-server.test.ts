@@ -1563,6 +1563,47 @@ describe('fake-llm-server HTTP', () => {
     });
   });
 
+  it('echoes numbered file contents from a Kilo v2 paged read', async () => {
+    const h = await start();
+    const prompt = '__fake__:file:read:native-read:shared-checkout.txt';
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: [
+          'Read file shared-checkout.txt, lines 1-2',
+          '1: nonce-value',
+          '2: fixture contents',
+          '[Output truncated. Continue reading with offset: 3]',
+        ].join('\n'),
+      },
+    ]);
+    expect(response.status).toBe(200);
+    expect(assistantContent(await parseSse(response))).toBe(
+      'file-read:shared-checkout.txt\nnonce-value\nfixture contents'
+    );
+  });
+
+  it('rejects a Kilo v2 read result for a different file', async () => {
+    const h = await start();
+    const prompt = '__fake__:file:read:native-wrong-path:shared-checkout.txt';
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: 'Read file different.txt, lines 1-1\n1: nonce-value',
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
   it('ignores a previous opTag tool result and emits a fresh read call', async () => {
     const h = await start();
     const opTag = 'file-read-fresh';

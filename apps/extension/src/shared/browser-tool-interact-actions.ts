@@ -1,7 +1,8 @@
 /* eslint-disable id-length, max-lines -- CDP mouse commands name their coordinates `x` and `y`; one module owns the eight interaction tools and the shared CDP and page-helper plumbing keeps their shapes consistent. */
 import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
-import type { BrowserToolResolvedTarget } from './browser-tool-session';
+import { ambiguousSelectorError } from './browser-agent-checks';
+import type { BrowserToolResolvedTarget, BrowserToolUniqueTarget } from './browser-tool-session';
 import type { EvalTabResult } from './tab-debugger';
 
 /**
@@ -66,7 +67,7 @@ const refPattern = /^(?:ref=)?(?:f\d+)?e\d+$/u;
 const looksLikeRef = (target: string): boolean => refPattern.test(target.trim());
 
 type TargetResolution =
-  | { readonly ok: true; readonly target: BrowserToolResolvedTarget }
+  | { readonly ok: true; readonly target: BrowserToolUniqueTarget }
   | { readonly ok: false; readonly error: string };
 
 const resolveTargetOrError = async (
@@ -74,6 +75,10 @@ const resolveTargetOrError = async (
   target: string
 ): Promise<TargetResolution> => {
   const resolved = await session.resolveTarget(target);
+
+  if (resolved?.kind === 'ambiguous') {
+    return { error: ambiguousSelectorError(resolved.matches), ok: false };
+  }
 
   if (resolved !== undefined) {
     return { ok: true, target: resolved };
@@ -93,7 +98,7 @@ type CentreResult =
   | { readonly centreX: number; readonly centreY: number; readonly ok: true }
   | { readonly error: string; readonly ok: false };
 
-const nodeParams = (target: BrowserToolResolvedTarget): Record<string, unknown> =>
+const nodeParams = (target: BrowserToolUniqueTarget): Record<string, unknown> =>
   target.kind === 'ref' ? { backendNodeId: target.backendNodeId } : { nodeId: target.nodeId };
 
 const boxModelResponseSchema = z.object({
@@ -137,7 +142,7 @@ const NO_VISIBLE_BOX_ERROR =
  */
 const resolveCentre = async (
   session: BrowserToolInteractSession,
-  target: BrowserToolResolvedTarget
+  target: BrowserToolUniqueTarget
 ): Promise<CentreResult> => {
   try {
     await session.send('DOM.scrollIntoViewIfNeeded', nodeParams(target));
@@ -503,7 +508,7 @@ const nodeIsConnected = async (
  */
 const toPageHelperTarget = async (
   session: BrowserToolInteractSession,
-  target: BrowserToolResolvedTarget
+  target: BrowserToolUniqueTarget
 ): Promise<PageHelperTargetResult> => {
   if (target.kind === 'selector') {
     return { ok: true, target: { selector: target.selector } };

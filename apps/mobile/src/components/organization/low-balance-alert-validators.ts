@@ -37,16 +37,33 @@ export function parseEmails(value: string): string[] {
     .filter(email => email !== '');
 }
 
+/** The reserve set for `FormField`'s `reserveErrorMessages`: every message the threshold rule can show. */
+export function thresholdErrorMessages(): readonly [aboveMaximum: string, invalid: string] {
+  return [
+    aboveMaximumError(MAX_THRESHOLD_USD),
+    i18n.t('organization.lowBalanceAlert.thresholdError'),
+  ];
+}
+
 /** Inline error for the balance field, or `null` while the value is valid. */
 export function thresholdError(value: string): string | null {
+  const [aboveMaximum, invalid] = thresholdErrorMessages();
   const { problem } = readAmountAtMost(value, MAX_THRESHOLD_USD);
   if (problem === null) {
     return null;
   }
-  if (problem === 'aboveMaximum') {
-    return aboveMaximumError(MAX_THRESHOLD_USD);
-  }
-  return i18n.t('organization.lowBalanceAlert.thresholdError');
+  return problem === 'aboveMaximum' ? aboveMaximum : invalid;
+}
+
+/**
+ * The reserve set for `FormField`'s `reserveErrorMessages`: every message the
+ * recipient rule can show.
+ */
+export function emailsErrorMessages(): readonly [required: string, invalid: string] {
+  return [
+    i18n.t('organization.lowBalanceAlert.emailsRequired'),
+    i18n.t('organization.lowBalanceAlert.emailsInvalid'),
+  ];
 }
 
 /**
@@ -56,13 +73,12 @@ export function thresholdError(value: string): string | null {
  * separate addresses, so neither repeats it.
  */
 export function emailsError(value: string): string | null {
+  const [required, invalid] = emailsErrorMessages();
   const emails = parseEmails(value);
   if (emails.length === 0) {
-    return i18n.t('organization.lowBalanceAlert.emailsRequired');
+    return required;
   }
-  return emails.some(email => !EMAIL_SCHEMA.safeParse(email).success)
-    ? i18n.t('organization.lowBalanceAlert.emailsInvalid')
-    : null;
+  return emails.some(email => !EMAIL_SCHEMA.safeParse(email).success) ? invalid : null;
 }
 
 /** Where a failed save belongs and what it says, both localized. */

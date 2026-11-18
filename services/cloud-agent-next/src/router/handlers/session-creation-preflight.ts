@@ -2,7 +2,10 @@ import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
   getBuiltinAgentSettings,
+  getModelContextLimits,
+  getWebSearchPreference,
   hasBuiltinAgentSettings,
+  hasModelContextLimits,
   loadEnvironmentForSession,
   mergeProfileConfiguration,
   profileMcpServersToClientRecord,
@@ -14,7 +17,9 @@ import {
   type EnvironmentSessionLayer,
   type InlineAgentInput,
   type MergeProfileConfigurationResult,
+  type ModelContextLimits,
   type ProfileOwner,
+  type WebSearchPreference,
 } from '@kilocode/cloud-agent-profile';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
@@ -193,9 +198,19 @@ async function resolveProfileForSessionCreateRequest(
 function applyProfileResolution(
   input: SessionCreateRequest,
   resolved: MergeProfileConfigurationResult | null,
-  builtinAgents: BuiltinAgentSettings
+  builtinAgents: BuiltinAgentSettings,
+  modelContextLimits: ModelContextLimits,
+  webSearchPreference: WebSearchPreference
 ): SessionCreateRequest {
+  const webSearch = {
+    webSearchDisabled: webSearchPreference === 'off' ? (true as const) : undefined,
+    webSearchProvider:
+      webSearchPreference === 'off' || webSearchPreference === 'default'
+        ? undefined
+        : webSearchPreference,
+  };
   const hasBuiltinAgents = hasBuiltinAgentSettings(builtinAgents);
+  const hasContextLimits = hasModelContextLimits(modelContextLimits);
   if (!resolved) {
     return {
       ...input,
@@ -210,6 +225,8 @@ function applyProfileResolution(
           runtimeSkills: input.profile?.overrides?.runtimeSkills,
           runtimeAgents: input.profile?.overrides?.runtimeAgents,
           ...(hasBuiltinAgents ? { builtinAgents } : {}),
+          ...(hasContextLimits ? { modelContextLimits } : {}),
+          ...webSearch,
         },
       },
     };
@@ -235,6 +252,8 @@ function applyProfileResolution(
         runtimeSkills: resolved.skills,
         runtimeAgents: resolved.agents,
         ...(hasBuiltinAgents ? { builtinAgents } : {}),
+        ...(hasContextLimits ? { modelContextLimits } : {}),
+        ...webSearch,
         kiloCommands: resolved.kiloCommands ?? input.profile?.resolved?.kiloCommands,
         runtimeInstructions: resolved.instructions ?? input.profile?.resolved?.runtimeInstructions,
       },
@@ -278,6 +297,40 @@ async function loadBuiltinAgentSettingsForSession(
   }
 }
 
+async function loadModelContextLimitsForSession(
+  ctx: Pick<TRPCContext, 'env' | 'userId'>,
+  db?: WorkerDb
+): Promise<ModelContextLimits> {
+  try {
+    return await getModelContextLimits(db ?? getPgDb(ctx.env), ctx.userId);
+  } catch (error) {
+    logger
+      .withFields({
+        userId: ctx.userId,
+        errorClass: error instanceof Error ? error.name : typeof error,
+      })
+      .warn('Unable to load model context limit preferences; using defaults');
+    return {};
+  }
+}
+
+async function loadWebSearchPreferenceForSession(
+  ctx: Pick<TRPCContext, 'env' | 'userId'>,
+  db?: WorkerDb
+): Promise<WebSearchPreference> {
+  try {
+    return await getWebSearchPreference(db ?? getPgDb(ctx.env), ctx.userId);
+  } catch (error) {
+    logger
+      .withFields({
+        userId: ctx.userId,
+        errorClass: error instanceof Error ? error.name : typeof error,
+      })
+      .warn('Unable to load web search preferences; using defaults');
+    return 'default';
+  }
+}
+
 export async function resolveEffectiveSessionConfiguration(
   ctx: Pick<TRPCContext, 'env' | 'userId'>,
   input: SessionCreateRequest,
@@ -292,14 +345,24 @@ export async function resolveEffectiveSessionConfiguration(
   });
   // An environment resolves only under the implicit-defaults policy, so the
   // profile path always runs when one exists.
-  const [resolved, builtinAgents] = await Promise.all([
+  const [resolved, builtinAgents, modelContextLimits, webSearchPreference] = await Promise.all([
     shouldResolveProfile(input, policy)
       ? resolveProfileForSessionCreateRequest(ctx, input, environment?.layer, db)
       : Promise.resolve(null),
     loadBuiltinAgentSettingsForSession(ctx, db),
+    loadModelContextLimitsForSession(ctx, db),
+    input.options?.kilocodeOrganizationId
+      ? Promise.resolve('default' as const)
+      : loadWebSearchPreferenceForSession(ctx, db),
   ]);
 
-  const resolvedRequest = applyProfileResolution(input, resolved, builtinAgents);
+  const resolvedRequest = applyProfileResolution(
+    input,
+    resolved,
+    builtinAgents,
+    modelContextLimits,
+    webSearchPreference
+  );
   assertResolvedConfigurationWithinSessionLimits(resolvedRequest.profile?.resolved);
   // The reference and the allocation travel beside the merged configuration;
   // a client cannot set them.

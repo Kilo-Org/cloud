@@ -1066,12 +1066,12 @@ function typeInto(field: TestRenderer.ReactTestInstance, value: string) {
   });
 }
 
-/** The remaining-character row, found by the counted sentence it is named with. */
+/** The remaining-character row, found by the counted sentence it shows. */
 function counterRow(root: TestRenderer.ReactTestInstance, remaining: number) {
   return root.findAll(
     node =>
       String(node.type) === 'Text' &&
-      propOf(node, 'accessibilityLabel') ===
+      propOf(node, 'children') ===
         i18n.t('agentChat.composer.charactersRemaining', { count: remaining })
   );
 }
@@ -1107,10 +1107,10 @@ describe('ManualReviewScreen instructions limit', () => {
     const { renderer, unmount } = await renderScreen();
     typeInto(instructionsField(renderer.root), 'x'.repeat(3_500));
 
-    // The number is the visible row; the counted sentence is its accessible
-    // name, so a screen reader reads "500 characters remaining", not "500".
+    // The counted sentence is the visible row, so a sighted reader and a screen
+    // reader both get "500 characters remaining", not "500".
     const [counter] = counterRow(renderer.root, 500);
-    expect(counter?.props.children).toBe(500);
+    expect(counter?.props.children).toBe('500 characters remaining');
 
     unmount();
   });

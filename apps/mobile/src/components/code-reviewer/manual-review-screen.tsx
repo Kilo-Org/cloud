@@ -22,6 +22,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
+import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
@@ -458,21 +459,10 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               }}
             />
             {/* One line at a time: the room left while the draft nears the
-                bound, the bound itself once it is reached. The counted sentence
-                is the row's accessible name, so the number is not read alone. */}
+                bound, the bound itself once it is reached. */}
             {instructionsRemaining > 0 &&
             instructionsRemaining <= INSTRUCTIONS_COUNTER_VISIBLE_REMAINING ? (
-              <View className="flex-row justify-end">
-                {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
-                <Text
-                  className="text-xs font-normal text-muted-foreground"
-                  accessibilityLabel={t('agentChat.composer.charactersRemaining', {
-                    count: instructionsRemaining,
-                  })}
-                >
-                  {instructionsRemaining}
-                </Text>
-              </View>
+              <RemainingCharactersCounter remaining={instructionsRemaining} />
             ) : null}
             {instructionsRemaining <= 0 ? (
               <AccessibleStatus

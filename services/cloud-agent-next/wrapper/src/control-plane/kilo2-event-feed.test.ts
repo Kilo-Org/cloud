@@ -411,6 +411,7 @@ it.each([200, 503])(
 it('forwards an unchanged assistant projection once', async () => {
   const directory = '/workspace';
   const sessionID = 'ses_local';
+  const error = { type: 'provider.quota', message: 'Request failed', status: 402 };
   const events: KiloFeedEvent[] = [];
   let text = 'first';
   let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
@@ -441,6 +442,7 @@ it('forwards an unchanged assistant projection once', async () => {
               type: 'assistant',
               time: { created: 2 },
               content: [{ type: 'text', text }],
+              error,
             },
           ],
           cursor: { next: null },
@@ -476,7 +478,18 @@ it('forwards an unchanged assistant projection once', async () => {
     text = 'second';
     controller?.enqueue(frame('session.step.ended', { sessionID }));
     await until(() => updates().length === 2);
-    expect(updates()[1].properties).toMatchObject({ parentID: '', message: { id: 'msg_answer' } });
+    expect(updates()[1].properties).toMatchObject({
+      parentID: '',
+      message: { id: 'msg_answer', error },
+    });
+    expect(activity[0].activity).toMatchObject({
+      type: 'message',
+      message: {
+        id: 'msg_answer',
+        sessionId: sessionID,
+        error: { name: 'APIError', data: { statusCode: 402 } },
+      },
+    });
     // Each changed read reports the message, then its parts under the delta identity.
     expect(
       activity.map(event =>
@@ -666,12 +679,24 @@ it.each([
     'model_catalog_unavailable',
   ],
   [catalogFailure('HTTP 503'), 'provider_unavailable'],
+  ['Model unavailable: kilo/nvidia/nemotron-3-ultra-550b-a55b:free', 'model_unavailable'],
+  [
+    'SessionRunnerModel.ModelUnavailableError: Model unavailable: kilo/example',
+    'model_unavailable',
+  ],
+  ['Variant unavailable for kilo/nvidia/nemotron-3.5-super-vl:free: instant', 'invalid_request'],
+  [
+    'SessionRunnerModel.VariantUnavailableError: Variant unavailable for kilo/example: instant',
+    'invalid_request',
+  ],
+  ['Request failed: Model unavailable: kilo/example', 'unknown'],
   [catalogFailure('HTTP 401'), 'provider_authentication'],
   [catalogFailure('network'), 'unknown'],
   ['No model is selected', 'unknown'],
 ] as const)('classifies a native no-route failure %s as %s', (message, reason) => {
   const failure = classifyAssistantFailure(nativeTurnError({ type: 'provider.no-route', message }));
   expect(failure.reason).toBe(reason);
+  if (reason === 'model_unavailable') expect(failure.terminalCode).toBe('model_missing');
   if (reason === 'model_catalog_unavailable') {
     expect(failure.safeMessage).toBe('The Kilo model catalog could not be loaded');
     expect(failure.terminalCode).toBeUndefined();

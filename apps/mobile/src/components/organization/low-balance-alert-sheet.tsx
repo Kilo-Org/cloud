@@ -8,10 +8,12 @@ import { View } from 'react-native';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import {
   emailsError,
+  emailsErrorMessages,
   parseEmails,
   parseThreshold,
   saveErrorCopy,
   thresholdError,
+  thresholdErrorMessages,
 } from '@/components/organization/low-balance-alert-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
@@ -24,6 +26,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { formatNumber } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
@@ -132,7 +135,18 @@ function LowBalanceAlertForm({
   return (
     <>
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text className="text-sm font-medium">{t('common.enabled')}</Text>
+        {/* The slot wraps the label and carries the gutter (`pe-3`) instead of
+            the label, so a wrapped catalog line stays clear of the switch's
+            own 44 dp box — the shape sibling toggle rows use. The label keeps
+            the hidden-label props: hiding the wrapper's own node would leave
+            the inner text in the tree (`no` hides one view,
+            `no-hide-descendants` hides a subtree), so the props sit on the
+            text itself. The switch below already names the row. */}
+        <View className="min-w-0 flex-1 pe-3">
+          <Text {...HIDDEN_LABEL_PROPS} className="text-sm font-medium">
+            {t('organization.lowBalanceAlert.enableA11y')}
+          </Text>
+        </View>
         <Switch
           accessibilityLabel={t('organization.lowBalanceAlert.enableA11y')}
           value={enabled}
@@ -155,6 +169,7 @@ function LowBalanceAlertForm({
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}
             validate={thresholdError}
+            reserveErrorMessages={thresholdErrorMessages()}
             error={draftThresholdError ?? undefined}
             onChangeText={value => {
               thresholdRef.current = value;
@@ -168,12 +183,14 @@ function LowBalanceAlertForm({
             <FormField
               label={t('organization.lowBalanceAlert.notifyEmailsLabel')}
               required
+              validateWhileTyping
               placeholder={t('organization.inviteMember.emailPlaceholder')}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               defaultValue={emailsRef.current || undefined}
               validate={emailsError}
+              reserveErrorMessages={emailsErrorMessages()}
               onChangeText={value => {
                 emailsRef.current = value;
                 revalidate(enabled, thresholdRef.current, value);

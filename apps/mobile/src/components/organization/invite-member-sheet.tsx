@@ -9,6 +9,7 @@ import { roleLabel } from '@/components/organization/member-row';
 import { getInviteSuccessMessage } from '@/components/organization/invited-member-row-state';
 import {
   inviteEmailError,
+  inviteEmailErrorMessages,
   inviteErrorCopy,
 } from '@/components/organization/invite-member-validators';
 import {
@@ -233,6 +234,7 @@ export function InviteMemberSheet() {
           key={formEpoch}
           label={t('common.email')}
           required
+          validateWhileTyping
           placeholder={t('organization.inviteMember.emailPlaceholder')}
           keyboardType="email-address"
           autoCapitalize="none"
@@ -241,6 +243,8 @@ export function InviteMemberSheet() {
           textContentType="emailAddress"
           autoFocus
           validate={inviteEmailError}
+          alwaysReserve
+          reserveErrorMessages={inviteEmailErrorMessages()}
           error={visibleInviteError?.field === 'email' ? visibleInviteError.message : undefined}
           onChangeText={value => {
             emailRef.current = value;

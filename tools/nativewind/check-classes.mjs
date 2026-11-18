@@ -136,30 +136,36 @@ const SCROLL_CONTAINER =
 const HORIZONTAL_PADDING = /^-?(?:p|px|pl|pr|ps|pe)-/;
 
 /**
- * The class strings in one `className` value: every string literal and
- * template chunk it holds, including the ones a `${…}` or a `cn(…)` argument
- * contributes, so `cn('flex-1', compact && 'p-2')` contributes `p-2` and
- * `` `flex-1 ${wide ? 'p-6' : ''}` `` contributes `p-6`.
+ * Every string chunk one syntax tree holds, with where each chunk starts in
+ * the source text and the two readings of its content. These are the only
+ * places a class name can be written: a comment, a regular expression and an
+ * identifier are nodes of their own, so a ban can no longer fire on text that
+ * only reads like a class.
  *
- * Only the value of the element's own `className` is read, so an element
- * nested in `renderItem` or `ListHeaderComponent` keeps its classes to itself.
+ * Each chunk is read two ways, and which reading a rule takes is the rule's
+ * choice:
+ * - `raw` is the chunk's source text — a string literal keeps its quotes —
+ *   so a match's offset inside it maps straight back to the file's line,
+ *   escapes included. The ban-list rules match on this.
+ * - `value` is the string the code evaluates to (`cooked ?? raw` for a
+ *   template chunk), so an escaped literal reads as its class name. The
+ *   scroll-padding rule reads this.
  */
-function classStrings(value) {
-  if (value === null || value === undefined) {
-    return [];
-  }
-  if (value.type === 'Literal') {
-    return typeof value.value === 'string' ? [value.value] : [];
-  }
-  const strings = [];
-  walk(value, node => {
+function stringChunks(root, text) {
+  const chunks = [];
+  walk(root, node => {
     if (node.type === 'Literal' && typeof node.value === 'string') {
-      strings.push(node.value);
+      chunks.push({ start: node.start, raw: text.slice(node.start, node.end), value: node.value });
     } else if (node.type === 'TemplateElement') {
-      strings.push(node.value.cooked ?? node.value.raw);
+      // The node spans its delimiters; the chunk itself starts just inside.
+      chunks.push({
+        start: node.start + 1,
+        raw: node.value.raw,
+        value: node.value.cooked ?? node.value.raw,
+      });
     }
   });
-  return strings;
+  return chunks;
 }
 
 /** The source of a JSX tag's name, `ScrollView` or `Animated.ScrollView` alike. */
@@ -185,7 +191,8 @@ export function checkScrollPadding(relative, program, text, lineOf) {
     );
     const padding = [
       ...new Set(
-        classStrings(attribute?.value)
+        stringChunks(attribute?.value, text)
+          .map(chunk => chunk.value)
           .flatMap(classes => classes.split(/\s+/))
           .filter(classes => HORIZONTAL_PADDING.test(classes))
       ),
@@ -353,40 +360,23 @@ export function checkDirectIntl(relative, absolute, program, lineOf) {
   return problems;
 }
 
-/**
- * The raw source of every string literal and template chunk in one file, with
- * the offset it starts at. These are the only places a class name can be
- * written: a comment, a regular expression and an identifier are nodes of
- * their own, so a ban can no longer fire on text that only reads like a class.
- *
- * The raw source is what the rules read, so a match's offset inside it maps
- * straight back to the file's line, escapes included.
- */
-function stringSources(program, text) {
-  const sources = [];
-  walk(program, node => {
-    if (node.type === 'Literal' && typeof node.value === 'string') {
-      sources.push({ start: node.start, source: text.slice(node.start, node.end) });
-    } else if (node.type === 'TemplateElement') {
-      // The node spans its delimiters; the chunk itself starts just inside.
-      sources.push({ start: node.start + 1, source: node.value.raw });
-    }
-  });
-  return sources;
-}
-
 /** The ban list over one file: every match of every rule, in source order. */
 export function checkRules(relative, program, text, lineOf) {
   const problems = [];
-  const strings = stringSources(program, text);
-  for (const rule of rules()) {
-    for (const { start, source } of strings) {
-      for (const match of source.matchAll(rule.pattern)) {
-        problems.push(`${relative}:${lineOf(start + match.index)}: "${match[0]}" ${rule.advice}`);
+  for (const { start, raw } of stringChunks(program, text)) {
+    for (const rule of rules()) {
+      for (const match of raw.matchAll(rule.pattern)) {
+        problems.push({
+          offset: start + match.index,
+          problem: `${relative}:${lineOf(start + match.index)}: "${match[0]}" ${rule.advice}`,
+        });
       }
     }
   }
-  return problems;
+  // One chunk can match several rules, so emission is sorted by offset after
+  // collection: the chunk-major walk alone does not order matches inside a
+  // chunk, and the docstring promises source order.
+  return problems.sort((left, right) => left.offset - right.offset).map(entry => entry.problem);
 }
 
 /**
@@ -400,13 +390,17 @@ export function checkCompilerStillDropsThese() {
   // reported the same way, and a stack trace would bury the fixture name.
   const firstLine = error =>
     (error instanceof Error ? error.message : String(error)).split('\n')[0];
+
+  /** One compiler-pin fixture that could not compile: the pin cannot hold. */
+  function compilerPinFailure(fixture, error) {
+    return `check-classes: the compiler failed on ${fixture} (${firstLine(error)}) — the compiler pins cannot be verified without it`;
+  }
   let compile;
   try {
     ({ compile } = require('react-native-css/compiler'));
   } catch (error) {
-    const detail = firstLine(error);
     problems.push(
-      `check-classes: react-native-css/compiler did not resolve (${detail}) — run pnpm install; the compiler pins cannot be verified without it`
+      `check-classes: react-native-css/compiler did not resolve (${firstLine(error)}) — run pnpm install; the compiler pins cannot be verified without it`
     );
     return problems;
   }
@@ -448,10 +442,7 @@ export function checkCompilerStillDropsThese() {
   try {
     alignment = compile('.x { text-align: start; }').warnings();
   } catch (error) {
-    const detail = firstLine(error);
-    problems.push(
-      `check-classes: the compiler failed on the text-align: start fixture (${detail}) — the compiler pins cannot be verified without it`
-    );
+    problems.push(compilerPinFailure('the text-align: start fixture', error));
     return problems;
   }
   if (!JSON.stringify(alignment ?? null).includes('text-align')) {
@@ -475,7 +466,7 @@ export function checkCompilerStillDropsThese() {
     );
   } catch (error) {
     problems.push(
-      `check-classes: the compiler failed on the color-mix over an @theme inline variable fixture (${firstLine(error)}) — the compiler pins cannot be verified without it`
+      compilerPinFailure('the color-mix over an @theme inline variable fixture', error)
     );
     return problems;
   }
@@ -497,9 +488,7 @@ export function checkCompilerStillDropsThese() {
       'lineHeight'
     );
   } catch (error) {
-    problems.push(
-      `check-classes: the compiler failed on the spacing-scale line-height fixture (${firstLine(error)}) — the compiler pins cannot be verified without it`
-    );
+    problems.push(compilerPinFailure('the spacing-scale line-height fixture', error));
     return problems;
   }
   if (!defersTo(spacingLeading, 'calc')) {

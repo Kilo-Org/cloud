@@ -509,6 +509,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
           }
         : {
             ...parsed.data,
+            model: resolvedModel,
             provider: providerPolicy,
             user: generateProviderSpecificHash(user.id, route.provider),
           },

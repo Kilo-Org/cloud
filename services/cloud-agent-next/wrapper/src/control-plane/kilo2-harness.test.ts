@@ -167,9 +167,16 @@ describe('Kilo v2 harness permission replies', () => {
 });
 
 describe('Kilo v2 harness commit messages', () => {
-  it('uses the native commit-message RPC in the target repository with server authorization', async () => {
+  const modelPath = '/api/model/default';
+  const generatePath = '/api/rpc/kilocode.commit-message/generate';
+
+  it('loads the default model before calling the authorized RPC in the target repository', async () => {
     const message = 'fix: preserve descriptive commit messages';
-    const { url, requests } = startStub(() => Response.json({ output: { message } }));
+    const { url, requests } = startStub((_request, url) =>
+      url.pathname === modelPath
+        ? new Response(null, { status: 204 })
+        : Response.json({ output: { message } })
+    );
     const repository = '/workspace/another repository';
 
     expect(await createHarness(url).generateCommitMessage({ path: repository })).toEqual({
@@ -177,8 +184,15 @@ describe('Kilo v2 harness commit messages', () => {
     });
     expect(requests).toEqual([
       {
+        method: 'GET',
+        pathname: modelPath,
+        directory: repository,
+        authorization: 'Basic harness-test',
+        body: undefined,
+      },
+      {
         method: 'POST',
-        pathname: '/api/rpc/kilocode.commit-message/generate',
+        pathname: generatePath,
         directory: repository,
         authorization: 'Basic harness-test',
         body: { input: { path: repository } },
@@ -192,12 +206,25 @@ describe('Kilo v2 harness commit messages', () => {
     { status: 200, body: { data: { text: 'Wrong API envelope' } } },
     { status: 200, body: { error: { code: 'failed', message: 'Generation failed' } } },
   ])('rejects failed or invalid native generation responses: %j', async ({ status, body }) => {
-    const { url, requests } = startStub(() => Response.json(body, { status }));
+    const { url, requests } = startStub((_request, url) =>
+      url.pathname === modelPath
+        ? new Response(null, { status: 204 })
+        : Response.json(body, { status })
+    );
     const error: unknown = await createHarness(url)
       .generateCommitMessage({ path: directory })
       .catch(cause => cause);
     expect(error).toBeInstanceOf(Error);
-    expect(requests).toHaveLength(1);
+    expect(requests.map(request => request.pathname)).toEqual([modelPath, generatePath]);
+  });
+
+  it('does not call the RPC when the default model request fails', async () => {
+    const { url, requests } = startStub(() => new Response(null, { status: 503 }));
+
+    await expect(createHarness(url).generateCommitMessage({ path: directory })).rejects.toThrow(
+      'HTTP 503'
+    );
+    expect(requests.map(request => request.pathname)).toEqual([modelPath]);
   });
 
   it('honors cancellation before requesting a commit message', async () => {

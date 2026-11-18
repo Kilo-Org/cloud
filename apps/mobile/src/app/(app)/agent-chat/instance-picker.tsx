@@ -343,6 +343,7 @@ export default function InstancePickerScreen() {
           <EmptyState
             icon={Server}
             placement="top"
+            inset="gutter"
             title={t('agentChat.instancePicker.noCliInstances')}
             description={stripInlineCodeMarkers(
               t('agentChat.instancePicker.noCliInstancesDescription')

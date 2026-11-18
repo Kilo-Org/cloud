@@ -98,6 +98,7 @@ function FilterFindingsSheet({ scope }: Readonly<{ scope: string }>) {
         <View className="px-4">
           <QueryError
             variant={repositoriesOffline ? 'offline' : 'neutral'}
+            inset="none"
             message={t('common.couldNotLoadRepositories')}
             onRetry={() => {
               void repositories.refetch();

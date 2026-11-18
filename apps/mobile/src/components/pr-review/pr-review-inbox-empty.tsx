@@ -92,17 +92,18 @@ function InboxBody({
         description={t('prReview.inbox.noReviewRequestsDescription')}
         placement="top"
         compact
+        inset="gutter"
         className="pt-4"
       />
     );
   }
 
   if (view.kind === 'permission') {
-    return <QueryError variant="permission" placement="top" />;
+    return <QueryError variant="permission" placement="top" inset="gutter" />;
   }
 
   if (view.kind === 'not-found') {
-    return <QueryError variant="not-found" placement="top" />;
+    return <QueryError variant="not-found" placement="top" inset="gutter" />;
   }
 
   if (view.kind === 'access-denied' || view.kind === 'organization-unavailable') {
@@ -121,6 +122,7 @@ function InboxBody({
             : 'prReview.inbox.accessLostDescription'
         )}
         placement="top"
+        inset="gutter"
         action={
           // No retry here: the server refuses this organization, so repeating
           // the same read can only be refused again. The way out is the
@@ -163,6 +165,7 @@ function InboxBody({
       }
       message={isServiceUnavailable ? t('prReview.reviewServiceUnavailableDescription') : undefined}
       placement="top"
+      inset="gutter"
       onRetry={onRetry}
       isRetrying={isRetrying}
     />

@@ -62,6 +62,7 @@ export function ProfilePickerSheet({
       <QueryError
         variant="server"
         placement="top"
+        inset="gutter"
         title={t('profiles.loadFailed')}
         onRetry={onRetry}
         isRetrying={isRefetching}
@@ -74,6 +75,7 @@ export function ProfilePickerSheet({
         title={t('profiles.emptyTitle')}
         description={emptyDescription}
         placement="top"
+        inset="gutter"
         action={
           onCreateProfile === undefined ? undefined : (
             <Button className={STATE_ACTION_CLASS} onPress={onCreateProfile}>

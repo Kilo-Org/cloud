@@ -68,6 +68,7 @@ export function TodoLinkSessionSheet({
     body = (
       <QueryError
         placement="static"
+        inset="gutter"
         onRetry={() => void sessions.refetch()}
         isRetrying={sessions.isFetching}
       />

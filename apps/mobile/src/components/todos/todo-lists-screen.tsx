@@ -130,6 +130,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
       <QueryError
         title={t('todos.lists.couldNotLoad')}
         placement="top"
+        inset="gutter"
         onRetry={() => void lists.refetch()}
         isRetrying={lists.isFetching}
       />
@@ -140,6 +141,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
         icon={ListTodo}
         title={t('todos.lists.empty')}
         placement="top"
+        inset="gutter"
         action={
           <Button className={STATE_ACTION_CLASS} variant="outline" onPress={openNewList}>
             <Text>{t('todos.lists.newList')}</Text>

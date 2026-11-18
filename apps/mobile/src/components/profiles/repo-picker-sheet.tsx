@@ -124,6 +124,7 @@ export function RepoPickerSheet({
       <QueryError
         variant="server"
         placement="top"
+        inset="gutter"
         title={t('profiles.loadFailed')}
         onRetry={onRetry}
       />
@@ -133,6 +134,7 @@ export function RepoPickerSheet({
       <EmptyState
         placement="top"
         compact
+        inset="gutter"
         icon={isSearching ? SearchX : GitBranch}
         title={
           isSearching ? t('common.noRepositoriesFound') : t('agentChat.repoPicker.noRepositories')

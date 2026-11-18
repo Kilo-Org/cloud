@@ -105,6 +105,7 @@ export function SaveDraftAsTodoSheet({
     body = (
       <QueryError
         placement="static"
+        inset="gutter"
         onRetry={() => void lists.refetch()}
         isRetrying={lists.isFetching}
       />

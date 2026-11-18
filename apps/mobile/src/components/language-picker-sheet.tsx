@@ -380,6 +380,7 @@ export function LanguagePickerSheet({
         ListEmptyComponent={
           <EmptyState
             placement="static"
+            inset="gutter"
             icon={SearchX}
             title={t('language.noMatches')}
             description={t('agents.sessionList.tryDifferentSearch')}

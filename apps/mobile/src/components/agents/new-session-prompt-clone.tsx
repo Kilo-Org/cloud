@@ -50,6 +50,7 @@ export function NewSessionPromptClone({
       <InputFrame className="overflow-hidden">
         <QueryError
           placement="top"
+          inset="gutter"
           variant="server"
           title={t('agentChat.newSession.couldNotLoadModels')}
           message={t('organization.boundary.loadErrorMessage')}

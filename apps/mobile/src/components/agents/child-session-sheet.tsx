@@ -209,6 +209,7 @@ export function ChildSessionSheet({
             onRetry={describedHydrationError?.retryable ? onRetry : undefined}
             isRetrying={hydrationState.status === 'loading'}
             placement="top"
+            inset="gutter"
             className="gap-3 border-b-[0.5px] border-hair-soft py-3"
           />
         ) : null}
@@ -263,7 +264,7 @@ export function ChildSessionSheet({
           <View className="items-center gap-3 px-4">
             <QueryError
               placement="top"
-              className="px-0 pt-0"
+              className="pt-0"
               title={t('agentChat.childSessionSheet.failed')}
               message={describedSessionError?.message}
             />

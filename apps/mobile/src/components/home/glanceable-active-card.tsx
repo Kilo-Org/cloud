@@ -176,6 +176,7 @@ export function GlanceableActiveCard({
               and one-line hint instead of a lone line in a blank card. */}
           <EmptyState
             placement="static"
+            inset="gutter"
             icon={Bot}
             title={t('home.noLiveSessions')}
             description={t('agents.sessionList.noSessionsYetDescription')}

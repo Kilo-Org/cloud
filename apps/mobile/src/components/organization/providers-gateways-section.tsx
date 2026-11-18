@@ -87,7 +87,8 @@ export function GatewaySettingsSection({
     return (
       <EmptyState
         placement="top"
-        className="bg-background px-4 pt-4"
+        inset="gutter"
+        className="bg-background pt-4"
         icon={Settings2}
         title={t('organizationModelAccess.gatewaysUnavailable')}
       />

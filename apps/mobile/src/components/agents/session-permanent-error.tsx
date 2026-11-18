@@ -55,7 +55,7 @@ export function SessionPermanentError({
           <QueryError
             variant={variant}
             placement="top"
-            className="px-0 pt-0"
+            className="pt-0"
             title={title}
             message={message}
             onRetry={retry}

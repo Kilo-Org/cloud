@@ -286,6 +286,7 @@ export function OrganizationCreditActivityScreen() {
           ListEmptyComponent={
             <EmptyState
               placement="top"
+              inset="gutter"
               icon={Receipt}
               title={t('organization.creditActivity.emptyTitle')}
               description={t('organization.creditActivity.emptyDescription')}

@@ -85,6 +85,9 @@ type QueryErrorProps = {
    */
   descriptionClassName?: string;
   placement?: 'center' | 'top' | 'static';
+  /** Who draws the page gutter; see `EmptyState`. A `center` error defaults to
+   *  the gutter, a `top`/`static` one to none. */
+  inset?: 'gutter' | 'none';
   refreshControl?: ScrollViewProps['refreshControl'];
 };
 
@@ -102,6 +105,7 @@ export function QueryError({
   className,
   descriptionClassName,
   placement = 'center',
+  inset,
   refreshControl,
 }: Readonly<QueryErrorProps>) {
   const { t } = useTranslation();
@@ -128,6 +132,7 @@ export function QueryError({
       }
       className={className}
       placement={placement}
+      inset={inset}
       refreshControl={refreshControl}
       iconContainerClassName="rounded-full bg-muted p-4"
       iconColor={colors.destructive}

@@ -6,9 +6,13 @@ import { CenteredState } from '@/components/centered-state';
 import { useShortCenteredBand } from '@/components/centered-state-band';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 
 const DEFAULT_ICON_CONTAINER_CLASS = 'h-14 w-14 rounded-full border border-border bg-card';
+
+/** The page gutter a state draws for itself; see `inset`. */
+const STATE_GUTTER_CLASS = SCREEN_GUTTER_CLASS;
 
 type EmptyStateProps = {
   icon: LucideIcon;
@@ -25,6 +29,17 @@ type EmptyStateProps = {
    *  content for a caller that owns its own full-screen layout and cannot
    *  depend on a measured surface (the root runtime-error screen). */
   placement?: 'center' | 'top' | 'static';
+  /**
+   * Whether the state draws the page gutter itself. `center` renders inside a
+   * `CenteredState`, whose content box carries no horizontal inset, so it
+   * defaults to `'gutter'`; `top` and `static` are laid out by a caller's body
+   * or card, which either insets its content already (the `SCREEN_BODY_CLASS`
+   * body, a `Card`, a padded row block) or owns the surface, so they default to
+   * `'none'`. A `top`/`static` state that is the full-bleed content of its
+   * surface — a list's `ListEmptyComponent`, a bare `CenteredState` — passes
+   * `'gutter'`. Callers never spell the inset themselves (`px-0`/`px-4`).
+   */
+  inset?: 'gutter' | 'none';
   refreshControl?: ScrollViewProps['refreshControl'];
   /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
   iconContainerClassName?: string;
@@ -71,6 +86,7 @@ function EmptyStateBody({
   className,
   action,
   placement,
+  inset = placement === 'center' ? 'gutter' : 'none',
   compact: compactOverride,
   iconContainerClassName = DEFAULT_ICON_CONTAINER_CLASS,
   iconColor,
@@ -103,7 +119,8 @@ function EmptyStateBody({
   const content = (
     <View
       className={cn(
-        'items-center px-4',
+        'items-center',
+        inset === 'gutter' && STATE_GUTTER_CLASS,
         compact ? 'gap-2' : 'gap-4',
         placement === 'top' && !compact && 'pt-16',
         className

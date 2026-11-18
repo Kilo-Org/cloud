@@ -124,6 +124,7 @@ export function RepositoryRowsList({
     searchable && deferredSearch.trim() !== '' && visibleRows.length === 0 ? (
       <EmptyState
         placement="top"
+        inset="gutter"
         icon={SearchX}
         title={t('agentChat.repoPicker.noMatches')}
         description={t('agents.sessionList.tryDifferentSearch')}

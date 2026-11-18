@@ -53,6 +53,7 @@ export function OrganizationModeFormScreen() {
         <ScreenHeader title={t('agentChat.modePicker.customModes')} />
         <QueryError
           variant={errorView.variant}
+          inset="gutter"
           onRetry={errorView.showRetry ? () => void modesQuery.refetch() : undefined}
           isRetrying={modesQuery.isFetching}
         />
@@ -84,6 +85,7 @@ function ModeNotFound() {
       <EmptyState
         icon={SlidersHorizontal}
         placement="top"
+        inset="gutter"
         title={t('organization.modes.notFound')}
         action={
           <Button

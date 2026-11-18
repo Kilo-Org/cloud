@@ -247,7 +247,9 @@ export function ShareDestinationList({
     if (state.kind === 'loading') {
       emptyContent = <SkeletonRows />;
     } else if (state.kind === 'retryable') {
-      emptyContent = <QueryError message={state.message} onRetry={onRetry} placement="top" />;
+      emptyContent = (
+        <QueryError message={state.message} onRetry={onRetry} placement="top" inset="gutter" />
+      );
     } else if (state.kind === 'empty') {
       emptyContent = <EmptyMessage message={state.message} />;
     } else if (search.trim()) {

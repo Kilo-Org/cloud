@@ -73,7 +73,8 @@ function ListHeader({
 }
 
 function NoMatch({ label }: Readonly<{ label: string }>) {
-  return <EmptyState icon={SearchX} title={label} className="bg-background py-8" />;
+  // The list's content container carries the page gutter, so the state adds none.
+  return <EmptyState icon={SearchX} title={label} inset="none" className="bg-background py-8" />;
 }
 
 /**

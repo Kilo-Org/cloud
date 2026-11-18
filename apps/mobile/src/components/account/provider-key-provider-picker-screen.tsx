@@ -145,6 +145,7 @@ export function ProviderKeyProviderPickerScreen({
     body = (
       <EmptyState
         placement="top"
+        inset="gutter"
         icon={Search}
         title={t('profile.providerKeys.noProvidersTitle')}
         description={t('profile.providerKeys.noProvidersDescription')}

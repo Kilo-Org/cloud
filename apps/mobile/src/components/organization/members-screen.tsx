@@ -151,6 +151,7 @@ export function OrganizationMembersScreen() {
     <EmptyState
       icon={Users}
       placement={items.length > 0 ? 'top' : 'center'}
+      inset="gutter"
       title={t('organization.members.emptyTitle')}
       description={
         canInvite

@@ -127,6 +127,45 @@ describe('EmptyState in a centered band', () => {
 
 const ICON_BUBBLE_CLASS = 'h-14 w-14';
 
+async function bodyFor(props: Partial<Parameters<typeof EmptyState>[0]>) {
+  const mounted = await renderWithProviders(
+    <EmptyState icon={SearchX} title="Nothing here" description="Nothing to show." {...props} />
+  );
+  const content = mounted.renderer.root.findAll(
+    node => typeof node.type === 'string' && (node.type as string) === 'View'
+  )[0] as Host | undefined;
+  if (!content) {
+    throw new Error('the empty state body did not render');
+  }
+  const { className } = content.props;
+  mounted.unmount();
+  return className;
+}
+
+describe('EmptyState page gutter', () => {
+  // One rule for every caller: the state owns the 14pt gutter only where it is
+  // the full-bleed content of its surface. A state laid out inside a body, a
+  // card or a list header that already insets must draw none — its own inset
+  // put the copy at 28pt, and callers were cancelling it with `px-0`.
+  it('draws the gutter for a centered state, whose surface does not', async () => {
+    expect(await bodyFor({})).toContain('px-4');
+  });
+
+  it('draws no gutter for a state the caller lays out in a body', async () => {
+    expect(await bodyFor({ placement: 'top' })).not.toContain('px-4');
+    expect(await bodyFor({ placement: 'static' })).not.toContain('px-4');
+  });
+
+  it('draws the gutter for a top state that is its surface full-bleed content', async () => {
+    expect(await bodyFor({ placement: 'top', inset: 'gutter' })).toContain('px-4');
+    expect(await bodyFor({ placement: 'static', inset: 'gutter' })).toContain('px-4');
+  });
+
+  it('leaves the gutter to a centered state the container already insets', async () => {
+    expect(await bodyFor({ inset: 'none' })).not.toContain('px-4');
+  });
+});
+
 function presentationEmptyState(compact: boolean) {
   return (
     <EmptyState

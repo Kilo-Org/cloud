@@ -214,6 +214,7 @@ function AuditReportView({
         <View className="grow justify-center">
           <EmptyState
             placement="static"
+            inset="gutter"
             icon={FileText}
             title={t('securityAgent.auditReport.noActivity')}
             description={
@@ -268,6 +269,7 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
         <TabScreenScrollView className="flex-1" contentContainerClassName="grow justify-center">
           <EmptyState
             placement="static"
+            inset="gutter"
             icon={ShieldOff}
             title={t('securityAgent.auditReport.unavailable')}
             description={t('securityAgent.auditReport.unavailableDescription')}

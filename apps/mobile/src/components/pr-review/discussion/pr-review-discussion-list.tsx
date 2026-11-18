@@ -268,6 +268,7 @@ export function PrReviewDiscussionList({
         // existing empty copy — new copy belongs to the translation slice.
         <EmptyState
           placement="top"
+          inset="gutter"
           icon={MessageSquarePlus}
           title={t('prReview.discussion.noDiscussion')}
           description={

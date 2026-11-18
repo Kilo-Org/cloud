@@ -166,6 +166,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
       <QueryError
         variant={errorView.variant}
         placement="top"
+        inset="gutter"
         onRetry={errorView.showRetry ? () => void items.refetch() : undefined}
         isRetrying={items.isFetching}
       />

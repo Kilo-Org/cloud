@@ -52,7 +52,12 @@ export function OrganizationGroupFormScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
-        <EmptyState icon={Users} placement="top" title={t('organization.groups.enterpriseOnly')} />
+        <EmptyState
+          icon={Users}
+          placement="top"
+          inset="gutter"
+          title={t('organization.groups.enterpriseOnly')}
+        />
       </View>
     );
   }
@@ -110,6 +115,7 @@ function GroupNotFound() {
       <EmptyState
         icon={Users}
         placement="top"
+        inset="gutter"
         title={t('organization.groups.notFound')}
         action={
           <Button

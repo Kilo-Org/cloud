@@ -15,6 +15,8 @@ type EmptyStateProps = {
   iconColor?: string;
   compactTitleClassName?: string;
   description?: ReactElement<{ tone?: string }>;
+  placement?: string;
+  inset?: string;
 };
 
 vi.mock('@/components/empty-state', () => ({
@@ -89,5 +91,17 @@ describe('QueryError state emphasis', () => {
 
     expect(emptyStateProps(mounted).compactTitleClassName).toBe('text-destructive');
     mounted.unmount();
+  });
+
+  it('hands the state the caller inset it asked for, and none by default', async () => {
+    // The error owns its surface's gutter only where it is that surface's
+    // full-bleed content; a `top` one in a body draws none (see EmptyState).
+    const plain = await renderWithProviders(<QueryError placement="top" />);
+    expect(emptyStateProps(plain).inset).toBeUndefined();
+    plain.unmount();
+
+    const fullBleed = await renderWithProviders(<QueryError placement="top" inset="gutter" />);
+    expect(emptyStateProps(fullBleed).inset).toBe('gutter');
+    fullBleed.unmount();
   });
 });

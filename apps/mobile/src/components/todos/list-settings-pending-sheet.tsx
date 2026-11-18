@@ -34,7 +34,7 @@ export function ListSettingsPendingSheet({
       expired={isSuccess}
     >
       {isError ? (
-        <QueryError onRetry={onRetry} isRetrying={isFetching} placement="top" />
+        <QueryError onRetry={onRetry} isRetrying={isFetching} placement="top" inset="gutter" />
       ) : (
         <View className={cn('items-center', TODO_SHEET_STATE_BODY_CLASS)}>
           <ActivityIndicator />

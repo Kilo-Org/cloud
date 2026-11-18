@@ -73,7 +73,7 @@ export function McpServersSection({
         title={t('modelChat.mcp.serversEmptyTitle')}
         description={t('modelChat.mcp.serversEmptyDescription')}
         placement="top"
-        className="px-0 pt-0"
+        className="pt-0"
       />
     );
   } else {

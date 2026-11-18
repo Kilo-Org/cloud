@@ -3409,7 +3409,7 @@ export function SessionDetailContent({
             <QueryError
               variant={shownTerminalError.variant}
               placement="top"
-              className="px-0 pt-0"
+              className="pt-0"
               title={shownTerminalError.title}
               message={shownTerminalError.message}
               onRetry={

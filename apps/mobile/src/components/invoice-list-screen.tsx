@@ -217,6 +217,7 @@ export function InvoiceListScreen({
           ListEmptyComponent={
             <EmptyState
               placement="top"
+              inset="gutter"
               icon={FileText}
               title={emptyTitle}
               description={emptyDescription}

@@ -527,6 +527,7 @@ export function NewSessionPrompt({
         {isModelsError && modelOptions.length === 0 ? (
           <QueryError
             placement="top"
+            inset="gutter"
             variant="server"
             title={t('agentChat.newSession.couldNotLoadModels')}
             message={t('organization.boundary.loadErrorMessage')}

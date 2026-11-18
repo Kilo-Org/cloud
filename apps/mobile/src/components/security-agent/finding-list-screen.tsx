@@ -64,6 +64,7 @@ function FindingsListFooter({
     return (
       <QueryError
         placement="top"
+        inset="gutter"
         message={t('securityAgent.findingList.couldNotLoadMore')}
         onRetry={onRetry}
       />
@@ -203,6 +204,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
       {repositories.isError ? (
         <QueryError
           placement="top"
+          inset="gutter"
           message={t('common.couldNotLoadRepositories')}
           onRetry={() => void repositories.refetch()}
           isRetrying={repositories.isFetching}

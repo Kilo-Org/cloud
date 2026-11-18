@@ -93,6 +93,7 @@ function ReviewListFooter({
     return (
       <QueryError
         placement="top"
+        inset="gutter"
         message={t('codeReviewer.reviewList.couldNotLoad')}
         onRetry={onRetry}
       />

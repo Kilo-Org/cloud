@@ -177,6 +177,7 @@ export function TodoDetailScreen({ itemId }: Readonly<{ itemId: string }>) {
         <QueryError
           variant={errorView.variant}
           placement="top"
+          inset="gutter"
           onRetry={errorView.showRetry ? () => void query.refetch() : undefined}
           isRetrying={query.isFetching}
         />

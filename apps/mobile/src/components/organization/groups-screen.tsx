@@ -74,12 +74,7 @@ export function OrganizationGroupsScreen() {
   let body: ReactNode = null;
   if (!enterprise) {
     body = (
-      <EmptyState
-        icon={Users}
-        placement="top"
-        className="px-0"
-        title={t('organization.groups.enterpriseOnly')}
-      />
+      <EmptyState icon={Users} placement="top" title={t('organization.groups.enterpriseOnly')} />
     );
   } else if (groupsQuery.isPending) {
     body = <GroupsSkeleton />;
@@ -114,7 +109,6 @@ export function OrganizationGroupsScreen() {
       <EmptyState
         icon={Users}
         placement="top"
-        className="px-0"
         title={t('organization.groups.emptyTitle')}
         description={t('organization.groups.emptyDescription')}
         action={

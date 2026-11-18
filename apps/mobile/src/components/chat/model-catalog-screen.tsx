@@ -76,15 +76,16 @@ export function ModelCatalogScreen() {
   let empty = <LoadingRows />;
   if (models.isError && !hasPages) {
     if (isHfGone(models.error)) {
-      empty = <QueryError variant="not-found" placement="top" />;
+      empty = <QueryError variant="not-found" placement="top" inset="gutter" />;
     } else if (isHfRestricted(models.error)) {
-      empty = <QueryError variant="permission" placement="top" />;
+      empty = <QueryError variant="permission" placement="top" inset="gutter" />;
     } else {
       empty = (
         <QueryError
           variant="server"
           title={t('agentChat.newSession.couldNotLoadModels')}
           placement="top"
+          inset="gutter"
           onRetry={() => void models.refetch()}
           isRetrying={models.isFetching}
         />
@@ -97,6 +98,7 @@ export function ModelCatalogScreen() {
         title={t(emptyCopy.titleKey, { query })}
         {...(emptyCopy.descriptionKey ? { description: t(emptyCopy.descriptionKey) } : {})}
         placement="top"
+        inset="gutter"
       />
     );
   }

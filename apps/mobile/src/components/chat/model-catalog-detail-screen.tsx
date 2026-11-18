@@ -227,6 +227,7 @@ function DetailBody({ id }: Readonly<{ id: string }>) {
           title={t('modelChat.catalog.noFiles')}
           description={t('modelChat.catalog.noFilesDescription')}
           placement="top"
+          inset="gutter"
         />
       }
       ListFooterComponent={<View className="h-12" />}

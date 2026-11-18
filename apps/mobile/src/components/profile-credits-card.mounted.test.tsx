@@ -1091,7 +1091,7 @@ describe('CreditsCard add-credits entry point', () => {
     listState.payload = orgs;
 
     const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
-    await waitFor(() => texts().includes('Acme'));
+    await waitFor(() => orgCreditBlocksQueryFn.mock.calls.length > 0);
 
     expect(texts()).toContain('ADD_CREDITS_ROW');
     expect(addCreditsRowProps.latest?.url).toBe(
@@ -1113,7 +1113,7 @@ describe('CreditsCard add-credits entry point', () => {
     listState.payload = orgs;
 
     const { texts, unmount } = await mountCard(queryClient, orgs);
-    await waitFor(() => texts().includes('Acme'));
+    await waitFor(() => orgCreditBlocksQueryFn.mock.calls.length > 0);
 
     // The personal row may render before the stored org resolves; the settled
     // tree must hold no row at all for a member who cannot manage billing.

@@ -271,10 +271,10 @@ describe('PR Overview full-body states', () => {
     const body = renderer.root.find(node => String(node.type) === 'EmptyState');
     const install = body.props.action as {
       type: unknown;
-      props: { children: { props: { children: string } } };
+      props: { label: string };
     };
-    expect(String(install.type)).toBe('Button');
-    expect(install.props.children.props.children).toBe('Install the Kilo GitHub App');
+    expect(String(install.type)).toBe('StateAction');
+    expect(install.props.label).toBe('Install the Kilo GitHub App');
     unmount();
   });
 

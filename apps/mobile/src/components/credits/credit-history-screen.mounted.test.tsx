@@ -78,6 +78,7 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 vi.mock('@/lib/a11y/tap-target', () => ({
   STATE_ACTION_CLASS: 'min-h-[48px]',
+  TOUCH_TARGET_OVERHANG_DP: 8,
 }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/components/credits/credit-history-rows', () => ({

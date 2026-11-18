@@ -147,7 +147,12 @@ vi.mock('@/components/centered-state-surface', () => ({
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  // The account row is the screen's inline header action; render it so the
+  // tests can reach the control the tab actually shows.
+  ScreenHeader: (props: { inlineActions?: ReactNode }) =>
+    createElement('ScreenHeader', null, props.inlineActions),
+}));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({

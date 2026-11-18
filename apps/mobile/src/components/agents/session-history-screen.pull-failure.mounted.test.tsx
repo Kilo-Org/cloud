@@ -87,6 +87,9 @@ vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
     run();
   },
 }));
+// The empty state's geometry hook reports through `@sentry/react-native`,
+// whose real module loads react-native in Node; the reporter is stubbed here.
+vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 vi.mock('@shopify/flash-list', async () => {
   const React = await import('react');
   type Row = { key: string };
@@ -142,6 +145,8 @@ vi.mock('@/components/ui/icons', () => ({
   X: 'X',
   Check: 'Check',
   Bot: 'Bot',
+  Plus: 'Plus',
+  SlidersHorizontal: 'SlidersHorizontal',
 }));
 vi.mock('@/components/ui/button', () => ({
   Button: (props: Record<string, unknown>): ReactNode => createElement('Pressable', props),

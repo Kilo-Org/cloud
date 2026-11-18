@@ -61,7 +61,11 @@ vi.mock('@/components/ui/text', () => ({
     createElement('TextMock', { className: props.className }, props.children),
 }));
 
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({ View: 'View', useColorScheme: () => 'light' }));
+
+// The centered state's geometry hook reports through `@sentry/react-native`,
+// whose real module loads react-native in Node; the reporter is stubbed here.
+vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 const Denied = ScopeAccessDeniedScreen as ComponentType<{
   title: string;
@@ -136,24 +140,14 @@ describe('ScopeAccessDeniedScreen', () => {
     expect(back).toBeDefined();
     expect(retry).toBeDefined();
 
-    // Leaving the stale selection is the recovery this state leads with, so the
-    // filled primary is Back to profile and it comes first.
-    const filled = findByType(renderer.root, 'ButtonMock').filter(
-      node => (node.props.variant ?? 'default') === 'default'
-    );
-    expect(filled).toHaveLength(1);
-    expect(filled[0]).toBe(back);
-    expect(findByType(renderer.root, 'ButtonMock')[0]).toBe(back);
-    // Dark --primary is the brand yellow that glares on the near-black page, so dark takes the muted lifted olive.
-    expect(String(back?.props.className)).toContain('bg-primary');
-    expect(String(back?.props.className)).toContain('dark:bg-selection');
-    const backLabel = back ? findByType(back, 'TextMock')[0] : undefined;
-    expect(String(backLabel?.props.className)).toContain('dark:text-selection-foreground');
-
-    // Retry only re-resolves the membership, so it is the outlined secondary,
-    // and the outline variant's own ink already paints its busy mark.
-    expect(retry?.props.variant).toBe('outline');
-    expect(String(retry?.props.className ?? '')).not.toContain('dark:bg-selection');
+    // Leaving the stale selection is the recovery this state leads with, so
+    // Back to profile comes first. Both ways out share the one state-action
+    // shape, so neither is an outlined or shadowed second control.
+    const actions = findByType(renderer.root, 'ButtonMock');
+    expect(actions).toHaveLength(2);
+    expect(actions[0]).toBe(back);
+    expect(actions[1]).toBe(retry);
+    expect(back?.props.className).toBe(retry?.props.className);
     expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.title).toBe('Security Agent');
 
     act(() => {
@@ -194,11 +188,10 @@ describe('ScopeAccessDeniedScreen', () => {
     );
     expect(findByType(renderer.root, 'ScreenHeaderMock')[0]?.props.eyebrow).toBe('Code Reviewer');
     // A deleted organization does not come back by retrying either, so the
-    // filled primary and the order are the denied state's, not Retry's.
-    expect(findByType(renderer.root, 'ButtonMock')[0]).toBe(
-      button('Back to profile', renderer.root)
-    );
-    expect(button('Retry', renderer.root)?.props.variant).toBe('outline');
+    // order is the denied state's, with Back to profile first.
+    const [backAction, retryAction] = findByType(renderer.root, 'ButtonMock');
+    expect(backAction).toBe(button('Back to profile', renderer.root));
+    expect(retryAction).toBe(button('Retry', renderer.root));
 
     act(() => {
       renderer.unmount();

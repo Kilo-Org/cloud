@@ -878,9 +878,13 @@ describe('AgentSessionListContent liveness', () => {
     expect(busy(retry)).toBe(true);
     expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(1);
     expect(
-      retry?.findAll(
-        node => node.type === 'Text' && node.props.children === i18n.t('common.retry')
-      )
+      retry?.findAll(node => {
+        if (node.type !== 'Text') {
+          return false;
+        }
+        const { children } = node.props;
+        return typeof children === 'string' && children === i18n.t('common.retry');
+      })
     ).toHaveLength(1);
     press(retry);
     expect(onRetry).not.toHaveBeenCalled();

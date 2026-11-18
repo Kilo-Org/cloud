@@ -294,9 +294,10 @@ async function mountAction(loading?: boolean) {
       accessibilityState !== null &&
       'busy' in accessibilityState &&
       accessibilityState.busy === true,
-    drawsLabel: mounted.renderer.root
-      .findAllByType('Text')
-      .some(node => node.props.children === 'Try again'),
+    drawsLabel: mounted.renderer.root.findAllByType('Text').some(node => {
+      const { children } = node.props;
+      return typeof children === 'string' && children === 'Try again';
+    }),
   };
 }
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 
+import { sheetUnderHandlePaddingClass } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { ChevronDown } from '@/components/ui/icons';
@@ -113,7 +114,10 @@ export function ReviewMemoryAnalyzeSection({
         snapPoints={['60%']}
       >
         <View className="flex-1">
-          <Text className="px-6 pt-4 pb-3 text-base font-semibold">{t('common.repository')}</Text>
+          {/* The native handle already leaves the room above the title. */}
+          <Text className={cn('px-6 text-base font-semibold', sheetUnderHandlePaddingClass())}>
+            {t('common.repository')}
+          </Text>
           <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6">
             {repositories.map(repo => (
               <ChoiceRow

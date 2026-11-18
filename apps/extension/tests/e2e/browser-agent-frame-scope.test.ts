@@ -1,52 +1,26 @@
-/* eslint-disable import/no-nodejs-modules */
+/* eslint-disable import/no-nodejs-modules, max-lines */
 import { expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { z } from 'zod';
 import { launchExtensionContext, startFixtureServer } from './extension-context-fixture';
+import { startFakeHub } from './local-agents-hub-fixture';
+import {
+  activateTab,
+  openPairedAgentSession,
+  seedLocalAgentsEnabled,
+} from './local-agents-fixture';
+import type { LocalAgentToolResponse } from './local-agents-fixture';
 
 /*
  * The end-to-end proof for agent frame scoping (SPEC "Frame scoping"): a
- * cross-origin iframe holds a marker string, and an agent caller driving the
- * background runtime directly sees the marker nowhere — not in the snapshot,
- * not in find, not in the screenshot's pixels — until the iframe's origin gets
- * its own `read` grant. The runtime call is the same `kilo.tabs.browserTool`
- * message the CLI transport uses, with the agent's `authorized` pairs.
+ * cross-origin iframe holds a marker string, and an agent session — opened and
+ * shared through the hub exactly as the CLI does — sees the marker nowhere:
+ * not in the snapshot, not in find, not in the screenshot's pixels, until the
+ * iframe's origin gets its own `read` grant.
  */
 
 const MARKER = 'KILO_FRAME_MARKER_42';
 const IFRAME_BOX = { height: 200, left: 40, top: 120, width: 400 };
-
-const agentToolResponseSchema = z.object({
-  ok: z.boolean().optional(),
-  permission: z.object({ items: z.array(z.record(z.string(), z.unknown())).optional() }).optional(),
-  result: z
-    .object({
-      error: z.string().optional(),
-      ok: z.boolean().optional(),
-      value: z.unknown().optional(),
-    })
-    .optional(),
-  withheldFrames: z.array(z.string()).optional(),
-});
-
-type AgentToolResponse = z.infer<typeof agentToolResponseSchema>;
-
-/**
- * The extension API surface this spec drives inside the extension's own page.
- * Extension pages expose it on the page global (`chrome`, or `browser` on
- * Firefox), and the `evaluate` callbacks below run inside such a page.
- */
-interface ExtensionPageApi {
-  readonly runtime?: {
-    readonly sendMessage: (message: unknown) => Promise<unknown>;
-  };
-  readonly tabs?: {
-    readonly query: (
-      query: Record<string, unknown>
-    ) => Promise<readonly { readonly id?: number; readonly url?: string }[]>;
-  };
-}
 
 const originOf = (url: string): string => {
   const parsed = new URL(url);
@@ -54,78 +28,25 @@ const originOf = (url: string): string => {
   return `${parsed.protocol}//${parsed.host}`;
 };
 
-const openExtensionPage = async (context: BrowserContext, extensionId: string): Promise<Page> => {
-  const page = await context.newPage();
-
-  await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-
-  return page;
-};
-
-const findTabId = async (extensionPage: Page, urlPrefix: string): Promise<number> => {
-  const tabId = await extensionPage.evaluate(async prefix => {
-    const api = (globalThis as typeof globalThis & { chrome?: ExtensionPageApi }).chrome;
-    const tabs = await api?.tabs?.query({});
-
-    return tabs?.find(tab => (tab.url ?? '').startsWith(prefix))?.id ?? -1;
-  }, urlPrefix);
-
-  return tabId;
-};
-
-const callAgentTool = async (
-  extensionPage: Page,
-  input: {
-    readonly authorized: readonly {
-      readonly class: 'act' | 'navigate' | 'read';
-      readonly origin: string;
-    }[];
-    readonly args: Record<string, unknown>;
-    readonly tabId: number;
-    readonly tool: string;
-  }
-): Promise<AgentToolResponse> => {
-  const response: unknown = await extensionPage.evaluate(
-    request => {
-      const api = (globalThis as typeof globalThis & { chrome?: ExtensionPageApi }).chrome;
-
-      return api?.runtime?.sendMessage(request);
-    },
-    {
-      agent: { authorized: [...input.authorized] },
-      arguments: input.args,
-      caller: { controllerId: 'controller-e2e', kind: 'agent', sessionHandle: 'session-e2e' },
-      tabId: input.tabId,
-      tool: input.tool,
-      type: 'kilo.tabs.browserTool',
-    } as const
-  );
-  const parsed = agentToolResponseSchema.safeParse(response);
-
-  if (!parsed.success) {
-    throw new Error(`unexpected browser tool response: ${JSON.stringify(response)}`);
+/** The tool result the assertions read; a protocol refusal is a test failure here. */
+const resultOf = (
+  response: LocalAgentToolResponse
+): Extract<LocalAgentToolResponse, { kind: 'result' }> => {
+  if (response.kind !== 'result') {
+    throw new Error(`unexpected protocol error: ${JSON.stringify(response)}`);
   }
 
-  return parsed.data;
+  return response;
 };
 
-/** A tool result's text, the only shape the snapshot and find assertions read. */
-const resultTextOf = (response: AgentToolResponse): string => {
-  const value = response.result?.value;
+const screenshotDataUrl = (response: LocalAgentToolResponse): string => {
+  const result = resultOf(response);
 
-  return typeof value === 'string' ? value : (JSON.stringify(value) ?? '');
-};
-
-const screenshotValueSchema = z.object({ dataUrl: z.string(), mediaType: z.string().optional() });
-
-const screenshotValue = (response: AgentToolResponse): { dataUrl: string; mediaType: string } => {
-  const parsed = screenshotValueSchema.safeParse(response.result?.value);
-
-  if (!parsed.success) {
+  if (result.image === undefined) {
     throw new Error(`no screenshot in ${JSON.stringify(response)}`);
   }
 
-  return { dataUrl: parsed.data.dataUrl, mediaType: parsed.data.mediaType ?? 'image/png' };
+  return `data:${result.image.mimeType};base64,${result.image.data}`;
 };
 
 const readPixel = (
@@ -156,6 +77,14 @@ const readPixel = (
     return [...pixel];
   }, input);
 
+const openExtensionPage = async (context: BrowserContext, extensionId: string): Promise<Page> => {
+  const page = await context.newPage();
+
+  await page.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+
+  return page;
+};
+
 test.describe('agent frame scoping', () => {
   test('a cross-origin iframe marker stays unreadable until its origin is granted', async () => {
     test.setTimeout(120_000);
@@ -171,11 +100,11 @@ test.describe('agent frame scoping', () => {
       ].join(''),
       title: 'Checkout host',
     });
+    const hub = await startFakeHub();
     const { context, extensionId, userDataDir } = await launchExtensionContext();
 
     try {
       const page = await context.newPage();
-
       await page.goto(outer.url);
       await page.waitForSelector('#pay');
 
@@ -184,61 +113,64 @@ test.describe('agent frame scoping', () => {
       await expect(frame.locator('#secret')).toHaveText(MARKER);
 
       const extensionPage = await openExtensionPage(context, extensionId);
-      const tabId = await findTabId(extensionPage, outer.url);
+      // The session owns the tab the user is on; the transport and the D9 group are the real ones.
+      const tabId = await activateTab(extensionPage, outer.url);
+
+      expect(tabId).toBeGreaterThan(0);
+      const session = await openPairedAgentSession({
+        context,
+        enableSwitch: () => seedLocalAgentsEnabled(extensionPage),
+        extensionId,
+        hub,
+        sidePanel: extensionPage,
+        title: 'Frame scope',
+      });
       const outerOrigin = originOf(outer.url);
       const innerOrigin = originOf(inner.url);
 
-      expect(tabId).toBeGreaterThan(0);
+      expect(session.tabId).toBe(tabId);
 
       // Nothing granted: the read itself is refused.
-      const refused = await callAgentTool(extensionPage, {
-        args: {},
-        authorized: [],
-        tabId,
-        tool: 'browser_snapshot',
-      });
+      const refused = await session.callTool('browser_snapshot', {}, []);
 
-      expect(refused.permission?.items).toEqual([{ class: 'read', origin: outerOrigin }]);
+      expect(refused).toMatchObject({
+        code: -32_010,
+        items: [{ class: 'read', origin: outerOrigin }],
+        kind: 'error',
+      });
 
       // The tab's own origin is granted, the iframe's is not.
-      const scoped = await callAgentTool(extensionPage, {
-        args: {},
-        authorized: [{ class: 'read', origin: outerOrigin }],
-        tabId,
-        tool: 'browser_snapshot',
-      });
+      const scoped = resultOf(
+        await session.callTool('browser_snapshot', {}, [{ class: 'read', origin: outerOrigin }])
+      );
 
-      expect(scoped.result?.ok).toBe(true);
-      expect(resultTextOf(scoped)).toContain(`[origin withheld: ${innerOrigin}]`);
-      expect(resultTextOf(scoped)).not.toContain(MARKER);
+      expect(scoped.isError).toBe(false);
+      expect(scoped.text).toContain(`[origin withheld: ${innerOrigin}]`);
+      expect(scoped.text).not.toContain(MARKER);
       expect(scoped.withheldFrames).toEqual([innerOrigin]);
 
-      const found = await callAgentTool(extensionPage, {
-        args: { text: MARKER },
-        authorized: [{ class: 'read', origin: outerOrigin }],
-        tabId,
-        tool: 'browser_find',
-      });
+      const found = resultOf(
+        await session.callTool('browser_find', { text: MARKER }, [
+          { class: 'read', origin: outerOrigin },
+        ])
+      );
 
       // The withheld frame's text never becomes a match; only the echoed query names the marker.
-      expect(resultTextOf(found)).toContain('No matches for');
-      expect(resultTextOf(found)).not.toContain('Path:');
+      expect(found.text).toContain('No matches for');
+      expect(found.text).not.toContain('Path:');
 
-      const shot = screenshotValue(
-        await callAgentTool(extensionPage, {
-          args: { scale: 'css', type: 'png' },
-          authorized: [{ class: 'read', origin: outerOrigin }],
-          tabId,
-          tool: 'browser_take_screenshot',
-        })
+      const shot = screenshotDataUrl(
+        await session.callTool('browser_take_screenshot', { scale: 'css', type: 'png' }, [
+          { class: 'read', origin: outerOrigin },
+        ])
       );
       const insidePixel = await readPixel(extensionPage, {
-        dataUrl: shot.dataUrl,
+        dataUrl: shot,
         pixelX: IFRAME_BOX.left + IFRAME_BOX.width / 2,
         pixelY: IFRAME_BOX.top + IFRAME_BOX.height / 2,
       });
       const outsidePixel = await readPixel(extensionPage, {
-        dataUrl: shot.dataUrl,
+        dataUrl: shot,
         pixelX: 8,
         pixelY: 8,
       });
@@ -248,33 +180,24 @@ test.describe('agent frame scoping', () => {
       expect(outsidePixel.slice(0, 3)).not.toEqual([0, 0, 0]);
 
       // Granting the frame's origin releases the content, and only then.
-      const granted = await callAgentTool(extensionPage, {
-        args: {},
-        authorized: [
-          { class: 'read', origin: outerOrigin },
-          { class: 'read', origin: innerOrigin },
-        ],
-        tabId,
-        tool: 'browser_snapshot',
-      });
+      const bothGrants = [
+        { class: 'read', origin: outerOrigin },
+        { class: 'read', origin: innerOrigin },
+      ];
+      const granted = resultOf(await session.callTool('browser_snapshot', {}, bothGrants));
 
-      expect(resultTextOf(granted)).toContain(MARKER);
+      expect(granted.text).toContain(MARKER);
       expect(granted.withheldFrames).toEqual([]);
 
-      const grantedFind = await callAgentTool(extensionPage, {
-        args: { text: MARKER },
-        authorized: [
-          { class: 'read', origin: outerOrigin },
-          { class: 'read', origin: innerOrigin },
-        ],
-        tabId,
-        tool: 'browser_find',
-      });
+      const grantedFind = resultOf(
+        await session.callTool('browser_find', { text: MARKER }, bothGrants)
+      );
 
-      expect(resultTextOf(grantedFind)).toContain(MARKER);
-      expect(resultTextOf(grantedFind)).toContain('Path:');
+      expect(grantedFind.text).toContain(MARKER);
+      expect(grantedFind.text).toContain('Path:');
     } finally {
       await context.close();
+      await hub.close();
       await inner.close();
       await outer.close();
       await rm(userDataDir, { force: true, recursive: true });

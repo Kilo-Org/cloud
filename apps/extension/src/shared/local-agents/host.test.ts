@@ -13,6 +13,7 @@ import type {
   LocalAgentStorageWatch,
 } from './storage';
 import { loadLocalAgentStatus } from './status';
+import { LocalAgentRpcError, LOCAL_AGENT_ERROR_CODES } from './jsonrpc';
 import { startLocalAgentsHost } from './host';
 import { LOCAL_AGENTS_COMMAND_MESSAGE } from './commands';
 
@@ -469,11 +470,71 @@ describe('local agents host over a loopback endpoint', () => {
       reason: 'user_stop',
       sessionHandle,
     });
+
+    // A CLI that raced the revoke gets the stop reason, not `unknown session handle`.
+    socket.handlers.onText(
+      JSON.stringify({
+        controllerId: CONTROLLER_ID,
+        message: {
+          id: 2,
+          jsonrpc: '2.0',
+          method: 'tools.call',
+          params: { arguments: {}, authorized: [], name: 'browser_snapshot', sessionHandle },
+        },
+        type: 'rpc',
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(rpcWith(socket.sent, 'id', 2)).toBeDefined();
+    });
+    expect(messageOf(rpcWith(socket.sent, 'id', 2))?.['error']).toStrictEqual({
+      code: -32_004,
+      message: 'The user stopped this agent session.',
+    });
+    expect(harness.bridge.callTool).not.toHaveBeenCalled();
     // Stop all ends the runtime session too: group grey, leases released.
     expect(harness.bridge.endSessions).toHaveBeenCalledWith([
       { controllerId: CONTROLLER_ID, sessionHandle },
     ]);
     await expect(loadLocalAgentConnectedAgents(harness.storage)).resolves.toStrictEqual([]);
+    host.stop();
+  });
+
+  it('forwards the structured error data the CLI reads', async () => {
+    const harness = createHarness();
+    seedEnabledWithEndpoint(harness.storage);
+    harness.bridge.listTools.mockRejectedValueOnce(
+      new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.needsPermission, 'Permission needed.', {
+        items: [{ class: 'read', origin: 'https://app.example.com' }],
+        stepToken: 'step-1',
+      })
+    );
+    const host = startHost(harness);
+    await host.ready;
+    const socket = await connectSocketIfNeeded(harness);
+
+    await completeHandshake(socket);
+    socket.handlers.onText(
+      JSON.stringify({
+        controllerId: CONTROLLER_ID,
+        message: { id: 7, jsonrpc: '2.0', method: 'tools.list', params: {} },
+        type: 'rpc',
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(rpcWith(socket.sent, 'id', 7)).toBeDefined();
+    });
+    // Without `data`, the CLI cannot ask for the origins or retry with the token.
+    expect(messageOf(rpcWith(socket.sent, 'id', 7))?.['error']).toStrictEqual({
+      code: -32_010,
+      data: {
+        items: [{ class: 'read', origin: 'https://app.example.com' }],
+        stepToken: 'step-1',
+      },
+      message: 'Permission needed.',
+    });
     host.stop();
   });
 

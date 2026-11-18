@@ -223,7 +223,9 @@ export const startFakeHub = async (): Promise<FakeHub> => {
       hub.connected = true;
 
       client.on('message', (data: Buffer) => {
-        hub.frames.push(frameSchema.parse(JSON.parse(data.toString())));
+        const text = data.toString();
+
+        hub.frames.push(frameSchema.parse(JSON.parse(text)));
       });
       client.on('close', () => {
         hub.connected = false;

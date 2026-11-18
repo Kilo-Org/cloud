@@ -151,14 +151,13 @@ export const getBrowserRuntime = ({
     }),
     scriptingApi,
     // Every session gets its group `Kilo · <title>`; an ended one collapses, greys and stays adoptable (D12).
+    // `tabs.group` lives on the tabs API and the rest of the group surface on `chrome.tabGroups`.
     ...(tabGroupsApi === undefined
       ? {}
       : {
           tabGroups: createBrowserTabGroupController({
             api: {
-              ...(tabGroupsApi.group === undefined
-                ? {}
-                : { group: tabGroupsApi.group.bind(tabGroupsApi) }),
+              ...(tabsApi.group === undefined ? {} : { group: tabsApi.group.bind(tabsApi) }),
               tabQuery: query => tabsApi.query(query),
               ...(tabGroupsApi.update === undefined
                 ? {}

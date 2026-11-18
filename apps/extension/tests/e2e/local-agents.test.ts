@@ -1,16 +1,20 @@
-/* eslint-disable import/no-nodejs-modules, max-lines, max-params, vitest/no-conditional-in-test, typescript-eslint/consistent-type-definitions -- the harness writes a temp profile, and frame predicates mirror the wire protocol */
+/* eslint-disable import/no-nodejs-modules, max-lines, vitest/no-conditional-in-test, typescript-eslint/consistent-type-definitions -- the harness writes a temp profile, and frame predicates mirror the wire protocol */
 import { expect, test } from '@playwright/test';
-import type { BrowserContext, Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { z } from 'zod';
-import {
-  launchExtensionContext,
-  readExtensionLocalStorage,
-  seedExtensionAuth,
-} from './extension-context-fixture';
+import { launchExtensionContext, readExtensionLocalStorage } from './extension-context-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
-import { FAKE_HUB_ID, fakeHubMac, fakeHubNonce, startFakeHub } from './local-agents-hub-fixture';
-import type { FakeHub } from './local-agents-hub-fixture';
+import { FAKE_HUB_ID, startFakeHub } from './local-agents-hub-fixture';
+import {
+  LOCAL_AGENT_PAIRING_KEY,
+  activateTab,
+  enableLocalAgents,
+  openPairedAgentSession,
+  openUnownedTab,
+  pairAndHandshake,
+  rpcOfMethod,
+  sendAgentRpc,
+} from './local-agents-fixture';
 
 /*
  * The local-agents flow with a real extension build and a fake loopback hub:
@@ -20,156 +24,33 @@ import type { FakeHub } from './local-agents-hub-fixture';
  * runtime with its grants, is refused outside its group, and Stop all ends it.
  */
 
-const PAIRING_KEY = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8';
-const PAIRING_TOKEN = 'ICEiIyQlJicoKSorLC0uLw';
-
-const rpcMessageSchema = z.object({
-  error: z.object({ code: z.number(), message: z.string() }).optional(),
-  id: z.number().optional(),
-  method: z.string().optional(),
-  params: z.record(z.string(), z.unknown()).optional(),
-  result: z.record(z.string(), z.unknown()).optional(),
-});
-
-const authFrameSchema = z.object({
-  hubId: z.string(),
-  mac: z.string(),
-  nonceE: z.string(),
-  type: z.literal('auth'),
-});
-
 const helloFrameSchema = z.object({ contractSha: z.string(), protocol: z.array(z.number()) });
 
-const toolResultSchema = z.object({
-  content: z.array(z.record(z.string(), z.unknown())),
-  isError: z.boolean().optional(),
+const grant = (origin: string) => [
+  { class: 'act', origin },
+  { class: 'navigate', origin },
+  { class: 'read', origin },
+];
+
+const tabRowsSchema = z.object({
+  tabs: z.array(z.object({ index: z.number(), selected: z.boolean(), url: z.string() })),
 });
 
-const rpcMessage = (frame: Record<string, unknown>) => {
-  const message = rpcMessageSchema.safeParse(frame['message']);
-
-  return message.success ? message.data : undefined;
-};
-
-/** The single RPC response the hub received for one request id. */
-const rpcOf = async (hub: FakeHub, id: number) => {
-  await expect
-    .poll(
-      () => hub.frames.some(frame => frame['type'] === 'rpc' && rpcMessage(frame)?.['id'] === id),
-      { timeout: 20_000 }
-    )
-    .toBe(true);
-
-  return rpcMessage(
-    hub.frames.find(frame => frame['type'] === 'rpc' && rpcMessage(frame)?.['id'] === id) ?? {}
-  );
-};
-
-const sendRpc = async (
-  hub: FakeHub,
-  controllerId: string,
-  id: number,
-  method: string,
-  params: Record<string, unknown>
+const listTabs = async (
+  callTool: (
+    name: string,
+    args: Record<string, unknown>,
+    authorized: readonly Record<string, unknown>[]
+  ) => Promise<{ kind: string; text?: string }>,
+  authorized: readonly Record<string, unknown>[]
 ) => {
-  hub.send({ controllerId, message: { id, jsonrpc: '2.0', method, params }, type: 'rpc' });
+  const listed = await callTool('browser_tabs', { action: 'list' }, authorized);
 
-  const answered = await rpcOf(hub, id);
-
-  if (answered === undefined) {
-    throw new Error(`no answer to ${method}`);
+  if (listed.text === undefined) {
+    throw new Error(`browser_tabs list failed: ${JSON.stringify(listed)}`);
   }
 
-  return answered;
-};
-
-const toolText = (result: Record<string, unknown> | undefined): string => {
-  const parsed = toolResultSchema.safeParse(result);
-
-  if (!parsed.success) {
-    throw new Error(`not a tool result: ${JSON.stringify(result)}`);
-  }
-
-  return parsed.data.content
-    .map(part => (typeof part['text'] === 'string' ? part['text'] : ''))
-    .join('\n');
-};
-
-/** Turns the switch on and waits for the settings panel to report it. */
-const enableLocalAgents = async (sidePanel: Page, extensionId: string): Promise<void> => {
-  await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-  await seedExtensionAuth(sidePanel);
-  await sidePanel.reload();
-  await sidePanel.getByLabel('Settings').click();
-
-  const toggle = sidePanel.getByRole('switch', { name: 'Allow local agents' });
-  await expect(toggle).toHaveAttribute('aria-checked', 'false');
-  await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-checked', 'true');
-};
-
-/** The CLI's pairing navigation, the HMAC handshake, and `ext.hello`. */
-const pairAndHandshake = async ({
-  context,
-  extensionId,
-  hub,
-  sidePanel,
-}: {
-  context: BrowserContext;
-  extensionId: string;
-  hub: FakeHub;
-  sidePanel: Page;
-}): Promise<void> => {
-  hub.setAllowedOrigin(`chrome-extension://${extensionId}`);
-  hub.setPairing({ key: PAIRING_KEY, token: PAIRING_TOKEN });
-
-  // The CLI opens the pairing page in a tab with no opener.
-  // Playwright's newPage() always records one, so create the tab through CDP.
-  const cdp = await context.newCDPSession(sidePanel);
-  await cdp.send('Target.createTarget', {
-    newWindow: true,
-    url: hub.pairingUrl(FAKE_HUB_ID, PAIRING_TOKEN),
-  });
-
-  await expect.poll(() => hub.connected, { timeout: 15_000 }).toBe(true);
-  expect(hub.origin).toBe(`chrome-extension://${extensionId}`);
-
-  const nonceH = fakeHubNonce(0x11);
-  hub.send({ nonceH, type: 'challenge' });
-  await expect
-    .poll(() => hub.frames.some(frame => frame['type'] === 'auth'), { timeout: 10_000 })
-    .toBe(true);
-
-  const auth = authFrameSchema.parse(hub.frames.find(frame => frame['type'] === 'auth'));
-  expect(auth.hubId).toBe(FAKE_HUB_ID);
-  expect(auth.mac).toBe(fakeHubMac(PAIRING_KEY, `ext|${nonceH}|${auth.nonceE}`));
-
-  hub.send({ mac: fakeHubMac(PAIRING_KEY, `hub|${auth.nonceE}|${nonceH}`), type: 'auth_ok' });
-  hub.send({ hubVersion: '1.2.3', mode: 'loopback', protocol: [1], type: 'hub.hello' });
-
-  await expect
-    .poll(() => hub.frames.some(frame => frame['type'] === 'ext.hello'), { timeout: 10_000 })
-    .toBe(true);
-};
-
-/**
- * Activates the tab showing `url` and returns its browser id. The extension's
- * `session.shareActiveTab` has no tab argument, so the tab has to be the one
- * the browser reports as active.
- */
-const activateTab = async (sidePanel: Page, url: string): Promise<number> => {
-  const tabId = await sidePanel.evaluate(
-    `(async () => {
-      const tabs = await chrome.tabs.query({});
-      const tab = tabs.find(candidate => (candidate.url || '').startsWith(${JSON.stringify(url)}));
-      if (!tab || tab.id === undefined) { return 0; }
-      try { await chrome.windows.update(tab.windowId, { focused: true }); } catch (error) { /* headless has no OS focus */ }
-      await chrome.tabs.update(tab.id, { active: true });
-      return tab.id;
-    })()`
-  );
-
-  return z.number().parse(tabId);
+  return tabRowsSchema.parse(JSON.parse(listed.text));
 };
 
 test('local agents pair over loopback, list the session, and Stop all revokes it', async () => {
@@ -186,6 +67,7 @@ test('local agents pair over loopback, list the session, and Stop all revokes it
 
   try {
     const sidePanel = await context.newPage();
+
     await enableLocalAgents(sidePanel, extensionId);
     await pairAndHandshake({ context, extensionId, hub, sidePanel });
 
@@ -194,7 +76,7 @@ test('local agents pair over loopback, list the session, and Stop all revokes it
     expect(hello.contractSha).toHaveLength(64);
 
     expect(await readExtensionLocalStorage(sidePanel, 'kiloLocalAgentEndpoints')).toStrictEqual({
-      endpoints: [{ hubId: FAKE_HUB_ID, key: PAIRING_KEY, ws: hub.wsUrl }],
+      endpoints: [{ hubId: FAKE_HUB_ID, key: LOCAL_AGENT_PAIRING_KEY, ws: hub.wsUrl }],
     });
     await expect
       .poll(async () =>
@@ -213,7 +95,7 @@ test('local agents pair over loopback, list the session, and Stop all revokes it
     const cwd = '/Users/igor/Projects/kilo-bridge-e2e';
 
     hub.send({ controllerId, type: 'controller.connected' });
-    const opened = await sendRpc(hub, controllerId, 1, 'session.open', {
+    const opened = await sendAgentRpc(hub, controllerId, 1, 'session.open', {
       cliVersion: '1.4.0',
       cwd,
       sessionId: 'session-e2e',
@@ -228,22 +110,11 @@ test('local agents pair over loopback, list the session, and Stop all revokes it
 
     await sidePanel.getByRole('button', { name: 'Stop all' }).click();
 
-    await expect
-      .poll(
-        () =>
-          hub.frames.some(
-            frame => frame['type'] === 'rpc' && rpcMessage(frame)?.['method'] === 'session.revoked'
-          ),
-        { timeout: 10_000 }
-      )
-      .toBe(true);
+    await expect.poll(() => rpcOfMethod(hub, 'session.revoked'), { timeout: 10_000 }).toBeDefined();
 
-    const revoked = hub.frames.find(
-      frame => frame['type'] === 'rpc' && rpcMessage(frame)?.['method'] === 'session.revoked'
-    );
     const revokedParams = z
       .object({ reason: z.string(), sessionHandle: z.string() })
-      .parse(rpcMessage(revoked ?? {})?.params);
+      .parse(rpcOfMethod(hub, 'session.revoked')?.['params']);
     expect(revokedParams).toStrictEqual({ reason: 'user_stop', sessionHandle });
     await expect(sidePanel.getByText(sessionTitle)).toHaveCount(0);
   } finally {
@@ -265,39 +136,31 @@ test('an agent session drives its tab through the runtime and Stop all ends it',
 
   try {
     const sidePanel = await context.newPage();
-    await enableLocalAgents(sidePanel, extensionId);
-    await pairAndHandshake({ context, extensionId, hub, sidePanel });
-
     const agentPage = await context.newPage();
+
     await agentPage.goto(`${hub.pageUrl}?start=1`);
-    const agentTabId = await activateTab(sidePanel, hub.pageUrl);
 
-    expect(agentTabId).toBeGreaterThan(0);
+    let agentTabId = 0;
 
-    const origin = `http://127.0.0.1:${String(hub.port)}`;
-    const grants = [
-      { class: 'act', origin },
-      { class: 'navigate', origin },
-      { class: 'read', origin },
-    ];
-    const controllerId = crypto.randomUUID();
-
-    hub.send({ controllerId, type: 'controller.connected' });
-    const opened = await sendRpc(hub, controllerId, 1, 'session.open', {
-      cliVersion: '1.4.0',
-      cwd: '/Users/igor/Projects/kilo-bridge-e2e',
-      sessionId: 'session-agent',
+    // One CLI session owns the tab the user is looking at (D9).
+    const session = await openPairedAgentSession({
+      beforeShare: async () => {
+        agentTabId = await activateTab(sidePanel, hub.pageUrl);
+      },
+      context,
+      extensionId,
+      hub,
+      sidePanel,
       title: 'Agent E2E session',
     });
-    const { sessionHandle } = z.object({ sessionHandle: z.string() }).parse(opened.result);
+    expect(agentTabId).toBeGreaterThan(0);
+    expect(session.tabId).toBe(agentTabId);
 
-    const shared = await sendRpc(hub, controllerId, 2, 'session.shareActiveTab', {
-      sessionHandle,
-    });
-    expect(shared.result?.['tabId']).toBe(agentTabId);
+    const origin = `http://127.0.0.1:${String(hub.port)}`;
+    const grants = grant(origin);
 
     // Read the tools the contract publishes before the first call, as the CLI does.
-    const tools = await sendRpc(hub, controllerId, 3, 'tools.list', {});
+    const tools = await sendAgentRpc(hub, session.controllerId, 3, 'tools.list', {});
     expect(
       z
         .array(z.object({ name: z.string() }))
@@ -305,64 +168,54 @@ test('an agent session drives its tab through the runtime and Stop all ends it',
         .map(tool => tool.name)
     ).toContain('browser_navigate');
 
-    const navigated = await sendRpc(hub, controllerId, 4, 'tools.call', {
-      arguments: { url: hub.pageUrl },
-      authorized: grants,
-      name: 'browser_navigate',
-      sessionHandle,
-    });
-    expect(navigated.error).toBeUndefined();
-    expect(toolResultSchema.parse(navigated.result).isError).toBeUndefined();
+    const navigated = await session.callTool('browser_navigate', { url: hub.pageUrl }, grants);
+    expect(navigated).toMatchObject({ isError: false, kind: 'result' });
     await agentPage.waitForURL(hub.pageUrl);
 
-    const snapshot = await sendRpc(hub, controllerId, 5, 'tools.call', {
-      arguments: {},
-      authorized: grants,
-      name: 'browser_snapshot',
-      sessionHandle,
-    });
-    expect(toolText(snapshot.result)).toContain('Bridge page');
+    const snapshot = await session.callTool('browser_snapshot', {}, grants);
+    expect(snapshot.kind === 'result' && snapshot.text).toContain('Bridge page');
 
-    // A tab outside the session's group is not the agent's to act on (D9).
-    // Created through CDP: a tab opened from the session's tab would join the
-    // group by design, and this one must belong to nobody.
-    const cdp = await context.newCDPSession(sidePanel);
-    await cdp.send('Target.createTarget', { url: `${hub.pageUrl}?other=1` });
-    await activateTab(sidePanel, hub.pageUrl);
+    // A tab nobody opened from the session's tab is outside its group (D9).
+    const unownedTabId = await openUnownedTab(sidePanel, `${hub.pageUrl}?other=1`);
+    expect(unownedTabId).toBeGreaterThan(0);
 
-    const listed = await sendRpc(hub, controllerId, 6, 'tools.call', {
-      arguments: { action: 'list' },
-      authorized: grants,
-      name: 'browser_tabs',
-      sessionHandle,
-    });
-    const tabs = z
-      .array(z.object({ index: z.number(), url: z.string() }))
-      .parse(z.object({ tabs: z.unknown() }).parse(JSON.parse(toolText(listed.result))).tabs);
-    const outside = tabs.find(tab => tab.url.includes('other=1'));
-
+    const before = await listTabs(session.callTool, grants);
+    const outside = before.tabs.find(row => row.url.includes('other=1'));
     expect(outside).toBeDefined();
+    expect(outside?.selected).toBe(false);
 
-    const refused = await sendRpc(hub, controllerId, 7, 'tools.call', {
-      arguments: { action: 'select', index: outside?.index },
-      authorized: grants,
-      name: 'browser_tabs',
-      sessionHandle,
-    });
-    const refusal = toolResultSchema.parse(refused.result);
-    expect(refusal.isError).toBe(true);
-    expect(toolText(refused.result)).toContain('not in the agent session');
+    const refused = await session.callTool(
+      'browser_tabs',
+      { action: 'select', index: outside?.index },
+      grants
+    );
+    // A D9 refusal is `blocked` (-32011) for the CLI, not a tool error.
+    expect(refused).toMatchObject({ code: -32_011, kind: 'error' });
+    expect(refused.kind === 'error' && refused.message).toContain('not in the agent session');
 
-    await sidePanel.getByRole('button', { name: 'Stop all' }).click();
+    // A tab opened *from* the session's tab joins the group, so the refusal above is not vacuous.
+    await agentPage.evaluate("window.open('/page?opened=1', '_blank')");
     await expect
       .poll(
-        () =>
-          hub.frames.some(
-            frame => frame['type'] === 'rpc' && rpcMessage(frame)?.['method'] === 'session.revoked'
-          ),
+        async () => {
+          const listed = await listTabs(session.callTool, grants);
+
+          return listed.tabs.some(row => row.url.includes('opened=1'));
+        },
         { timeout: 10_000 }
       )
       .toBe(true);
+    const listedAfterOpen = await listTabs(session.callTool, grants);
+    const joined = listedAfterOpen.tabs.find(row => row.url.includes('opened=1'));
+    const selected = await session.callTool(
+      'browser_tabs',
+      { action: 'select', index: joined?.index },
+      grants
+    );
+    expect(selected).toMatchObject({ isError: false, kind: 'result' });
+
+    await sidePanel.getByRole('button', { name: 'Stop all' }).click();
+    await expect.poll(() => rpcOfMethod(hub, 'session.revoked'), { timeout: 10_000 }).toBeDefined();
 
     // D12: the group outlives the session, collapsed, grey and titled `Kilo · ended`.
     await expect
@@ -376,13 +229,50 @@ test('an agent session drives its tab through the runtime and Stop all ends it',
       .toContainEqual({ collapsed: true, color: 'grey', title: 'Kilo · ended' });
 
     // A call after Stop all is refused as user_stopped rather than touching the page.
-    const stopped = await sendRpc(hub, controllerId, 8, 'tools.call', {
+    const stopped = await session.callTool('browser_snapshot', {}, grants);
+    expect(stopped).toMatchObject({ code: -32_004, kind: 'error' });
+  } finally {
+    await context.close();
+    await hub.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('a session is refused before a tab is shared into its group', async () => {
+  test.setTimeout(60_000);
+  const hub = await startFakeHub();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+  await mockKiloApi(context, {});
+  await context.addInitScript({
+    content:
+      "Object.defineProperty(chrome.permissions, 'request', { value: () => Promise.resolve(true) });",
+  });
+
+  try {
+    const sidePanel = await context.newPage();
+
+    await enableLocalAgents(sidePanel, extensionId);
+    await pairAndHandshake({ context, extensionId, hub, sidePanel });
+
+    const controllerId = crypto.randomUUID();
+    hub.send({ controllerId, type: 'controller.connected' });
+    const opened = await sendAgentRpc(hub, controllerId, 1, 'session.open', {
+      cliVersion: '1.4.0',
+      cwd: '/Users/igor/Projects/kilo-bridge-e2e',
+      sessionId: 'session-e2e',
+      title: 'No tab yet',
+    });
+    const { sessionHandle } = z.object({ sessionHandle: z.string() }).parse(opened.result);
+
+    // Nothing shared: there is no group to reach, so the call is refused rather than run on a guess.
+    const answered = await sendAgentRpc(hub, controllerId, 2, 'tools.call', {
       arguments: {},
-      authorized: grants,
+      authorized: [],
       name: 'browser_snapshot',
       sessionHandle,
     });
-    expect(stopped.error?.code).toBe(-32_004);
+
+    expect(z.object({ code: z.number() }).parse(answered.error).code).toBe(-32_011);
   } finally {
     await context.close();
     await hub.close();

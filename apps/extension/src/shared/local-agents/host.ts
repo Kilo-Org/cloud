@@ -62,6 +62,9 @@ import { connectLoopbackSocket } from './websocket';
 
 const WATCHDOG_PERIOD_MINUTES = 0.5;
 const NATIVE_ENDPOINT_ID = 'native';
+/** Enough stopped handles to answer a CLI that raced its own revoke, and nothing more. */
+const STOPPED_SESSION_LIMIT = 256;
+const sessionHandleParamSchema = z.string().min(1);
 
 export type LocalAgentAlarmsApi = {
   create(name: string, info: { periodInMinutes: number }): void;
@@ -149,14 +152,26 @@ const isTrustedPanelSender = (sender: unknown, runtimeId: string | undefined): b
   return url.startsWith('chrome-extension://') || url.startsWith('moz-extension://');
 };
 
-const errorResponse = (id: string | number, error: unknown) =>
-  error instanceof LocalAgentRpcError
-    ? buildErrorMessage({ code: error.code, id, message: error.message })
-    : buildErrorMessage({
-        code: LOCAL_AGENT_ERROR_CODES.internalError,
-        id,
-        message: 'Local agent request failed.',
-      });
+const errorResponse = (id: string | number, error: unknown) => {
+  if (error instanceof LocalAgentRpcError) {
+    const frame = buildErrorMessage({
+      code: error.code,
+      id,
+      message: error.message,
+    });
+
+    // `needs_permission` items, `origin_changed` origins and step tokens ride in `data`; the CLI reads them there.
+    return error.data === undefined
+      ? frame
+      : { ...frame, error: { ...frame.error, data: error.data } };
+  }
+
+  return buildErrorMessage({
+    code: LOCAL_AGENT_ERROR_CODES.internalError,
+    id,
+    message: 'Local agent request failed.',
+  });
+};
 
 /** Browser globals plus WXT storage, with the shipped defaults. */
 export const readLocalAgentsHostApis = (): LocalAgentsHostApis => {
@@ -247,9 +262,24 @@ export const startLocalAgentsHost = (
   /* Fragment key per connection attempt, so only the connection that proved it can consume it. */
   const pairingKeysByConnection = new WeakMap<LocalAgentConnection, string>();
   const ready = Promise.withResolvers<void>();
+  /* Handles a stop, a switch-off or a disconnect ended: a late call answers `user_stopped`, not `unknown handle`. */
+  const stoppedSessions = new Set<string>();
   let enabled = false;
   let settingsLoaded = false;
   let stopped = false;
+
+  /** Bounded: the last few hundred stopped handles are enough for a CLI that raced the revoke. */
+  const rememberStopped = (sessions: readonly { readonly sessionHandle: string }[]): void => {
+    for (const session of sessions) {
+      stoppedSessions.add(session.sessionHandle);
+
+      const [oldest] = stoppedSessions;
+
+      if (stoppedSessions.size > STOPPED_SESSION_LIMIT && oldest !== undefined) {
+        stoppedSessions.delete(oldest);
+      }
+    }
+  };
 
   const publishStatus = (): Promise<void> =>
     publish(async () => {
@@ -297,6 +327,16 @@ export const startLocalAgentsHost = (
     }
 
     try {
+      // A handle the user stopped answers `user_stopped` even before the dispatcher looks for its row.
+      const stoppedParam = sessionHandleParamSchema.safeParse(message.params['sessionHandle']);
+
+      if (stoppedParam.success && stoppedSessions.has(stoppedParam.data)) {
+        throw new LocalAgentRpcError(
+          LOCAL_AGENT_ERROR_CODES.userStopped,
+          'The user stopped this agent session.'
+        );
+      }
+
       const result = await dispatcher.handle(controllerId, message.method, message.params);
 
       connection.send(controllerId, buildResultMessage(message.id, result));
@@ -351,6 +391,7 @@ export const startLocalAgentsHost = (
         const removed = await registry.removeController(controllerId);
 
         // A dropped connection's sessions cannot resume: their groups end like a Stop all.
+        rememberStopped(removed?.sessions ?? []);
         await bridge.endSessions(
           (removed?.sessions ?? []).map(session => ({
             controllerId,
@@ -415,6 +456,7 @@ export const startLocalAgentsHost = (
     const revoked = await registry.takeAllSessions();
 
     // Every stopped session ends in the runtime too: its group turns grey (D12) and its leases are released.
+    rememberStopped(revoked);
     await bridge.endSessions(revoked);
 
     for (const { controllerId, sessionHandle } of revoked) {
@@ -431,6 +473,7 @@ export const startLocalAgentsHost = (
     const connection = controllerConnections.get(controllerId);
 
     controllerConnections.delete(controllerId);
+    rememberStopped(removed?.sessions ?? []);
     await bridge.endSessions(
       (removed?.sessions ?? []).map(session => ({
         controllerId,

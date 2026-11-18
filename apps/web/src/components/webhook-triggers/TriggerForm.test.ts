@@ -1379,6 +1379,7 @@ describe('TriggerForm environments', () => {
 
     selectEnvironment(mounted.container, environmentId);
     expect(mockUseCloudAgentEnvironments).toHaveBeenLastCalledWith({
+      enabled: true,
       organizationId: undefined,
       repository: { platform: 'github', fullName: 'kilo/cloud' },
     });
@@ -1390,6 +1391,7 @@ describe('TriggerForm environments', () => {
         ?.getAttribute('data-container-allocation')
     ).toBe('automatic');
     expect(mockUseCloudAgentEnvironments).toHaveBeenLastCalledWith({
+      enabled: true,
       organizationId: undefined,
       repository: { platform: 'github', fullName: 'kilo/other' },
     });
@@ -1405,6 +1407,7 @@ describe('TriggerForm environments', () => {
     render({ mode: 'create', initialData: { ...initialData(), githubRepo: '' } });
 
     expect(mockUseCloudAgentEnvironments).toHaveBeenLastCalledWith({
+      enabled: true,
       organizationId: undefined,
       repository: undefined,
     });
@@ -1414,12 +1417,14 @@ describe('TriggerForm environments', () => {
     const mounted = render({ mode: 'create', organizationId: 'org-1' });
 
     expect(mockUseCloudAgentEnvironments).toHaveBeenLastCalledWith({
+      enabled: true,
       organizationId: 'org-1',
       repository: { platform: 'github', fullName: 'kilo/cloud' },
     });
 
     click(mounted.container, 'test-creator');
     expect(mockUseCloudAgentEnvironments).toHaveBeenLastCalledWith({
+      enabled: true,
       organizationId: 'org-1',
       repository: { platform: 'github', fullName: 'kilo/cloud' },
     });

@@ -26,6 +26,7 @@
     "creditHistory": "היסטוריית קרדיטים",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "ביטול",
     "done": "סיום",
     "retry": "ניסיון חוזר",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "שינויים",
     "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
-    "privateRepositoryA11y": "{{name}}, מאגר פרטי"
+    "privateRepositoryA11y": "{{name}}, מאגר פרטי",
+    "legalDocumentEnglishOnly": "מסמך זה זמין באנגלית בלבד."
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -481,7 +483,14 @@
       "viewReceipt": "הצגת האישור"
     },
     "changelog": "מה חדש",
-    "changelogVersionPending": "ההערות לגרסה זו יגיעו עם עדכון האפליקציה הבא."
+    "changelogVersionPending": "ההערות לגרסה {{version}} יגיעו עם עדכון האפליקציה הבא.",
+    "changelogGroupNew": "חדש",
+    "changelogFixesIn": "תיקונים ושיפורים בתחומים הבאים: {{areas}}.",
+    "changelogFixesPolish": "תיקונים ושיפורים בכל האפליקציה.",
+    "changelogAreas": {
+      "signIn": "התחברות",
+      "profileOrganizations": "פרופיל וארגונים"
+    }
   },
   "preferences": {
     "general": "כללי",
@@ -676,7 +685,8 @@
       "managedOnWeb": "החיבור של הארגון הזה ל-Bitbucket מנוהל באתר דרך מחשב.",
       "description": "צור אסימון גישה לסביבת העבודה עם ההרשאות הנדרשות והדבק אותו למטה.",
       "scopes": "חשבון: קריאה · מאגרים: קריאה/כתיבה · בקשות משיכה: קריאה · התראות אוטומטיות: קריאה/כתיבה",
-      "tokenPlaceholder": "אסימון גישה לסביבת העבודה"
+      "tokenPlaceholder": "אסימון גישה לסביבת העבודה",
+      "tokenRefused": "Bitbucket לא קיבל את אסימון הגישה לסביבת העבודה הזה. בדוק שיש לו את ההרשאות שלמעלה, ולאחר מכן נסה שוב."
     },
     "followReviewMd": "פעולה לפי REVIEW.md",
     "followReviewMdSubtitle": "שימוש בהוראות שבקובץ REVIEW.md בכל מאגר",
@@ -923,13 +933,26 @@
       "repositoryLine": "סקירות: {{reviews}} · ממצאים: {{findings}}",
       "empty": "עדיין אין סקירות עם נתוני אנליטיקה",
       "emptyDescription": "האנליטיקה מתעדת סקירות שהושלמו כל עוד היא מופעלת עבור הארגון.",
-      "off": "האנליטיקה כבויה עבור הארגון הזה.",
-      "couldNotLoad": "לא ניתן לטעון את האנליטיקה"
+      "offTitle": "האנליטיקה כבויה עבור {{platform}}",
+      "offDescription": "תפקידי החיוב בארגון יכולים להפעיל את האנליטיקה בהגדרות הארגון באתר כדי לתעד סקירות שהושלמו.",
+      "couldNotLoad": "לא ניתן לטעון את האנליטיקה",
+      "trackedReviewsCaption": "סקירות שהושלמו והסתיימו בתקופה זו כשהאנליטיקה מופעלת. סקירות שמתנהלות או שנכשלו לעולם אינן נספרות.",
+      "trackedReviewsUncounted": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה.",
+      "trackedReviewsUncounted_one": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה.",
+      "trackedReviewsUncounted_other": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה.",
+      "trackedReviewsUncounted_two": "לא נספרות: {{displayCount}} מתוך {{displayTotal}} הסקירות שהסתיימו בארגון שלהן התוצאה לא נשמרה."
     },
     "council": {
       "title": "סקירת מועצה",
       "subtitle": "כמה מומחים סוקרים כל בקשת משיכה, והקולות שלהם מצטרפים להחלטה אחת.",
-      "unavailable": "סקירת מועצה אינה זמינה עבור הארגון הזה.",
+      "unavailablePersonallyTitle": "נדרש ארגון Enterprise",
+      "unavailablePersonally": "סקירת מועצה אינה חלק מחשבון אישי.",
+      "unavailablePersonallyAction": "יצירת ארגון",
+      "unavailablePersonallySwitchAction": "החלף ארגון",
+      "unavailableOrganizationTitle": "סקירת מועצה אינה זמינה",
+      "unavailableForOrganization": "סקירת מועצה דורשת את תוכנית Enterprise עם מינוי פעיל או תקופת ניסיון. אין לארגון הזה אותה כרגע.",
+      "unavailableForOrganizationNeutral": "סקירת מועצה אינה זמינה לארגון הזה כרגע. נסו שוב מאוחר יותר.",
+      "unavailableOnBitbucket": "סקירת מועצה אינה זמינה עבור מאגרי Bitbucket.",
       "noRepositories": "עדיין לא נבחרו מאגרים. בחר קודם מאגרים בהגדרות המאגרים.",
       "specialists": "מומחים",
       "labels": "תוויות שמפעילות סקירת מועצה",
@@ -2613,7 +2636,6 @@
     "completingPurchase": "הרכישה מתבצעת",
     "subscriptionLoading": "פרטי המינוי ל-Kilo Pass בטעינה",
     "retryHint": "טעינת המצב של Kilo Pass שוב.",
-    "cardAccessibility": "{{title}}. {{description}}. פעולה: {{actionLabel}}",
     "endedOn": "הסתיים ב-{{date}}",
     "notAvailableInApp": "Kilo Pass אינו זמין באפליקציה.",
     "statusActive": "פעיל",
@@ -3374,6 +3396,7 @@
       "manageOnWeb": "הגדרות חיוב באתר",
       "changePlan": "שינוי תוכנית",
       "buySeats": "רכישת רישיונות",
+      "managedOnWeb": "התוכנית, הרישיונות והטעינה האוטומטית מנוהלים באתר.",
       "setupAutoTopUp": "הגדרת טעינה אוטומטית",
       "manageAutoTopUp": "ניהול טעינה אוטומטית",
       "opensOnWeb": "נפתח באתר"
@@ -3535,12 +3558,10 @@
       "requestLogs": "יומני בקשות"
     },
     "requestLogs": {
-      "hint": "בקשות מהשעה שלפני סוף החלון, מהחדשות לישנות.",
       "older": "שעה קודמת",
       "newer": "שעה הבאה",
       "truncated": "בשעה הזו יש יותר בקשות ממה שמוצג ברשימה.",
       "emptyTitle": "אין בקשות",
-      "emptyDescription": "בשעה הזו אין בקשות ל-Gateway.",
       "loadError": "לא ניתן לטעון את יומני הבקשות.",
       "permissionDenied": "רק בעלים, אדמין או מנהל חיובים של הארגון יכולים לצפות ביומני הבקשות שלו.",
       "tokens": "קלט {{input}} · פלט {{output}}",
@@ -4348,8 +4369,7 @@
       "repoValue": "מאגר: {{name}}",
       "profileValue": "פרופיל: {{name}}",
       "profileUnavailable": "הפרופיל הזה כבר לא זמין. בחר פרופיל אחר.",
-      "pickerEmptyDescriptionOrganization": "צור פרופיל ארגוני לשימוש חוזר במשתני סביבה, פקודות הגדרה ומיומנויות בפעילויות שונות.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "בעלים של ארגון או מנהל יכולים ליצור פרופיל ארגוני."
+      "pickerEmptyDescriptionOrganization": "צור פרופיל ארגוני לשימוש חוזר במשתני סביבה, פקודות הגדרה ומיומנויות בפעילויות שונות."
     },
     "variablesDeleteFailed": "לא ניתן למחוק את המשתנה",
     "deleteVariable": "מחק את המשתנה {{key}}",
@@ -4539,7 +4559,6 @@
     "dismiss": "התעלמות מהדוח",
     "offline": "לא מקוון · דוח שמור",
     "cached": "דוח שמור · רענון לא זמין",
-    "window": "{{start}} – {{end}}",
     "summary": "סיכום AI",
     "summaryPending": "סיכום ה-AI בהכנה. הוא יצורף כאן כשיהיה מוכן.",
     "summaryUnavailable": "סיכום ה-AI אינו זמין. הדוח המובנה עדיין זמין.",
@@ -4606,6 +4625,8 @@
     "topModels": "מודלים מובילים",
     "topFeatures": "תכונות מובילות",
     "emptyTitle": "אין שימוש בתקופה זו",
+    "unavailableTitle": "השימוש אינו זמין",
+    "unavailableDescription": "סביבת העבודה הזו אינה מדווחת על שימוש. ניסיון חוזר לא יעזור.",
     "orgSelfNotice": "מוצג השימוש שלך בארגון זה.",
     "viewDetails": "הצגת פרטי השימוש"
   },
@@ -4656,6 +4677,7 @@
       "title": "טריגרים ווובהוקים",
       "subtitle": "אוטומציה של הרצות Cloud Agent מקריאת וובהוק או מלוח זמנים.",
       "new": "טריגר חדש",
+      "create": "צור טריגר",
       "emptyTitle": "אין טריגרים עדיין",
       "emptyDescription": "צרו טריגר כדי להתחיל הרצת Cloud Agent מקריאת וובהוק או לפי לוח זמנים.",
       "loadFailedTitle": "לא ניתן היה לטעון טריגרים",
@@ -4709,6 +4731,8 @@
       "created": "הטריגר נוצר",
       "saved": "הטריגר נשמר",
       "statusArrived": "הגיע",
+      "defaultPromptWebhook": "תארו את גוף בקשת הוובהוק הזו:\n\n{{body}}",
+      "defaultPromptScheduled": "הריצו את המשימה המתוזמנת. ההרצה החלה בשעה {{scheduledTime}}.",
       "problems": {
         "nameRequired": "הזינו שם.",
         "nameTooShort": "השתמשו בלפחות 8 תווים.",
@@ -4757,6 +4781,7 @@
     "superseded": "הקישור הזה הוחלף במכשיר אחר, ולכן הוא כבר לא עובד."
   },
   "sharedSession": {
+    "startedAt": "התחילה בשעה {{time}}",
     "title": "סשן משותף",
     "someone": "מישהו",
     "sharedBy": "שותף על ידי {{owner}}",

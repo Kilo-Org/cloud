@@ -2,6 +2,7 @@ import type { ToolDisplayMode } from './tool-detail-marker';
 import type { BackgroundActivityState } from './background-activity';
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
 import { readCloudAgentErrorFields } from '@kilocode/app-shared/cloud-agent-error';
+import { WORKSPACE_DELETING } from '@kilocode/session-ingest-contracts';
 import {
   errorShapeSchema,
   cloudSessionMetadataSchema,
@@ -862,11 +863,14 @@ function formatErrorDetail(err: unknown): FormattedErrorDetail {
         message: 'Service is unavailable right now. Please try again.',
         code: 'service-unavailable',
       };
-    if (code === 'CONFLICT' || httpStatus === 409)
+    if (code === 'CONFLICT' || httpStatus === 409) {
+      if (r.data.message === WORKSPACE_DELETING)
+        return { message: 'This workspace is being deleted.', code: 'workspace-deleting' };
       return {
         message: 'Previous task is still finishing up. Please wait a moment.',
         code: 'previous-task-in-progress',
       };
+    }
     if (code === 'SERVICE_UNAVAILABLE' || httpStatus === 503)
       return {
         message: 'Service is temporarily unavailable. Please retry in a moment.',

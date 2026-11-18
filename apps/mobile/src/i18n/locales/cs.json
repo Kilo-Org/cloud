@@ -26,6 +26,7 @@
     "creditHistory": "Historie kreditů",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Zrušit",
     "done": "Hotovo",
     "retry": "Zkusit znovu",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Změny",
     "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu.",
-    "privateRepositoryA11y": "{{name}}, soukromý repozitář"
+    "privateRepositoryA11y": "{{name}}, soukromý repozitář",
+    "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině."
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -481,7 +483,14 @@
       "viewReceipt": "Zobrazit potvrzení"
     },
     "changelog": "Co je nového",
-    "changelogVersionPending": "Poznámky k této verzi přijdou s další aktualizací aplikace."
+    "changelogVersionPending": "Poznámky k verzi {{version}} přijdou s další aktualizací aplikace.",
+    "changelogGroupNew": "Novinky",
+    "changelogFixesIn": "Opravy a vylepšení v oblastech: {{areas}}.",
+    "changelogFixesPolish": "Opravy a vylepšení v celé aplikaci.",
+    "changelogAreas": {
+      "signIn": "Přihlášení",
+      "profileOrganizations": "Profil a organizace"
+    }
   },
   "preferences": {
     "general": "Obecné",
@@ -1400,7 +1409,8 @@
       "managedOnWeb": "Připojení Bitbucket této organizace se spravuje na webu z počítače.",
       "description": "Vytvořte přístupový token pracovního prostoru s požadovanými oprávněními a vložte jej níže.",
       "scopes": "Účet: čtení · Repozitáře: čtení/zápis · PR: čtení · Webhooky: čtení/zápis",
-      "tokenPlaceholder": "Přístupový token pracovního prostoru"
+      "tokenPlaceholder": "Přístupový token pracovního prostoru",
+      "tokenRefused": "Bitbucket tento token pracovního prostoru nepřijal. Zkontrolujte, že má výše uvedená oprávnění, a poté to zkuste znovu."
     },
     "scopeList": {
       "personalStillAvailable": "Osobní repozitáře jsou stále k dispozici níže.",
@@ -1513,13 +1523,27 @@
       "repositoryLine": "Kontroly: {{reviews}} · Nálezy: {{findings}}",
       "empty": "Zatím žádné kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenává dokončené kontroly, pokud je pro organizaci zapnutá.",
-      "off": "Analytika je pro tuto organizaci vypnutá.",
-      "couldNotLoad": "Analytiku se nepodařilo načíst"
+      "offTitle": "Analytika je pro {{platform}} vypnutá",
+      "offDescription": "Organizační role pro fakturaci mohou zapnout analytiku v nastavení organizace na webu, aby se zaznamenávaly dokončené kontroly.",
+      "couldNotLoad": "Analytiku se nepodařilo načíst",
+      "trackedReviewsCaption": "Dokončené kontroly, které v tomto období skončily se zapnutou analytikou. Probíhající a neúspěšné kontroly se nikdy nepočítají.",
+      "trackedReviewsUncounted": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_few": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_many": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_one": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_other": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen."
     },
     "council": {
       "title": "Kontrola radou",
       "subtitle": "Každý pull request zkontroluje několik specialistů a jejich hlasy se spojí do jednoho rozhodnutí.",
-      "unavailable": "Kontrola radou není pro tuto organizaci dostupná.",
+      "unavailablePersonallyTitle": "Vyžaduje organizaci Enterprise",
+      "unavailablePersonally": "Kontrola radou není součástí osobního účtu.",
+      "unavailablePersonallyAction": "Vytvořit organizaci",
+      "unavailablePersonallySwitchAction": "Přepnout organizaci",
+      "unavailableOrganizationTitle": "Kontrola radou není nyní dostupná",
+      "unavailableForOrganization": "Kontrola radou vyžaduje plán Enterprise s aktivním předplatným nebo zkušebním obdobím. Tato organizace jej nyní nemá.",
+      "unavailableForOrganizationNeutral": "Kontrola radou není pro tuto organizaci nyní dostupná. Zkuste to znovu později.",
+      "unavailableOnBitbucket": "Kontrola radou není dostupná pro repozitáře Bitbucket.",
       "noRepositories": "Zatím nejsou vybrány žádné repozitáře. Nejprve je vyberte v nastavení repozitářů.",
       "specialists": "Specialisté",
       "labels": "Štítky spouštějící kontrolu radou",
@@ -3236,7 +3260,6 @@
     "completingPurchase": "Dokončuje se nákup",
     "subscriptionLoading": "Načítá se předplatné Kilo Pass",
     "retryHint": "Znovu načte stav Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. Akce: {{actionLabel}}",
     "endedOn": "Ukončeno {{date}}",
     "notAvailableInApp": "Kilo Pass není v aplikaci k dispozici.",
     "statusActive": "Aktivní",
@@ -3439,6 +3462,7 @@
       "manageOnWeb": "Nastavení fakturace na webu",
       "changePlan": "Změnit plán",
       "buySeats": "Koupit uživatelská místa",
+      "managedOnWeb": "Plán, uživatelská místa a automatické dobití se spravují na webu.",
       "setupAutoTopUp": "Nastavit automatické dobití",
       "manageAutoTopUp": "Spravovat automatické dobití",
       "opensOnWeb": "Otevře se na webu"
@@ -3587,12 +3611,10 @@
       "requestLogs": "Protokoly požadavků"
     },
     "requestLogs": {
-      "hint": "Požadavky z hodiny před koncem časového okna, od nejnovějších.",
       "older": "Starší hodina",
       "newer": "Novější hodina",
       "truncated": "V této hodině je více požadavků, než seznam zobrazuje.",
       "emptyTitle": "Žádné požadavky",
-      "emptyDescription": "V této hodině nejsou žádné požadavky na bránu.",
       "loadError": "Protokoly požadavků se nepodařilo načíst.",
       "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
       "tokens": "{{input}} vstup · {{output}} výstup",
@@ -4414,8 +4436,7 @@
       "repoValue": "Úložiště: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Tento profil už není dostupný. Vyberte jiný.",
-      "pickerEmptyDescriptionOrganization": "Vytvořte profil organizace pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Profil organizace může vytvořit vlastník organizace nebo správce."
+      "pickerEmptyDescriptionOrganization": "Vytvořte profil organizace pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi."
     },
     "variablesDeleteFailed": "Proměnnou se nepodařilo smazat",
     "deleteVariable": "Smazat proměnnou {{key}}",
@@ -4609,7 +4630,6 @@
     "dismiss": "Skrýt přehled",
     "offline": "Offline · uložený přehled",
     "cached": "Uložený přehled · obnovení nedostupné",
-    "window": "{{start}} – {{end}}",
     "summary": "AI shrnutí",
     "summaryPending": "AI shrnutí se připravuje. Až bude hotové, objeví se zde.",
     "summaryUnavailable": "AI shrnutí není k dispozici. Strukturovaný přehled je stále dostupný.",
@@ -4676,6 +4696,8 @@
     "topModels": "Nejpoužívanější modely",
     "topFeatures": "Nejpoužívanější funkce",
     "emptyTitle": "V tomto období žádné využití",
+    "unavailableTitle": "Využití není k dispozici",
+    "unavailableDescription": "Tento pracovní prostor nevykazuje využití. Opakování nepomůže.",
     "orgSelfNotice": "Vidíte své vlastní využití v této organizaci.",
     "viewDetails": "Zobrazit podrobnosti o využití"
   },
@@ -4726,6 +4748,7 @@
       "title": "Spouštěče a webhooky",
       "subtitle": "Automatizujte spouštění Cloud Agent voláním webhooku nebo podle plánu.",
       "new": "Nový spouštěč",
+      "create": "Vytvořit spouštěč",
       "emptyTitle": "Zatím žádné spouštěče",
       "emptyDescription": "Vytvořte spouštěč pro spuštění Cloud Agent voláním webhooku nebo podle plánu.",
       "loadFailedTitle": "Spouštěče se nepodařilo načíst",
@@ -4779,6 +4802,8 @@
       "created": "Spouštěč vytvořen",
       "saved": "Spouštěč uložen",
       "statusArrived": "Dorazilo",
+      "defaultPromptWebhook": "Popište tělo tohoto požadavku webhooku:\n\n{{body}}",
+      "defaultPromptScheduled": "Spusťte naplánovaný úkol. Spuštěno v {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Zadejte název.",
         "nameTooShort": "Použijte alespoň 8 znaků.",
@@ -4827,6 +4852,7 @@
     "superseded": "Tento odkaz byl nahrazen na jiném zařízení, a proto už nefunguje."
   },
   "sharedSession": {
+    "startedAt": "Zahájeno v {{time}}",
     "title": "Sdílená relace",
     "someone": "Někdo",
     "sharedBy": "Sdílí {{owner}}",

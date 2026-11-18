@@ -164,15 +164,14 @@ function findCaretBand(root: TestInstance): TestInstance {
 }
 
 /**
- * The eyebrow a reader sees: the heading's own slot. The leading column lays
- * out a twin of it (a zero-ink, hidden line box), so a bare `Eyebrow` lookup
- * has two candidates the moment the header carries an eyebrow.
+ * The eyebrow a reader sees: the heading's own slot. Both the leading column
+ * and the `reserveTitleSpace` band lay out a zero-ink twin of it, hidden from
+ * assistive readers, so a bare `Eyebrow` lookup has more than one candidate the
+ * moment the header carries an eyebrow line.
  */
 function findHeadingEyebrow(root: TestInstance): TestInstance {
   const eyebrow = root.findAll(
-    node =>
-      String(node.type) === 'Eyebrow' &&
-      String(node.parent?.props.className ?? '') === 'min-w-0 flex-1'
+    node => String(node.type) === 'Eyebrow' && node.props['aria-hidden'] !== true
   )[0];
   if (!eyebrow) {
     throw new Error('heading eyebrow not found');
@@ -900,24 +899,6 @@ describe('ScreenHeader mounted', () => {
     renderer.unmount();
   });
 
-  // The band holds the arriving label's line box: a known label is laid out as
-  // itself, and an unknown one as a filler whose script matches the interface
-  // (`reservedEyebrowFiller`), so the family and size it resolves to are the
-  // ones a localized label takes.
-  it("holds the arriving label's line box in the reserved band", () => {
-    const renderer = renderHeader({
-      title: 'الفواتير',
-      reserveEyebrow: true,
-      reservedEyebrow: 'الفواتير',
-      reserveTitleSpace: true,
-    });
-
-    const twin = findReservedBand(renderer.root).findAll(node => String(node.type) === 'Eyebrow');
-    expect(twin).toHaveLength(1);
-    expect(twin[0]?.children).toEqual(['الفواتير']);
-    renderer.unmount();
-  });
-
   // The reserve cannot know the arriving label, so it holds a no-ink no-break
   // space: the eyebrow variant's line box is the same for every script
   // (`EYEBROW_LINE_HEIGHT_DP`), so the space reserves exactly the height the
@@ -945,39 +926,24 @@ describe('ScreenHeader mounted', () => {
       const placeholder = findHeadingEyebrow(inline.root);
       expect(placeholder.children).toEqual(['\u00A0']);
       // It still paints nothing and reaches no reader.
-      expect(placeholder.props.className).toBe('mb-0.5 opacity-0');
+      expect(placeholder.props.className).toContain('opacity-0');
       inline.unmount();
 
       i18nManager.isRTL = false;
     }
   );
 
-  // A known Latin label keeps the reserve at the eyebrow token's own size.
-  it('holds a known Latin label in the reserve exactly as given', () => {
-    const renderer = renderHeader({
-      title: '#6054',
-      reserveEyebrow: true,
-      reservedEyebrow: 'Live now',
-      reserveTitleSpace: true,
-    });
-
-    const twin = findReservedBand(renderer.root).find(node => String(node.type) === 'Eyebrow');
-    expect(twin.children).toEqual(['Live now']);
-    renderer.unmount();
-  });
-
-  it('keeps the reserved label out of the accessibility tree and the visible eyebrow readable', () => {
+  it('keeps the reserved eyebrow twin out of the accessibility tree and the visible eyebrow readable', () => {
     const renderer = renderHeader({
       title: 'الفواتير',
       eyebrow: 'الفواتير',
-      reservedEyebrow: 'الفواتير',
       reserveTitleSpace: true,
     });
 
     const band = findReservedBand(renderer.root);
     expect(band.props['aria-hidden']).toBe(true);
     // The twin is still clipped to no width: it holds height only, so the
-    // reserved label it now lays out paints nothing.
+    // eyebrow line it lays out paints nothing.
     expect(band.props.className).toContain('w-0');
     expect(band.props.className).toContain('overflow-hidden');
 
@@ -1073,7 +1039,10 @@ describe('ScreenHeader mounted', () => {
       expect(label.props.ellipsizeMode).toBe('tail');
       expect(label.children).toEqual([eyebrow]);
       expect(label.props.accessible).toBe(true);
-      expect(label.parent?.props.className).toContain('min-w-0 flex-1');
+      // The label paints on its own line above the title, inside the heading
+      // column the back control centres on.
+      expect(label.parent?.props.className).toContain('mb-0.5');
+      expect(label.parent?.parent?.props.className).toContain('min-w-0 flex-1');
 
       // Files and Discussion have fewer header actions than Overview. Keep the
       // same line limit as their available width changes instead of reflowing.
@@ -1086,14 +1055,35 @@ describe('ScreenHeader mounted', () => {
     }
   });
 
-  it('keeps a reserved eyebrow hidden and on one line until its label arrives', () => {
-    const renderer = renderHeader({ title: '#6054', reserveEyebrow: true, centerTitle: true });
-    const placeholder = renderer.root.findByType('Eyebrow');
-    expect(placeholder.props.numberOfLines).toBe(1);
-    expect(placeholder.props.accessible).toBe(false);
-    expect(placeholder.props.accessibilityElementsHidden).toBe(true);
-    expect(placeholder.props.importantForAccessibility).toBe('no-hide-descendants');
-    expect(placeholder.props.className).toContain('opacity-0');
+  it('paints a placeholder on the reserved eyebrow line above the title', () => {
+    const renderer = renderHeader({
+      title: '#6054',
+      reserveEyebrow: true,
+      centerTitle: true,
+      eyebrowPlaceholder: createElement('PlaceholderBar'),
+    });
+
+    // The reserved line stays in flow above the title, so the heading block the
+    // back control centres on is already the height the label will leave it.
+    const heading = renderer.root.findByProps({ className: 'min-w-0 flex-1' });
+    expect(
+      heading
+        .findAll(
+          node => String(node.type) === 'Eyebrow' || node.props.accessibilityRole === 'header'
+        )
+        .map(node => node.type)
+    ).toEqual(['Eyebrow', 'Text']);
+    expect(heading.findAllByType('PlaceholderBar')).toHaveLength(1);
+
+    // The reserved copy holds the line's height and the placeholder paints over
+    // it. A blank line is not a label, so the line stays hidden from assistive
+    // readers until the real text arrives.
+    const reserved = heading.findByType('Eyebrow');
+    expect(reserved.children).toEqual(['\u00A0']);
+    expect(reserved.props.className).toContain('opacity-0');
+    expect(reserved.props.accessible).toBe(false);
+    expect(reserved.props.accessibilityElementsHidden).toBe(true);
+    expect(reserved.props.importantForAccessibility).toBe('no-hide-descendants');
 
     act(() => {
       renderer.update(
@@ -1106,10 +1096,16 @@ describe('ScreenHeader mounted', () => {
       );
     });
     const label = renderer.root.findByType('Eyebrow');
+    expect(label.children).toEqual(['KILO-ORG/CLOUD']);
     expect(label.props.numberOfLines).toBe(1);
     expect(label.props.className).toContain('text-center');
     expect(label.props.className).not.toContain('opacity-0');
     expect(label.props.accessible).toBe(true);
+    // The line the placeholder held is the line the label now paints, so the
+    // header keeps its height and the placeholder is gone.
+    const labelledHeading = renderer.root.findByProps({ className: 'min-w-0 flex-1' });
+    expect(labelledHeading.findAllByType('Eyebrow')).toHaveLength(1);
+    expect(labelledHeading.findAllByType('PlaceholderBar')).toHaveLength(0);
     renderer.unmount();
   });
 
@@ -1119,30 +1115,23 @@ describe('ScreenHeader mounted', () => {
     renderer.unmount();
   });
 
-  it('lays out the arriving label in the hidden eyebrow line, so the swap cannot grow it', () => {
+  it('holds the arriving eyebrow line with a no-ink filler, so the swap cannot grow it', () => {
     // The invoices boundary reserves the eyebrow line without
-    // `reserveTitleSpace`, so this transparent slot is what holds the height:
-    // with a no-break space it held the mono 10px line box, which is shorter
-    // than the 13px twin an Arabic-script label takes
-    // (`EYEBROW_RTL_SCRIPT_DISPLAY`), so the header grew on the swap.
-    const renderer = renderHeader({
-      title: 'الفواتير',
-      reserveEyebrow: true,
-      reservedEyebrow: 'الفواتير',
-    });
-    const placeholder = findHeadingEyebrow(renderer.root);
-    expect(placeholder.children).toEqual(['الفواتير']);
-    expect(placeholder.props.className).toContain('opacity-0');
-    expect(placeholder.props.accessible).toBe(false);
-    expect(placeholder.props.accessibilityElementsHidden).toBe(true);
+    // `reserveTitleSpace`, so this transparent slot is what holds the height.
+    // The eyebrow variant owns one line box for every script
+    // (`EYEBROW_LINE_HEIGHT_DP`), so a no-break space reserves exactly the
+    // height the arriving label takes — Arabic included — and the swap cannot
+    // grow the header.
+    const renderer = renderHeader({ title: 'الفواتير', reserveEyebrow: true });
+    const reserved = findHeadingEyebrow(renderer.root);
+    expect(reserved.children).toEqual(['\u00A0']);
+    expect(reserved.props.className).toContain('opacity-0');
+    expect(reserved.props.accessible).toBe(false);
+    expect(reserved.props.accessibilityElementsHidden).toBe(true);
 
     act(() => {
       renderer.update(
-        createElement(ScreenHeader, {
-          title: 'استوديو آنا للتصميم',
-          eyebrow: 'الفواتير',
-          reservedEyebrow: 'الفواتير',
-        })
+        createElement(ScreenHeader, { title: 'استوديو آنا للتصميم', eyebrow: 'الفواتير' })
       );
     });
     const label = findHeadingEyebrow(renderer.root);
@@ -1425,13 +1414,17 @@ describe('ScreenHeader mounted', () => {
     expect(eyebrow.children).toEqual(['KILO-STUB/DISCUSSION-MIXED']);
   });
 
-  it('keeps the reserved eyebrow placeholder on the same single capped line', () => {
+  it('keeps a reserved eyebrow on its own capped line above the title', () => {
     const renderer = renderHeader({ reserveEyebrow: true, eyebrowNumberOfLines: 1 });
 
-    const eyebrow = findHeadingEyebrow(renderer.root);
-    expect(eyebrow.props.numberOfLines).toBe(1);
-    expect(eyebrow.props.ellipsizeMode).toBe('middle');
-    expect(eyebrow.children).toEqual(['\u00A0']);
+    // The reserve is the eyebrow itself: a blank line in the same style, capped
+    // and middle-ellipsized the way the label will be, so the header is already
+    // the height the label leaves it and a path's distinguishing tail survives.
+    const reserved = findHeadingEyebrow(renderer.root);
+    expect(reserved.children).toEqual(['\u00A0']);
+    expect(reserved.props.numberOfLines).toBe(1);
+    expect(reserved.props.ellipsizeMode).toBe('middle');
+    expect(reserved.props.accessible).toBe(false);
   });
 
   it('centres the back control on the title band, not on the eyebrow-plus-title block', () => {

@@ -14,7 +14,6 @@
     "dismiss": "Dismiss brief",
     "offline": "Offline · saved brief",
     "cached": "Saved report · refresh unavailable",
-    "window": "{{start}} – {{end}}",
     "summary": "AI summary",
     "summaryPending": "AI summary is in progress. It will attach here when ready.",
     "summaryUnavailable": "AI summary unavailable. Your structured report is still available.",
@@ -93,6 +92,7 @@
     "creditHistory": "Credit history",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancel",
     "done": "Done",
     "retry": "Retry",
@@ -242,7 +242,8 @@
     "durationHourShort": "h",
     "changes": "Changes",
     "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.",
-    "privateRepositoryA11y": "{{name}}, private repository"
+    "privateRepositoryA11y": "{{name}}, private repository",
+    "legalDocumentEnglishOnly": "This document is available in English only."
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -548,7 +549,14 @@
       "viewReceipt": "View receipt"
     },
     "changelog": "What's New",
-    "changelogVersionPending": "The notes for this version arrive with the next app update."
+    "changelogGroupNew": "New",
+    "changelogFixesIn": "Fixes and improvements in {{areas}}.",
+    "changelogFixesPolish": "Bug fixes and polish.",
+    "changelogAreas": {
+      "signIn": "Sign-in",
+      "profileOrganizations": "Profile and organizations"
+    },
+    "changelogVersionPending": "The notes for {{version}} arrive with the next app update."
   },
   "preferences": {
     "biometricUnlock": "Unlock with biometrics",
@@ -1421,7 +1429,8 @@
       "managedOnWeb": "This organization's Bitbucket connection is managed on the web from a computer.",
       "description": "Create a Workspace Access Token with the required scopes and paste it below.",
       "scopes": "Account: read · Repositories: read/write · Pull requests: read · Webhooks: read/write",
-      "tokenPlaceholder": "Workspace access token"
+      "tokenPlaceholder": "Workspace access token",
+      "tokenRefused": "Bitbucket did not accept this workspace token. Check that it has the scopes above, then try again."
     },
     "scopeList": {
       "personalStillAvailable": "Personal repositories are still available below.",
@@ -1526,19 +1535,31 @@
     "analytics": {
       "title": "Analytics",
       "trackedReviews": "Reviews tracked",
+      "trackedReviewsCaption": "Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.",
+      "trackedReviewsUncounted": "Not counted: {{displayCount}} of {{displayTotal}} finished reviews without a captured result.",
+      "trackedReviewsUncounted_one": "Not counted: {{displayCount}} of {{displayTotal}} finished reviews without a captured result.",
+      "trackedReviewsUncounted_other": "Not counted: {{displayCount}} of {{displayTotal}} finished reviews without a captured result.",
       "findingsRaised": "Findings raised",
       "highImpactChanges": "High-impact changes",
       "impactPoints": "Impact points",
       "repositoryLine": "Reviews: {{reviews}} · Findings: {{findings}}",
       "empty": "No reviews with analytics yet",
       "emptyDescription": "Analytics records completed reviews while it is enabled for the organization.",
-      "off": "Analytics is off for this organization.",
+      "offTitle": "Analytics is off for {{platform}}",
+      "offDescription": "Organization billing roles can turn analytics on in the settings on the web to record completed reviews.",
       "couldNotLoad": "Could not load analytics"
     },
     "council": {
       "title": "Council review",
       "subtitle": "Several specialists review each pull request, and their votes combine into one decision.",
-      "unavailable": "Council review is not available for this organization.",
+      "unavailablePersonallyTitle": "Needs an Enterprise organization",
+      "unavailablePersonally": "Council review is not part of a personal account.",
+      "unavailablePersonallyAction": "Create an organization",
+      "unavailablePersonallySwitchAction": "Switch organization",
+      "unavailableOrganizationTitle": "Council review is unavailable",
+      "unavailableForOrganization": "Council review needs the Enterprise plan with an active subscription or trial. This organization does not have it right now.",
+      "unavailableForOrganizationNeutral": "Council review is not available for this organization right now. Try again later.",
+      "unavailableOnBitbucket": "Council review is not available for Bitbucket repositories.",
       "noRepositories": "No repositories selected yet. Choose repositories in the repository settings first.",
       "specialists": "Specialists",
       "labels": "Labels that trigger council review",
@@ -3202,7 +3223,6 @@
     "completingPurchase": "Completing purchase",
     "subscriptionLoading": "Kilo Pass subscription loading",
     "retryHint": "Retries Kilo Pass state.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Ended {{date}}",
     "notAvailableInApp": "Kilo Pass isn't available in the app.",
     "statusActive": "Active",
@@ -3405,6 +3425,7 @@
       "manageOnWeb": "Billing settings on the web",
       "changePlan": "Change plan",
       "buySeats": "Buy seats",
+      "managedOnWeb": "The plan, seats and auto top-up are managed on the web.",
       "setupAutoTopUp": "Set up auto top-up",
       "manageAutoTopUp": "Manage auto top-up",
       "opensOnWeb": "Opens on the web"
@@ -3553,12 +3574,10 @@
       "requestLogs": "Request logs"
     },
     "requestLogs": {
-      "hint": "Requests from the hour before the window ends, newest first.",
       "older": "Older hour",
       "newer": "Newer hour",
       "truncated": "This hour has more requests than the list shows.",
       "emptyTitle": "No requests",
-      "emptyDescription": "This hour has no gateway requests.",
       "loadError": "Couldn't load request logs.",
       "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs.",
       "tokens": "{{input}} in · {{output}} out",
@@ -4349,8 +4368,7 @@
       "repoValue": "Repository: {{name}}",
       "profileValue": "Profile: {{name}}",
       "profileUnavailable": "This profile is no longer available. Choose another one.",
-      "pickerEmptyDescriptionOrganization": "Create an organization profile to reuse environment variables, setup commands, and skills across sessions.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "An organization owner or admin can create an organization profile."
+      "pickerEmptyDescriptionOrganization": "Create an organization profile to reuse environment variables, setup commands, and skills across sessions."
     },
     "variablesDeleteFailed": "Couldn't delete variable",
     "deleteVariable": "Delete variable {{key}}",
@@ -4536,6 +4554,8 @@
     "topModels": "Top models",
     "topFeatures": "Top features",
     "emptyTitle": "No usage in this period",
+    "unavailableTitle": "Usage is unavailable",
+    "unavailableDescription": "This workspace isn't reporting usage. Retrying won't help.",
     "orgSelfNotice": "You're seeing your own usage in this organization.",
     "viewDetails": "View usage details"
   },
@@ -4586,6 +4606,7 @@
       "title": "Triggers & webhooks",
       "subtitle": "Automate Cloud Agent runs from a webhook call or a schedule.",
       "new": "New trigger",
+      "create": "Create trigger",
       "emptyTitle": "No triggers yet",
       "emptyDescription": "Create a trigger to start a Cloud Agent run from a webhook call or on a schedule.",
       "loadFailedTitle": "Couldn't load triggers",
@@ -4639,6 +4660,8 @@
       "created": "Trigger created",
       "saved": "Trigger saved",
       "statusArrived": "Arrived",
+      "defaultPromptWebhook": "Describe this webhook request payload:\n\n{{body}}",
+      "defaultPromptScheduled": "Run the scheduled task. Triggered at {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Enter a name.",
         "nameTooShort": "Use at least 8 characters.",
@@ -4690,6 +4713,7 @@
     "title": "Shared session",
     "someone": "Someone",
     "sharedBy": "Shared by {{owner}}",
+    "startedAt": "Started at {{time}}",
     "unavailableTitle": "Link unavailable",
     "unavailableDescription": "This share link has expired or been revoked.",
     "transcriptUnavailableTitle": "Couldn't load this transcript",

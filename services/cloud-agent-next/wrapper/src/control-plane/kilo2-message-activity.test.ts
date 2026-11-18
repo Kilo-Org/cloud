@@ -81,7 +81,7 @@ describe('Kilo v2 message activity', () => {
         ],
       })
     );
-    expect(activity?.error).toEqual({ type: 'provider', message: 'overloaded' });
+    expect(activity?.error).toEqual({ name: 'UnknownError', data: { message: 'overloaded' } });
     expect(activity?.parts.map(part => part.tool)).toEqual([
       { callId: 'call_stream', name: 'edit', status: 'pending', interactive: false },
       {

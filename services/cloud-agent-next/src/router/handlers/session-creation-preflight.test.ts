@@ -11,6 +11,7 @@ const {
   db,
   mergeProfileConfigurationMock,
   getBuiltinAgentSettingsMock,
+  getModelContextLimitsMock,
   loadEnvironmentForSessionMock,
   assertKiloModelAvailableMock,
   assertRepositoryAccessMock,
@@ -23,6 +24,7 @@ const {
   db: { mockedDb: true },
   mergeProfileConfigurationMock: vi.fn(),
   getBuiltinAgentSettingsMock: vi.fn(),
+  getModelContextLimitsMock: vi.fn(),
   loadEnvironmentForSessionMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
   assertRepositoryAccessMock: vi.fn(),
@@ -39,6 +41,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
     getBuiltinAgentSettings: getBuiltinAgentSettingsMock,
+    getModelContextLimits: getModelContextLimitsMock,
     loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
 });
@@ -127,6 +130,7 @@ describe('session creation preflight', () => {
     vi.clearAllMocks();
     mergeProfileConfigurationMock.mockResolvedValue({});
     getBuiltinAgentSettingsMock.mockResolvedValue({});
+    getModelContextLimitsMock.mockResolvedValue({});
     loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertRepositoryAccessMock.mockResolvedValue(undefined);
@@ -1279,6 +1283,7 @@ describe('user built-in agent overrides', () => {
     vi.clearAllMocks();
     mergeProfileConfigurationMock.mockResolvedValue({});
     getBuiltinAgentSettingsMock.mockResolvedValue({});
+    getModelContextLimitsMock.mockResolvedValue({});
     loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertRepositoryAccessMock.mockResolvedValue(undefined);
@@ -1365,6 +1370,78 @@ describe('user built-in agent overrides', () => {
   });
 });
 
+describe('user model context limits', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mergeProfileConfigurationMock.mockResolvedValue({});
+    getBuiltinAgentSettingsMock.mockResolvedValue({});
+    getModelContextLimitsMock.mockResolvedValue({});
+    loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
+    assertKiloModelAvailableMock.mockResolvedValue(undefined);
+    assertRepositoryAccessMock.mockResolvedValue(undefined);
+    assertEnvironmentRepositoriesAccessMock.mockResolvedValue(undefined);
+    parentSpawnContextMock.mockResolvedValue({
+      token: 'trusted-parent-model-token',
+      createdOnPlatform: 'cloud-agent-web',
+    });
+    parentMetadataMock.mockResolvedValue(parentMetadata());
+    balanceMock.mockResolvedValue({ success: true });
+  });
+
+  it('injects the user caps into a web session profile resolution', async () => {
+    getModelContextLimitsMock.mockResolvedValue({ 'openai/gpt-6.1-sol': 300_000 });
+
+    const resolved = await preflightSessionCreation(
+      request({ options: { createdOnPlatform: 'cloud-agent-web' } }),
+      context,
+      'prepareSession'
+    );
+
+    expect(getModelContextLimitsMock).toHaveBeenCalledWith(db, context.userId);
+    expect(resolved.profile?.resolved?.modelContextLimits).toEqual({
+      'openai/gpt-6.1-sol': 300_000,
+    });
+  });
+
+  it('injects the user caps even when the origin skips default profile resolution', async () => {
+    getModelContextLimitsMock.mockResolvedValue({ 'openai/gpt-6.1-sol': 300_000 });
+
+    const resolved = await preflightSessionCreation(
+      request({ options: { createdOnPlatform: 'code-review' } }),
+      context,
+      'prepareSession'
+    );
+
+    expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+    expect(resolved.profile?.resolved?.modelContextLimits).toEqual({
+      'openai/gpt-6.1-sol': 300_000,
+    });
+  });
+
+  it('uses defaults when the preference read fails', async () => {
+    getModelContextLimitsMock.mockRejectedValueOnce(new Error('database unavailable'));
+    const childLogger = logger.withFields({});
+    const warn = vi.spyOn(childLogger, 'warn').mockImplementation(() => {});
+    const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(childLogger);
+
+    const resolved = await preflightSessionCreation(
+      request({ options: { createdOnPlatform: 'cloud-agent-web' } }),
+      context,
+      'prepareSession'
+    );
+
+    expect(resolved.profile?.resolved?.modelContextLimits).toBeUndefined();
+    expect(withFields).toHaveBeenCalledWith({ userId: context.userId, errorClass: 'Error' });
+    expect(warn).toHaveBeenCalledWith(
+      'Unable to load model context limit preferences; using defaults'
+    );
+  });
+});
+
 describe('scoped child network policy', () => {
   const authority = {
     version: 1 as const,
@@ -1401,6 +1478,7 @@ describe('scoped child network policy', () => {
     vi.clearAllMocks();
     mergeProfileConfigurationMock.mockResolvedValue({});
     getBuiltinAgentSettingsMock.mockResolvedValue({});
+    getModelContextLimitsMock.mockResolvedValue({});
     loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertRepositoryAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);

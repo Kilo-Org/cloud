@@ -54,7 +54,7 @@ const boundaryState = vi.hoisted(() => ({
 // Props each header boundary was rendered with: the boundary's own header and
 // the shared list header, which the resolved screen paints.
 const boundaryProps = vi.hoisted(() => ({
-  rendered: [] as { title?: string; reserveEyebrow?: boolean; eyebrow?: string }[],
+  rendered: [] as { title?: string; reserveEyebrow?: boolean }[],
 }));
 
 const screenHeaders = vi.hoisted(() => ({
@@ -146,7 +146,7 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/organization/organization-boundary', () => ({
-  OrganizationBoundary: (props: { title?: string; reserveEyebrow?: boolean; eyebrow?: string }) => {
+  OrganizationBoundary: (props: { title?: string; reserveEyebrow?: boolean }) => {
     boundaryProps.rendered.push(props);
     return null;
   },
@@ -516,11 +516,10 @@ describe('OrganizationInvoicesScreen header', () => {
     expect(boundaryProps.rendered).toHaveLength(1);
     expect(boundaryProps.rendered[0]?.title).toBe(i18n.t('organization.invoices.title'));
     expect(boundaryProps.rendered[0]?.reserveEyebrow).toBe(true);
-    // The reserved line holds this very label's line box: Arabic-script copy
-    // takes the 13px eyebrow twin, whose line box the mono 10px space the
-    // reserve would otherwise hold is too short for, so the swap cannot grow
-    // the header.
-    expect(boundaryProps.rendered[0]?.eyebrow).toBe(i18n.t('organization.invoices.title'));
+    // The reserve needs no label of its own: the eyebrow variant holds one line
+    // box for every script (`EYEBROW_LINE_HEIGHT_DP`), so the boundary hands the
+    // header its reserve alone and the swap cannot grow it.
+    expect(boundaryProps.rendered[0]).not.toHaveProperty('eyebrow');
   });
 
   it('does not reserve the eyebrow line on a settled boundary state that never fills it', async () => {

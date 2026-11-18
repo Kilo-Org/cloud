@@ -28,13 +28,6 @@ type OrganizationBoundaryProps = Readonly<{
    */
   reserveEyebrow?: boolean;
   /**
-   * The label the boundary's `ScreenHeader` receives once the membership
-   * resolves. It only sizes the reserved line: the boundary paints no eyebrow,
-   * so the band holds this label's line box — Arabic-script copy is 13px, whose
-   * line box the mono 10px space the reserve would otherwise use cannot hold.
-   */
-  eyebrow?: string;
-  /**
    * Where the header's Back lands when the screen opens with no history to pop.
    * Every caller that passes a `title` names its own area's parent: the Profile
    * tab's root for that tab's children, the organization hub for the
@@ -73,7 +66,6 @@ type OrganizationBoundaryProps = Readonly<{
 export function OrganizationBoundary({
   title,
   reserveEyebrow,
-  eyebrow,
   backFallback,
   organizationIdOverride,
   icon = Building2,
@@ -177,12 +169,7 @@ export function OrganizationBoundary({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={title}
-        reserveEyebrow={reserveEyebrow}
-        reservedEyebrow={eyebrow}
-        backFallback={backFallback}
-      />
+      <ScreenHeader title={title} reserveEyebrow={reserveEyebrow} backFallback={backFallback} />
       {content}
     </View>
   );

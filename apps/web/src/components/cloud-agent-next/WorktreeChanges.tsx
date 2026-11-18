@@ -24,6 +24,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useResizableSidebar } from '@/hooks/useResizableSidebar';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
@@ -56,35 +57,21 @@ const fileStatusStyles = {
   modified: { label: 'Modified', dot: 'bg-(--status-orange-400)' },
   deleted: { label: 'Deleted', dot: 'bg-diff-delete-text' },
 };
-const compactCountFormatter = new Intl.NumberFormat('en', {
-  notation: 'compact',
-  maximumFractionDigits: 0,
-});
-
 function ChangeLineCounts({
   additions,
   deletions,
   countsComplete,
-  compactOnMobile = false,
-}: Pick<WorktreeChangesFile, 'additions' | 'deletions' | 'countsComplete'> & {
-  compactOnMobile?: boolean;
-}) {
+}: Pick<WorktreeChangesFile, 'additions' | 'deletions' | 'countsComplete'>) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1.5 font-mono tabular-nums ${compactOnMobile ? 'text-[11px] sm:text-xs' : 'text-xs'}`}
+      className="inline-flex shrink-0 items-center gap-1.5 font-mono text-xs tabular-nums"
       title={countsComplete ? undefined : 'Partial line counts'}
     >
       <span className="text-diff-add-text" aria-label={`${additions} additions`}>
-        {compactOnMobile && (
-          <span className="sm:hidden">+{compactCountFormatter.format(additions)}</span>
-        )}
-        <span className={compactOnMobile ? 'hidden sm:inline' : undefined}>+{additions}</span>
+        +{additions}
       </span>
       <span className="text-diff-delete-text" aria-label={`${deletions} deletions`}>
-        {compactOnMobile && (
-          <span className="sm:hidden">−{compactCountFormatter.format(deletions)}</span>
-        )}
-        <span className={compactOnMobile ? 'hidden sm:inline' : undefined}>−{deletions}</span>
+        −{deletions}
       </span>
       {!countsComplete && (
         <span className="text-muted-foreground" aria-label="Partial line counts">
@@ -151,34 +138,44 @@ export function WorktreeChangesButton({
     });
   }, [refreshSignal, cloudAgentSessionId, queryClient, queryKey]);
 
-  const snapshotTotals = getWorktreeChangesTotals(saved.data?.snapshot);
-  // A clean worktree keeps the plain icon instead of a row of zero counts.
-  const totals = snapshotTotals && snapshotTotals.fileCount > 0 ? snapshotTotals : null;
-  const summary = totals
-    ? `${totals.fileCount} changed files, ${totals.additions} additions, ${totals.deletions} deletions${totals.countsComplete ? '' : ' (partial summary)'}`
-    : 'Changes';
+  const totals = getWorktreeChangesTotals(saved.data?.snapshot);
+  const fileCount = totals?.fileCount ?? 0;
+  const fileNoun = fileCount === 1 ? 'file' : 'files';
+  const hasChanges = fileCount > 0;
+  const description =
+    totals && hasChanges
+      ? `${fileCount} changed ${fileNoun}, ${totals.additions} additions, ${totals.deletions} deletions${totals.countsComplete ? '' : ' (partial summary)'}`
+      : undefined;
 
   return (
-    <Button
-      type="button"
-      size="sm"
-      variant="ghost"
-      className="aria-expanded:bg-secondary h-11 min-w-11 shrink-0 gap-1.5 px-2 font-mono text-xs tabular-nums sm:h-8 sm:min-w-8"
-      aria-label="Changes"
-      aria-description={totals ? summary : undefined}
-      title={totals ? `Saved changes: ${summary}` : 'Changes'}
-      aria-expanded={open}
-      aria-controls={open ? 'worktree-changes-panel' : undefined}
-      onClick={onToggle}
-    >
-      <FileDiff className={totals ? 'hidden size-4 sm:block' : 'size-4'} aria-hidden="true" />
-      {totals && (
-        <>
-          <span className="text-muted-foreground hidden sm:inline">{totals.fileCount}f</span>
-          <ChangeLineCounts {...totals} compactOnMobile />
-        </>
-      )}
-    </Button>
+    <Tooltip delayDuration={400}>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="ghost"
+          className="text-muted-foreground aria-expanded:bg-secondary"
+          aria-label="Changes"
+          aria-description={description}
+          aria-expanded={open}
+          aria-controls={open ? 'worktree-changes-panel' : undefined}
+          onClick={onToggle}
+        >
+          <span className="relative size-4">
+            <FileDiff className="size-4" aria-hidden="true" />
+            {hasChanges && (
+              <span
+                aria-hidden="true"
+                className="bg-foreground ring-background absolute -top-0.5 -right-0.5 size-1.5 rounded-full ring-2"
+              />
+            )}
+          </span>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent sideOffset={4}>
+        {hasChanges ? `Changes · ${fileCount} ${fileNoun}` : 'Changes'}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

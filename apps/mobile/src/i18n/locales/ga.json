@@ -26,6 +26,7 @@
     "creditHistory": "Stair chreidmheasa",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cealaigh",
     "done": "Déanta",
     "retry": "Bain triail eile as",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Athruithe",
     "organizationTrialEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
-    "privateRepositoryA11y": "{{name}}, stór príobháideach"
+    "privateRepositoryA11y": "{{name}}, stór príobháideach",
+    "legalDocumentEnglishOnly": "Tá an doiciméad seo ar fáil i mBéarla amháin."
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -481,7 +483,14 @@
       "viewReceipt": "Féach ar an admháil"
     },
     "changelog": "Na rudaí nua",
-    "changelogVersionPending": "Beidh nótaí an leagain seo sa chéad nuashonrú eile den aip."
+    "changelogVersionPending": "Beidh nótaí an leagain {{version}} sa chéad nuashonrú eile den aip.",
+    "changelogGroupNew": "Nua",
+    "changelogFixesIn": "Ceartúcháin agus feabhsuithe sna réimsí seo: {{areas}}.",
+    "changelogFixesPolish": "Ceartúcháin agus feabhsuithe ar fud na haipe.",
+    "changelogAreas": {
+      "signIn": "Síniú isteach",
+      "profileOrganizations": "Próifíl agus eagraíochtaí"
+    }
   },
   "preferences": {
     "general": "Ginearálta",
@@ -1423,7 +1432,8 @@
       "managedOnWeb": "Bainistítear nasc Bitbucket na heagraíochta seo ar an ngréasán ó ríomhaire.",
       "description": "Cruthaigh comhartha rochtana don spás oibre leis na scóip riachtanacha agus greamaigh thíos é.",
       "scopes": "Cuntas: léamh · Stórtha: léamh/scríobh · Iarratais tarraingthe: léamh · Crúcaí gréasáin: léamh/scríobh",
-      "tokenPlaceholder": "Comhartha rochtana don spás oibre"
+      "tokenPlaceholder": "Comhartha rochtana don spás oibre",
+      "tokenRefused": "Níor ghlac Bitbucket leis an gcomhartha rochtana spáis oibre seo. Seiceáil go bhfuil na scóip thuas aige, ansin triail arís."
     },
     "scopeList": {
       "personalStillAvailable": "Tá stórtha pearsanta ar fáil fós thíos.",
@@ -1537,13 +1547,28 @@
       "repositoryLine": "Athbhreithnithe: {{reviews}} · Torthaí: {{findings}}",
       "empty": "Níl aon athbhreithniú le hanailísíocht fós",
       "emptyDescription": "Taifeadann an anailísíocht athbhreithnithe críochnaithe fad atá sí cumasaithe don eagraíocht.",
-      "off": "Tá an anailísíocht múchta don eagraíocht seo.",
-      "couldNotLoad": "Níorbh fhéidir an anailísíocht a lódáil"
+      "offTitle": "Tá an anailísíocht múchta do {{platform}}",
+      "offDescription": "Is féidir le huinéirí, riarthóirí agus bainisteoirí billíochta — róil billíochta na heagraíochta — an anailísíocht a chumasú i socruithe na heagraíochta ar an ngréasán chun athbhreithnithe críochnaithe a thaifeadadh.",
+      "couldNotLoad": "Níorbh fhéidir an anailísíocht a lódáil",
+      "trackedReviewsCaption": "Athbhreithnithe críochnaithe a tháinig chun deiridh sa tréimhse seo leis an anailísíocht chumasaithe. Ní áirítear ariamh athbhreithnithe atá ar siúl ná cinn a theip orthu.",
+      "trackedReviewsUncounted": "Ní áirítear: {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht níor taifeadadh a dtorthaí.",
+      "trackedReviewsUncounted_few": "Ní áirítear: {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht níor taifeadadh a dtorthaí.",
+      "trackedReviewsUncounted_many": "Ní áirítear: {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht níor taifeadadh a dtorthaí.",
+      "trackedReviewsUncounted_one": "Ní áirítear: {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht níor taifeadadh a dtorthaí.",
+      "trackedReviewsUncounted_other": "Ní áirítear: {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht níor taifeadadh a dtorthaí.",
+      "trackedReviewsUncounted_two": "Ní áirítear: {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht níor taifeadadh a dtorthaí."
     },
     "council": {
       "title": "Athbhreithniú comhairle",
       "subtitle": "Déanann roinnt speisialtóirí athbhreithniú ar gach iarratas tarraingthe, agus cuirtear a vótaí le chéile in aon chinneadh amháin.",
-      "unavailable": "Níl athbhreithniú comhairle ar fáil don eagraíocht seo.",
+      "unavailablePersonallyTitle": "Teastaíonn eagraíocht Enterprise",
+      "unavailablePersonally": "Níl athbhreithniú comhairle mar chuid de chuntas pearsanta.",
+      "unavailablePersonallyAction": "Cruthaigh eagraíocht",
+      "unavailablePersonallySwitchAction": "Athraigh eagraíocht",
+      "unavailableOrganizationTitle": "Níl athbhreithniú comhairle ar fáil faoi láthair",
+      "unavailableForOrganization": "Teastaíonn an plean Enterprise ó athbhreithniú comhairle le síntiús gníomhach nó le triail. Níl sé ag an eagraíocht seo faoi láthair.",
+      "unavailableForOrganizationNeutral": "Níl athbhreithniú comhairle ar fáil don eagraíocht seo faoi láthair. Bain triail eile as níos déanaí.",
+      "unavailableOnBitbucket": "Níl athbhreithniú comhairle ar fáil do stóir Bitbucket.",
       "noRepositories": "Níl aon stór roghnaithe fós. Roghnaigh stóir i socruithe na stór ar dtús.",
       "specialists": "Speisialtóirí",
       "labels": "Lipéid a spreagann athbhreithniú comhairle",
@@ -3293,7 +3318,6 @@
     "completingPurchase": "Ag críochnú an cheannaigh",
     "subscriptionLoading": "Ag lódáil shíntiús Kilo Pass",
     "retryHint": "Déanann sé iarracht eile stádas Kilo Pass a lódáil.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Críochnaithe {{date}}",
     "notAvailableInApp": "Níl Kilo Pass ar fáil san aip.",
     "statusActive": "Gníomhach",
@@ -3496,6 +3520,7 @@
       "manageOnWeb": "Socruithe billeála ar an ngréasán",
       "changePlan": "Athraigh an plean",
       "buySeats": "Ceannaigh suíocháin",
+      "managedOnWeb": "Bainistítear an plean, na suíocháin agus an breisiú uathoibríoch ar an ngréasán.",
       "setupAutoTopUp": "Socraigh breisiú uathoibríoch",
       "manageAutoTopUp": "Bainistigh breisiú uathoibríoch",
       "opensOnWeb": "Osclaítear ar an ngréasán"
@@ -3644,12 +3669,10 @@
       "requestLogs": "Logaí iarratas"
     },
     "requestLogs": {
-      "hint": "Iarratais ón uair an chloig roimh dheireadh na fuinneoige, na cinn is déanaí ar dtús.",
       "older": "Uair níos luaithe",
       "newer": "Uair níos déanaí",
       "truncated": "Tá níos mó iarratas san uair seo ná mar a thaispeántar sa liosta.",
       "emptyTitle": "Níl aon iarratais",
-      "emptyDescription": "Níl aon iarratais chuig an ngeata san uair seo.",
       "loadError": "Níorbh fhéidir logaí iarratas a lódáil.",
       "permissionDenied": "Ní féidir ach le húinéir, riarthóir nó bainisteoir billeála eagraíochta a logaí iarratas a léamh.",
       "tokens": "{{input}} isteach · {{output}} amach",
@@ -4480,8 +4503,7 @@
       "repoValue": "Stór: {{name}}",
       "profileValue": "Próifíl: {{name}}",
       "profileUnavailable": "Níl an phróifíl seo ar fáil a thuilleadh. Roghnaigh ceann eile.",
-      "pickerEmptyDescriptionOrganization": "Cruthaigh próifíl eagrais chun athróga timpeallachta, orduithe socraithe, agus scileanna a athúsáid thar seisiúin.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Is féidir le húinéir nó riarthóir eagrais próifíl eagrais a chruthú."
+      "pickerEmptyDescriptionOrganization": "Cruthaigh próifíl eagrais chun athróga timpeallachta, orduithe socraithe, agus scileanna a athúsáid thar seisiúin."
     },
     "variablesDeleteFailed": "Níorbh fhéidir an athróg a scriosadh",
     "deleteVariable": "Scrios athróg {{key}}",
@@ -4679,7 +4701,6 @@
     "dismiss": "Cuir an tuarascáil as an áireamh",
     "offline": "As líne · tuarascáil shábháilte",
     "cached": "Tuarascáil shábháilte · ní féidir athnuachan",
-    "window": "{{start}} – {{end}}",
     "summary": "Achoimre AI",
     "summaryPending": "Tá an achoimre AI á hullmhú. Ceanglófar anseo í nuair a bheidh sí réidh.",
     "summaryUnavailable": "Níl achoimre AI ar fáil. Tá do thuarascáil struchtúrtha ar fáil fós.",
@@ -4746,6 +4767,8 @@
     "topModels": "Samhlacha is mó úsáid",
     "topFeatures": "Gnéithe is mó úsáid",
     "emptyTitle": "Níl aon úsáid sa tréimhse seo",
+    "unavailableTitle": "Níl úsáid ar fáil",
+    "unavailableDescription": "Ní thuairiscíonn an spás oibre seo úsáid. Ní chabhróidh sé triail a bhaint as arís.",
     "orgSelfNotice": "Tá d'úsáid féin san eagraíocht seo á feiceáil agat.",
     "viewDetails": "Féach ar shonraí úsáide"
   },
@@ -4796,6 +4819,7 @@
       "title": "Truicir agus crúcaí gréasáin",
       "subtitle": "Uathoibrigh ritheanna Cloud Agent ó ghlao crúca gréasáin nó ó sceideal.",
       "new": "Truicear nua",
+      "create": "Cruthaigh truicear",
       "emptyTitle": "Níl truicir ar bith ann fós",
       "emptyDescription": "Cruthaigh truicear chun rith Cloud Agent a thosú ó ghlao crúca gréasáin nó ar sceideal.",
       "loadFailedTitle": "Níorbh fhéidir truicir a lódáil",
@@ -4849,6 +4873,8 @@
       "created": "Cruthaíodh an truicear",
       "saved": "Sábháladh an truicear",
       "statusArrived": "Tagtha",
+      "defaultPromptWebhook": "Déan cur síos ar chomhlacht an iarratais chruca ghréasáin seo:\n\n{{body}}",
+      "defaultPromptScheduled": "Rith an tasc sceidealaithe. Truiceartha ag {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Cuir isteach ainm.",
         "nameTooShort": "Úsáid 8 gcarachtar ar a laghad.",
@@ -4897,6 +4923,7 @@
     "superseded": "Cuireadh nasc nua in ionad an naisc seo in áit eile, mar sin ní oibríonn sé a thuilleadh."
   },
   "sharedSession": {
+    "startedAt": "Tosaíodh ag {{time}}",
     "title": "Seisiún comhroinnte",
     "someone": "Duine éigin",
     "sharedBy": "Comhroinnte ag {{owner}}",

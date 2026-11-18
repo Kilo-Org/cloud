@@ -1,7 +1,4 @@
-import {
-  WORKSPACE_ARTIFACT_RETENTION_MS,
-  type WorkspaceArtifactEntry,
-} from '@kilocode/worker-utils/cloud-agent-workspace-artifacts';
+import type { WorkspaceArtifactEntry } from '@kilocode/worker-utils/cloud-agent-workspace-artifacts';
 
 export function getWorkspaceArtifactsQueryKey({
   userId,
@@ -13,12 +10,6 @@ export function getWorkspaceArtifactsQueryKey({
   cloudAgentSessionId: string;
 }) {
   return ['workspace-artifacts', userId, organizationId ?? null, cloudAgentSessionId] as const;
-}
-
-export function workspaceArtifactExpiresAt(
-  entry: Pick<WorkspaceArtifactEntry, 'updatedAt' | 'expiresAt'>
-) {
-  return entry.expiresAt ?? entry.updatedAt + WORKSPACE_ARTIFACT_RETENTION_MS;
 }
 
 export function groupWorkspaceArtifactsByFolder(entries: readonly WorkspaceArtifactEntry[]) {

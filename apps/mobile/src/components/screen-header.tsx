@@ -97,12 +97,11 @@ export function shouldStackHeaderActions(
 const MAX_TITLE_LINES = 3;
 
 /**
- * What a reserve lays out when it cannot know the label that will fill it: a
- * no-break space, which paints no ink. It holds the eyebrow variant's single
- * line box (`EYEBROW_LINE_HEIGHT_DP` in `ui/text.tsx`), which no longer depends
- * on the script, so any zero-ink filler reserves exactly the height the arriving
- * label takes. A caller that knows the label passes `reservedEyebrow` and the
- * reserve lays out that label itself.
+ * What a reserve paints when it has no label yet: a no-break space, which paints
+ * no ink. It holds the eyebrow variant's single line box
+ * (`EYEBROW_LINE_HEIGHT_DP` in `ui/text.tsx`), which no longer depends on the
+ * script, so a zero-ink filler reserves exactly the height the arriving label
+ * takes.
  */
 const blankEyebrow = '\u00A0';
 
@@ -175,18 +174,24 @@ type ScreenHeaderProps = {
   /** Optional mono-uppercase line above the title. */
   eyebrow?: string;
   /**
-   * Render this label in the reserve instead of the blank filler, so the
-   * reserved eyebrow line holds the exact box of the label that replaces it —
-   * pass it when the caller knows the label before it paints (the invoices
-   * boundary passes the screen's own name). The eyebrow variant holds one line
-   * box for every script (`EYEBROW_LINE_HEIGHT_DP`), so the blank filler already
-   * reserves the height a label takes; this is for the caller that owns the
-   * label and wants the reserve to lay it out rather than a stand-in. The
-   * reserve paints nothing either way (a zero-width, clipped, `aria-hidden`
-   * twin), so this is the label's metrics, not its text.
+   * Reserve the eyebrow's line even while it has no text, so the label arriving
+   * later cannot change the header's height. The reserved line stays in flow
+   * above the title: the heading block — label line plus title — is what centres
+   * against the leading control, so a line painted only once the label lands
+   * would push the title down by half a line. A caller whose read settles
+   * without a label drops the reserve, which lets the title centre alone.
    */
-  reservedEyebrow?: string;
   reserveEyebrow?: boolean;
+  /**
+   * What the reserved eyebrow line paints while the caller's label is not
+   * available yet, such as a bar one eyebrow line tall. It is drawn over the
+   * reserved text, which still holds the line's height, so neither the
+   * placeholder nor the arriving label moves the body. The caller supplies the
+   * node, so the header itself pulls in no loading surface; a read that stopped
+   * passes none, leaving the reserved line blank. `eyebrowHeaderProps` maps the
+   * caller's `HeaderEyebrow` state to all three props.
+   */
+  eyebrowPlaceholder?: React.ReactNode;
   centerTitle?: boolean;
   /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
   size?: 'default' | 'large';
@@ -269,6 +274,22 @@ type ScreenHeaderProps = {
   /** Extra classes on the outer header container. Overrides the default `px-4` for screens that need a different horizontal inset. */
   className?: string;
 };
+
+/**
+ * The eyebrow line a header paints when its label comes from a read: the label
+ * itself once the read answers, a reserved line while the read is pending —
+ * with the caller's placeholder bar over it, because the label is still on its
+ * way — a reserved line with nothing painted after the read failed, where the
+ * title holds the position the label will take without an animation that may
+ * never finish, or no line at all once the read settled without a label, where
+ * the title centres on the leading control alone. A caller keeps one of these
+ * values as its single source of truth.
+ */
+export type HeaderEyebrow =
+  | { readonly kind: 'ready'; readonly text: string }
+  | { readonly kind: 'loading' }
+  | { readonly kind: 'held' }
+  | { readonly kind: 'none' };
 
 /**
  * Height of the reserved title box for `reserveTitleSpace`, one title line
@@ -357,8 +378,8 @@ export function ScreenHeader({
   eyebrowNumberOfLines,
   reserveTitleSpace = false,
   eyebrow,
-  reservedEyebrow,
   reserveEyebrow = false,
+  eyebrowPlaceholder,
   size = 'default',
   headerRight,
   headerRightWidth,
@@ -514,8 +535,11 @@ export function ScreenHeader({
 
   // A centered title shares its row with the leading and trailing controls.
   // A spacer opposite the back control keeps the title centered on the full
-  // width without placing either control out of flow.
-  const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
+  // width without placing either control out of flow. A reserved eyebrow is one
+  // of that title's own lines, painted from the first frame: counting it here
+  // keeps the row's shape (and the back control's gutter pull) from changing
+  // when the label lands.
+  const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow) || reserveEyebrow);
 
   // One decision for two cells: the heading lays the subtitle under its title
   // and the leading column lays a zero-ink twin of that same line under its
@@ -534,28 +558,35 @@ export function ScreenHeader({
   const heading = (
     <View className="min-w-0 flex-1">
       {eyebrow || reserveEyebrow ? (
-        <Eyebrow
-          className={cn('mb-0.5', centerTitle && 'text-center', !eyebrow && 'opacity-0')}
-          // A status line is one line: a narrow window truncates it rather than
-          // stacking it into a column beside the title. A caller that raises
-          // `eyebrowNumberOfLines` opts into the extra lines and the middle
-          // ellipsis that keeps a path's distinguishing tail.
-          numberOfLines={eyebrowNumberOfLines ?? 1}
-          ellipsizeMode={eyebrowNumberOfLines === undefined ? 'tail' : 'middle'}
-          accessible={Boolean(eyebrow)}
-          accessibilityElementsHidden={!eyebrow}
-          importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}
-        >
-          {/*
-            Before the caller's label exists the slot holds the label that will
-            fill it (`reservedEyebrow`), and with no label to go on it holds the
-            blank filler: the eyebrow variant's line box no longer depends on the
-            script (`EYEBROW_LINE_HEIGHT_DP`), so a no-ink space reserves exactly
-            the height the arriving label takes. The copy stays transparent and
-            hidden from assistive readers until `eyebrow` itself is set.
-          */}
-          {eyebrow ?? reservedEyebrow ?? blankEyebrow}
-        </Eyebrow>
+        <View className={cn('mb-0.5', centerTitle && 'items-center')}>
+          {eyebrow === undefined && eyebrowPlaceholder ? (
+            // The reserved text below still holds the line's height, so the
+            // placeholder is painted over it rather than sizing the slot.
+            <View
+              className={cn(
+                'absolute inset-0 justify-center',
+                centerTitle ? 'items-center' : 'items-start'
+              )}
+              pointerEvents="none"
+            >
+              {eyebrowPlaceholder}
+            </View>
+          ) : null}
+          <Eyebrow
+            className={cn(centerTitle && 'text-center', !eyebrow && 'opacity-0')}
+            // A status line is one line: a narrow window truncates it rather than
+            // stacking it into a column beside the title. A caller that raises
+            // `eyebrowNumberOfLines` opts into the extra lines and the middle
+            // ellipsis that keeps a path's distinguishing tail.
+            numberOfLines={eyebrowNumberOfLines ?? 1}
+            ellipsizeMode={eyebrowNumberOfLines === undefined ? 'tail' : 'middle'}
+            accessible={Boolean(eyebrow)}
+            accessibilityElementsHidden={!eyebrow}
+            importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}
+          >
+            {eyebrow ?? '\u00A0'}
+          </Eyebrow>
+        </View>
       ) : null}
       {hasBackControl ? <View className={bandClass}>{titleNode}</View> : titleNode}
       {hasSubtitleLine ? (
@@ -592,6 +623,7 @@ export function ScreenHeader({
       ) : null}
     </View>
   );
+
   // The reserve, as a band rather than a box around the title: a zero-width,
   // clipped twin of the eyebrow and the title's line cap holds the header's text
   // area to one height for every line count the cap allows, so a title that
@@ -600,13 +632,10 @@ export function ScreenHeader({
   // control up with the text rather than with the empty line the reserve keeps.
   // The twin lays out with the same eyebrow style and the same cap box as the
   // visible title, so the band follows the font scale, and it needs no measured
-  // height and no line-height constant of its own (the eyebrow variant owns
-  // `EYEBROW_LINE_HEIGHT_DP`, the same box for every script).
+  // height and no line-height constant.
   const reservedTitleBand = reserveTitleSpace ? (
     <View className="w-0 overflow-hidden" aria-hidden>
-      {eyebrow || reserveEyebrow ? (
-        <Eyebrow className="mb-0.5">{reservedEyebrow ?? eyebrow ?? blankEyebrow}</Eyebrow>
-      ) : null}
+      {eyebrow || reserveEyebrow ? <Eyebrow className="mb-0.5">{blankEyebrow}</Eyebrow> : null}
       <View className={reservedTitleHeightClass(size, titleLines)} />
     </View>
   ) : null;

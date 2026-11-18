@@ -26,6 +26,7 @@
     "creditHistory": "سجل الرصيد",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "إلغاء",
     "done": "تم",
     "retry": "إعادة المحاولة",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "التغييرات",
     "organizationTrialEnded": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكن لمالك المؤسسة تحديث الفوترة على kilo.ai، ثم المحاولة مرة أخرى.",
-    "privateRepositoryA11y": "{{name}}، مستودع خاص"
+    "privateRepositoryA11y": "{{name}}، مستودع خاص",
+    "legalDocumentEnglishOnly": "هذا المستند متوفر باللغة الإنجليزية فقط."
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -481,7 +483,14 @@
       "viewReceipt": "عرض الإيصال"
     },
     "changelog": "ما الجديد",
-    "changelogVersionPending": "ستصل ملاحظات هذا الإصدار مع التحديث القادم للتطبيق."
+    "changelogVersionPending": "ستصل ملاحظات الإصدار {{version}} مع التحديث القادم للتطبيق.",
+    "changelogGroupNew": "جديد",
+    "changelogFixesIn": "إصلاحات وتحسينات في {{areas}}.",
+    "changelogFixesPolish": "إصلاحات وتحسينات في جميع أنحاء التطبيق.",
+    "changelogAreas": {
+      "signIn": "تسجيل الدخول",
+      "profileOrganizations": "الملف الشخصي والمؤسسات"
+    }
   },
   "preferences": {
     "general": "عام",
@@ -676,7 +685,8 @@
       "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بهذه المؤسسة عبر الويب من جهاز كمبيوتر.",
       "description": "أنشئ رمز وصول لمساحة العمل بالصلاحيات المطلوبة والصقه أدناه.",
       "scopes": "الصلاحيات المطلوبة: الحساب: قراءة · المستودعات: قراءة/كتابة · طلبات السحب: قراءة · خطافات الويب: قراءة/كتابة.",
-      "tokenPlaceholder": "رمز وصول مساحة العمل"
+      "tokenPlaceholder": "رمز وصول مساحة العمل",
+      "tokenRefused": "لم يقبل Bitbucket رمز وصول مساحة العمل هذا. تحقق من أنه يتضمن الصلاحيات المذكورة أعلاه، ثم أعد المحاولة."
     },
     "followReviewMd": "اتباع تعليمات REVIEW.md",
     "followReviewMdSubtitle": "الالتزام بملفات تعليمات REVIEW.md لكل مستودع",
@@ -926,13 +936,29 @@
       "repositoryLine": "المراجعات: {{reviews}} · النتائج: {{findings}}",
       "empty": "لا توجد مراجعات بتحليلات بعد",
       "emptyDescription": "تسجّل التحليلات المراجعات المكتملة ما دامت مفعّلة للمؤسسة.",
-      "off": "التحليلات متوقفة لهذه المؤسسة.",
-      "couldNotLoad": "تعذّر تحميل التحليلات"
+      "offTitle": "التحليلات متوقفة لمنصة {{platform}}",
+      "offDescription": "يمكن لأصحاب أدوار الفوترة في المؤسسة تفعيل التحليلات في إعدادات المؤسسة على الويب لتسجّل المراجعات المكتملة.",
+      "couldNotLoad": "تعذّر تحميل التحليلات",
+      "trackedReviewsCaption": "المراجعات المكتملة التي انتهت خلال هذه الفترة والتحليلات مفعّلة. لا تُحتسب المراجعات الجارية والفاشلة أبدًا.",
+      "trackedReviewsUncounted": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها.",
+      "trackedReviewsUncounted_few": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها.",
+      "trackedReviewsUncounted_many": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها.",
+      "trackedReviewsUncounted_one": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها.",
+      "trackedReviewsUncounted_other": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها.",
+      "trackedReviewsUncounted_two": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها.",
+      "trackedReviewsUncounted_zero": "غير محتسبة: {{displayCount}} من أصل {{displayTotal}} من المراجعات المكتملة لدى المؤسسة لم تُحسب نتيجتها."
     },
     "council": {
       "title": "مراجعة المجلس",
       "subtitle": "يراجع عدة متخصصين كل طلب دمج، وتُجمع أصواتهم في قرار واحد.",
-      "unavailable": "مراجعة المجلس غير متاحة لهذه المؤسسة.",
+      "unavailablePersonallyTitle": "يتطلب مؤسسة Enterprise",
+      "unavailablePersonally": "مراجعة المجلس ليست جزءًا من الحساب الشخصي.",
+      "unavailablePersonallyAction": "إنشاء مؤسسة",
+      "unavailablePersonallySwitchAction": "تبديل المؤسسة",
+      "unavailableOrganizationTitle": "مراجعة المجلس غير متاحة الآن",
+      "unavailableForOrganization": "تحتاج مراجعة المجلس إلى خطة Enterprise مع اشتراك نشط أو فترة تجريبية. هذه المؤسسة لا تمتلكها الآن.",
+      "unavailableForOrganizationNeutral": "مراجعة المجلس غير متاحة لهذه المؤسسة الآن. حاول مرة أخرى لاحقًا.",
+      "unavailableOnBitbucket": "مراجعة المجلس غير متاحة لمستودعات Bitbucket.",
       "noRepositories": "لم تُحدَّد أي مستودعات بعد. اختر المستودعات من إعدادات المستودعات أولًا.",
       "specialists": "المتخصصون",
       "labels": "التصنيفات التي تُفعّل مراجعة المجلس",
@@ -2715,7 +2741,6 @@
     "completingPurchase": "جارٍ إكمال الشراء",
     "subscriptionLoading": "جارٍ تحميل اشتراك Kilo Pass",
     "retryHint": "يعيد محاولة التحقق من حالة Kilo Pass.",
-    "cardAccessibility": "{{title}}؛ {{description}}؛ {{actionLabel}}",
     "endedOn": "انتهى في {{date}}",
     "notAvailableInApp": "Kilo Pass غير متاح في التطبيق.",
     "statusActive": "نشط",
@@ -3545,6 +3570,7 @@
       "manageOnWeb": "إعدادات الفوترة على الويب",
       "changePlan": "تغيير الخطة",
       "buySeats": "شراء مقاعد",
+      "managedOnWeb": "تتم إدارة الخطة والمقاعد والشحن التلقائي على الويب.",
       "setupAutoTopUp": "إعداد الشحن التلقائي",
       "manageAutoTopUp": "إدارة الشحن التلقائي",
       "opensOnWeb": "يُفتح على الويب"
@@ -3706,12 +3732,10 @@
       "requestLogs": "سجلات الطلبات"
     },
     "requestLogs": {
-      "hint": "طلبات الساعة السابقة لنهاية الفترة المعروضة، الأحدث أولًا.",
       "older": "الساعة الأقدم",
       "newer": "الساعة الأحدث",
       "truncated": "في هذه الساعة طلبات أكثر مما تعرضه القائمة.",
       "emptyTitle": "لا توجد طلبات",
-      "emptyDescription": "لا توجد طلبات عبر البوابة في هذه الساعة.",
       "loadError": "تعذّر تحميل سجلات الطلبات.",
       "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها قراءة سجلات الطلبات الخاصة بها.",
       "tokens": "{{input}} إدخال · {{output}} إخراج",
@@ -4546,8 +4570,7 @@
       "repoValue": "المستودع: {{name}}",
       "profileValue": "الملف الشخصي: {{name}}",
       "profileUnavailable": "لم يعد هذا الملف الشخصي متاحًا. اختر ملفًا شخصيًا آخر.",
-      "pickerEmptyDescriptionOrganization": "قم بإنشاء ملف شخصي للمؤسسة لإعادة استخدام متغيرات البيئة وأوامر الإعداد والمهارات عبر الجلسات.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "يمكن لمالك المؤسسة أو أحد مسؤوليها إنشاء ملف شخصي للمؤسسة."
+      "pickerEmptyDescriptionOrganization": "قم بإنشاء ملف شخصي للمؤسسة لإعادة استخدام متغيرات البيئة وأوامر الإعداد والمهارات عبر الجلسات."
     },
     "variablesDeleteFailed": "تعذر حذف المتغير",
     "deleteVariable": "احذف المتغير {{key}}",
@@ -4749,7 +4772,6 @@
     "dismiss": "استبعاد التقرير",
     "offline": "غير متصل · تقرير محفوظ",
     "cached": "تقرير محفوظ · التحديث غير متاح",
-    "window": "{{start}} – {{end}}",
     "summary": "ملخص AI",
     "summaryPending": "جارٍ إعداد ملخص AI. سيُرفق هنا عند جاهزيته.",
     "summaryUnavailable": "ملخص AI غير متاح. لا يزال تقريرك المنظّم متاحًا.",
@@ -4816,6 +4838,8 @@
     "topModels": "أكثر النماذج استخدامًا",
     "topFeatures": "أكثر الميزات استخدامًا",
     "emptyTitle": "لا يوجد استخدام في هذه الفترة",
+    "unavailableTitle": "الاستخدام غير متاح",
+    "unavailableDescription": "مساحة العمل هذه لا تبلّغ عن أي استخدام. إعادة المحاولة لن تفيد.",
     "orgSelfNotice": "أنت تشاهد استخدامك الخاص في هذه المؤسسة.",
     "viewDetails": "عرض تفاصيل الاستخدام"
   },
@@ -4866,6 +4890,7 @@
       "title": "المشغلات والويب هوك",
       "subtitle": "أتمت تشغيل Cloud Agent من استدعاء ويب هوك أو جدول زمني.",
       "new": "مشغل جديد",
+      "create": "أنشئ مشغلاً",
       "emptyTitle": "لا توجد مشغلات بعد",
       "emptyDescription": "أنشئ مشغلاً لبدء تشغيل Cloud Agent من استدعاء ويب هوك أو وفق جدول زمني.",
       "loadFailedTitle": "تعذر تحميل المشغلات",
@@ -4919,6 +4944,8 @@
       "created": "تم إنشاء المشغل",
       "saved": "تم حفظ المشغل",
       "statusArrived": "وصل",
+      "defaultPromptWebhook": "صف جسم طلب الويب هوك هذا:\n\n{{body}}",
+      "defaultPromptScheduled": "شغّل المهمة المجدولة. بدأ التشغيل في {{scheduledTime}}.",
       "problems": {
         "nameRequired": "أدخل اسماً.",
         "nameTooShort": "استخدم 8 أحرف على الأقل.",
@@ -4967,6 +4994,7 @@
     "superseded": "تم استبدال هذا الرابط من جهاز آخر، لذا لم يعد يعمل."
   },
   "sharedSession": {
+    "startedAt": "بدأت في {{time}}",
     "title": "جلسة مُشارَكة",
     "someone": "شخص ما",
     "sharedBy": "شاركها {{owner}}",

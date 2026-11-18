@@ -22,10 +22,6 @@ export function OrganizationInvoicesScreen() {
       <OrganizationBoundary
         title={t('organization.invoices.title')}
         reserveEyebrow={isResolving}
-        // The reserved line holds this label's own line box: Arabic-script copy
-        // takes the 13px eyebrow twin, taller than the mono 10px space the
-        // reserve would otherwise hold, so the header cannot grow on the swap.
-        eyebrow={t('organization.invoices.title')}
         backFallback={ORGANIZATION_HUB_PATH}
       />
     );
@@ -34,10 +30,6 @@ export function OrganizationInvoicesScreen() {
   return (
     <InvoiceListScreen
       title={org.organizationName}
-      // The organization titles the screen, so the eyebrow keeps the list's own
-      // name out of the header's uppercase style. The boundary reserved this
-      // one-line eyebrow while the membership read ran, so the swap to this
-      // header cannot move the list.
       eyebrow={t('organization.invoices.title')}
       // The title keeps the header's default tail ellipsis, so the start of the
       // organization name always stays readable.

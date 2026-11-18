@@ -29,6 +29,13 @@ type Dashboard = {
     suggestionFindings: number;
   }[];
   settings: { enabled: boolean };
+  coverage: {
+    enrolledCompletedReviews: number;
+    captured: number;
+    missing: number;
+    invalid: number;
+    omitted: number;
+  };
 };
 
 const queries = vi.hoisted(() => ({
@@ -56,6 +63,13 @@ const dashboard: Dashboard = {
   },
   repositories: [],
   settings: { enabled: true },
+  coverage: {
+    enrolledCompletedReviews: 13,
+    captured: 12,
+    missing: 1,
+    invalid: 0,
+    omitted: 0,
+  },
 };
 
 const denial = { data: { code: 'UNAUTHORIZED', httpStatus: 401 } };
@@ -342,20 +356,37 @@ describe('CodeReviewerAnalytics period labels', () => {
 });
 
 describe('CodeReviewerAnalytics empty state', () => {
-  it('drops the generic description when analytics is off and keeps it when analytics is on', () => {
-    queries.dashboard.data = { ...dashboard, settings: { enabled: false } };
+  it('renders a disabled EmptyState naming the platform when analytics is off', () => {
+    queries.dashboard.data = { ...dashboard, settings: { enabled: false, platform: 'github' } };
     const offRenderer = mountScreen();
 
-    const offTexts = findByType(offRenderer.root, 'TextMock').map(node => node.props.children);
-    expect(offTexts).toContain('Analytics is off for this organization.');
     const offEmpty = findByType(offRenderer.root, 'EmptyStateMock')[0];
-    expect(offEmpty?.props.title).toBe('No reviews with analytics yet');
-    expect(offEmpty?.props.description).toBeUndefined();
+    expect(offEmpty?.props.title).toBe('Analytics is off for GitHub');
+    expect(offEmpty?.props.description).toBe(
+      'Organization billing roles can turn analytics on in the settings on the web to record completed reviews.'
+    );
+    expect(findByType(offRenderer.root, 'TextMock')).toHaveLength(0);
+    expect(findByType(offRenderer.root, 'ConfigureRowMock')).toHaveLength(0);
 
     act(() => {
       offRenderer.unmount();
     });
 
+    // Analytics is enabled per platform, so the state names the platform whose
+    // setting it renders: the same organization with GitLab off reads as GitLab
+    // being off, not the whole organization.
+    queries.dashboard.data = { ...dashboard, settings: { enabled: false, platform: 'gitlab' } };
+    const offGitLabRenderer = mountScreen();
+
+    const offGitLabEmpty = findByType(offGitLabRenderer.root, 'EmptyStateMock')[0];
+    expect(offGitLabEmpty?.props.title).toBe('Analytics is off for GitLab');
+
+    act(() => {
+      offGitLabRenderer.unmount();
+    });
+  });
+
+  it('keeps the metric cards and the generic empty state when analytics is on', () => {
     queries.dashboard.data = dashboard;
     const onRenderer = mountScreen();
 
@@ -365,6 +396,49 @@ describe('CodeReviewerAnalytics empty state', () => {
 
     act(() => {
       onRenderer.unmount();
+    });
+  });
+
+  it('explains what tracked reviews counts and names the uncounted amount beside the cards', () => {
+    queries.dashboard.data = dashboard;
+    const onRenderer = mountScreen();
+
+    const captions = findByType(onRenderer.root, 'TextMock')
+      .map(node => node.props.children)
+      .filter(child => typeof child === 'string');
+    expect(captions).toContain(
+      'Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.'
+    );
+    expect(captions).toContain('Not counted: 1 of 13 finished reviews without a captured result.');
+
+    act(() => {
+      onRenderer.unmount();
+    });
+
+    // Every completed review captured, so the caption says what tracked
+    // counts and nothing implies a problem.
+    queries.dashboard.data = {
+      ...dashboard,
+      coverage: {
+        ...dashboard.coverage,
+        captured: dashboard.coverage.enrolledCompletedReviews,
+        missing: 0,
+      },
+    };
+    const completeRenderer = mountScreen();
+
+    const completeCaptions = findByType(completeRenderer.root, 'TextMock')
+      .map(node => node.props.children)
+      .filter(child => typeof child === 'string');
+    expect(completeCaptions).toContain(
+      'Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.'
+    );
+    expect(completeCaptions).toContain(
+      'Not counted: 0 of 13 finished reviews without a captured result.'
+    );
+
+    act(() => {
+      completeRenderer.unmount();
     });
   });
 });

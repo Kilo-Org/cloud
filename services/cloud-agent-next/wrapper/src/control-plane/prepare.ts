@@ -439,13 +439,13 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   }
 
   async function withOneRetry<T>(
-    operation: () => Promise<T>,
+    operation: (attempt: number) => Promise<T>,
     isCurrent: () => boolean
   ): Promise<T> {
     let lastError: unknown;
     for (let attempt = 1; attempt <= STEP_RETRY_ATTEMPTS; attempt += 1) {
       try {
-        return await operation();
+        return await operation(attempt);
       } catch (error) {
         if (!isCurrent()) throw error;
         lastError = error;
@@ -1021,7 +1021,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     client: Harness,
     signal: AbortSignal,
     restoreFiles: boolean,
-    restoreRoots: RestoreRoots | undefined
+    restoreRoots: RestoreRoots | undefined,
+    snapshotRestore: NonNullable<Parameters<Harness['open']>[0]['snapshotRestore']>
   ): Promise<void> {
     const readHistoryPage = deps.readHistoryPage;
     await workspaceHistory.open(client, {
@@ -1041,6 +1042,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       env,
       signal,
       restoreFiles,
+      snapshotRestore,
       ...(restoreRoots === undefined ? {} : { roots: restoreRoots }),
       onRestore: () => emitProgress(spec.sessionId, 'kilo_session', 'Loading session history'),
     });
@@ -1322,27 +1324,61 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         emitProgress(sessionId, 'kilo_session');
         await settleReleaseCleanup(sessionId);
         await withOneRetry(
-          () =>
-            withinStep('kilo_session', timers.kiloSessionMs, async signal => {
-              await Promise.all([
-                resolveKiloSession(
-                  spec,
-                  directory,
-                  builtEnv,
-                  client,
-                  signal,
-                  restoreFiles,
-                  // A V2 route sends each restored diff to the root that contains it.
-                  hasEnvironmentRoots(roots)
-                    ? {
-                        directories: roots.map(root => root.directory),
-                        recovered: [...recoveredRoots],
-                      }
-                    : undefined
-                ),
-                workspaceHistory.preload(client, spec, builtEnv, signal),
-              ]);
-            }),
+          async attempt => {
+            const snapshotRestore: NonNullable<Parameters<Harness['open']>[0]['snapshotRestore']> =
+              { timings: {} };
+            let failed = false;
+            try {
+              await withinStep('kilo_session', timers.kiloSessionMs, async signal => {
+                await Promise.all([
+                  resolveKiloSession(
+                    spec,
+                    directory,
+                    builtEnv,
+                    client,
+                    signal,
+                    restoreFiles,
+                    // A V2 route sends each restored diff to the root that contains it.
+                    hasEnvironmentRoots(roots)
+                      ? {
+                          directories: roots.map(root => root.directory),
+                          recovered: [...recoveredRoots],
+                        }
+                      : undefined,
+                    snapshotRestore
+                  ),
+                  workspaceHistory.preload(client, spec, builtEnv, signal),
+                ]);
+              });
+            } catch (error) {
+              failed = true;
+              throw error;
+            } finally {
+              if (snapshotRestore.startedAt !== undefined) {
+                try {
+                  const result =
+                    snapshotRestore.result ??
+                    ({
+                      outcome: owner.released ? 'cancelled' : 'failed',
+                      reason: 'restore_error',
+                    } as const);
+                  deps.emit({
+                    type: 'session.restore_attempt',
+                    sessionId,
+                    attempt,
+                    ...snapshotRestore.timings,
+                    durationMs:
+                      snapshotRestore.durationMs ??
+                      Math.round(performance.now() - snapshotRestore.startedAt),
+                    ...result,
+                    willRetry: failed && !owner.released && attempt < STEP_RETRY_ATTEMPTS,
+                  });
+                } catch {
+                  // Diagnostic delivery must not change preparation's result.
+                }
+              }
+            }
+          },
           () => !owner.released
         );
       };

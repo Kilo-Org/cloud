@@ -63,9 +63,9 @@ function selectedBuildDetail({
 
 /**
  * The new-session Environment row: the cloud environment the session starts
- * with, and its snapshot build in one line. Every state renders the same card
- * and the same two reserved lines, so the form never changes height as the
- * list, the pick or the build settles.
+ * with, and its snapshot build in one line. Every state renders the same card,
+ * and the card is only as tall as what it shows: the title, then the detail
+ * line when the state has one, so the form never keeps a blank second line.
  *
  * The label is "Environment"; the row above it picked this form's earlier
  * naming and is the agent profile. Web's form keeps the profile under
@@ -108,9 +108,11 @@ export function NewSessionCloudEnvironmentRow({
         <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
           {label}
         </Text>
-        <Text className="min-h-10 text-sm text-muted-foreground" numberOfLines={2}>
-          {detail.length > 0 ? detail : '\u00A0\n\u00A0'}
-        </Text>
+        {detail.length === 0 ? null : (
+          <Text className="text-sm text-muted-foreground" numberOfLines={2}>
+            {detail}
+          </Text>
+        )}
       </View>
       {opensPicker ? <ChevronDown size={18} color={colors.mutedForeground} /> : null}
     </>

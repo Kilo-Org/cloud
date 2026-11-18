@@ -890,6 +890,7 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
           ],
           runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: {} }],
           kiloCommands: [{ name: 'review-now', template: 'Review' }],
+          modelContextLimits: { 'openai/gpt-6.1-sol': 300_000 },
         },
       }),
       selection
@@ -904,6 +905,7 @@ describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
     expect(registration.spec.runtimeAgents).toBeUndefined();
     expect(registration.spec.runtimeInstructions).toBeUndefined();
     expect(registration.spec.kiloCommands).toBeUndefined();
+    expect(registration.spec.modelContextLimits).toBeUndefined();
     expect(registration.spec.runtimeIsolation).toBe('per-session');
     expect(registration.spec.permission).toMatchObject({
       question: 'deny',
@@ -1262,25 +1264,29 @@ describe('profile runtime delivery', () => {
       },
     ],
     kiloCommands: [{ name: 'review-now', template: 'Review $ARGUMENTS', agent: 'reviewer' }],
+    modelContextLimits: { 'openai/gpt-6.1-sol': 300_000 },
   };
 
-  it.each(['runtimeSkills', 'runtimeAgents', 'kiloCommands', 'runtimeInstructions'] as const)(
-    'delivers %s with compatibility isolation',
-    key => {
-      const registration = buildControlPlaneSessionRegistration(
-        metadata({ profile: { [key]: profile[key] } }),
-        selection
-      );
-      expect(registration.spec[key]).toEqual(profile[key]);
-      expect(registration.spec.runtimeIsolation).toBe('per-session');
-      expect(
-        controlPlanePrepareInputSchema.parse({
-          spec: registration.spec,
-          credentials: registration.credentials,
-        }).spec[key]
-      ).toEqual(profile[key]);
-    }
-  );
+  it.each([
+    'runtimeSkills',
+    'runtimeAgents',
+    'kiloCommands',
+    'runtimeInstructions',
+    'modelContextLimits',
+  ] as const)('delivers %s with compatibility isolation', key => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ profile: { [key]: profile[key] } }),
+      selection
+    );
+    expect(registration.spec[key]).toEqual(profile[key]);
+    expect(registration.spec.runtimeIsolation).toBe('per-session');
+    expect(
+      controlPlanePrepareInputSchema.parse({
+        spec: registration.spec,
+        credentials: registration.credentials,
+      }).spec[key]
+    ).toEqual(profile[key]);
+  });
 
   it('delivers plain environment variables with compatibility isolation', () => {
     const registration = buildControlPlaneSessionRegistration(

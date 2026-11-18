@@ -23,6 +23,7 @@ import {
   isLegacySharedSandboxWorkspace,
   type SessionMetadata,
 } from './persistence/session-metadata.js';
+import { logRuntimeAuthorizationDiagnostic } from './session/runtime-authorization-diagnostics.js';
 
 export const CLOUD_AGENT_PARENT_AUTHORITY_DENIED = 'Cloud Agent parent authority denied';
 
@@ -127,14 +128,12 @@ export function validateScopedWorkerPreparation(authority: CloudAgentAuthority, 
   });
 }
 
-export function assertCloudAgentParentAuthority(
+function hasCloudAgentParentAuthorityMismatch(
   metadata: SessionMetadata | null,
   authorization: RuntimeAuthorization,
-  authority: CloudAgentAuthority,
-  now = Date.now()
-): void {
-  const scope = CloudAgentAuthoritySchema.parse(authority);
-  if (
+  scope: CloudAgentAuthority
+): boolean {
+  return (
     !metadata ||
     !isWorkspaceAnchorMetadata(metadata) ||
     metadata.allowSubagentSessions !== true ||
@@ -147,11 +146,28 @@ export function assertCloudAgentParentAuthority(
     authorization.resourceId !== scope.parentSessionId ||
     authorization.userId !== scope.ownerId ||
     (authorization.organizationId ?? null) !== scope.organizationId ||
-    authorization.state !== 'active' ||
     authorization.id !== scope.authorizationId ||
-    Date.parse(authorization.delegationExpiresAt) <= now ||
-    scope.expiresAt * 1000 <= now ||
     scope.expiresAt * 1000 > Date.parse(authorization.delegationExpiresAt)
+  );
+}
+
+function parentDelegationUnavailableReason(authorization: RuntimeAuthorization, now: number) {
+  if (authorization.state !== 'active') return 'stored_authorization_revoked';
+  if (Date.parse(authorization.delegationExpiresAt) <= now) return 'delegation_expired';
+  return undefined;
+}
+
+export function assertCloudAgentParentAuthority(
+  metadata: SessionMetadata | null,
+  authorization: RuntimeAuthorization,
+  authority: CloudAgentAuthority,
+  now = Date.now()
+): void {
+  const scope = CloudAgentAuthoritySchema.parse(authority);
+  if (
+    hasCloudAgentParentAuthorityMismatch(metadata, authorization, scope) ||
+    parentDelegationUnavailableReason(authorization, now) !== undefined ||
+    scope.expiresAt * 1000 <= now
   ) {
     throw new Error(CLOUD_AGENT_PARENT_AUTHORITY_DENIED);
   }
@@ -173,7 +189,8 @@ export async function issueCloudAgentMcpGrant(
   if (!isWorkspaceAnchorMetadata(metadata)) return undefined;
   if (!matchesWorkspaceMcpBinding(metadata, input.workspace)) return undefined;
   const authorization = RuntimeAuthorizationSchema.parse(await input.authorization());
-  const now = Math.floor(Date.now() / 1000);
+  const nowMs = Date.now();
+  const now = Math.floor(nowMs / 1000);
   const scope: CloudAgentAuthority = {
     version: 1,
     ownerId: metadata.identity.userId,
@@ -182,6 +199,18 @@ export async function issueCloudAgentMcpGrant(
     authorizationId: authorization.id,
     expiresAt: Math.floor(Date.parse(authorization.delegationExpiresAt) / 1000),
   };
+  const unavailableReason = parentDelegationUnavailableReason(authorization, nowMs);
+  if (
+    unavailableReason !== undefined &&
+    !hasCloudAgentParentAuthorityMismatch(
+      metadata,
+      authorization,
+      CloudAgentAuthoritySchema.parse(scope)
+    )
+  ) {
+    logRuntimeAuthorizationDiagnostic(scope.parentSessionId, 'mcp_grant', unavailableReason);
+    return undefined;
+  }
   assertCloudAgentParentAuthority(metadata, authorization, scope);
   const renewed = await renewRuntimeAuthorization({
     authorization,

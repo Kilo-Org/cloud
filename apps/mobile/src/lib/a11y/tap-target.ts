@@ -218,16 +218,15 @@ const ROW_FRAME_CONTENT_DP = 27;
 export const TOUCH_TARGET_OVERHANG_DP = (TOUCH_TARGET_DP - ROW_FRAME_CONTENT_DP) / 2;
 
 /**
- * Per-side vertical `hitSlop` of the label pressable inside a
- * `ROW_FRAME_CLASS` row: the 27pt content band plus 8.5pt a side reaches
- * {@link TOUCH_TARGET_DP}. The frame owns the 48pt row, so the pressable must
- * not carry a floor of its own — a `min-h-[48px]` inside the padded frame made
- * every preference row 69pt tall beside a 48pt `KvRow`.
+ * The label pressable inside a `ROW_FRAME_CLASS` row cancels the frame's
+ * vertical padding and pads itself back by the same amount, so its own node
+ * spans the whole 48pt row while its content stays on the content band. A
+ * control-size audit reads the pressable's own rect, and `hitSlop` does not
+ * lift it: a 27pt pressable with slop measured below the 28pt floor. A
+ * `min-h-[48px]` floor inside the padded frame instead made every preference
+ * row 69pt tall beside a 48pt `KvRow`.
  */
-export const ROW_FRAME_CONTENT_HIT_SLOP = {
-  top: TOUCH_TARGET_OVERHANG_DP,
-  bottom: TOUCH_TARGET_OVERHANG_DP,
-} as const;
+export const ROW_FRAME_CONTENT_PRESS_CLASS = '-my-3 py-3';
 
 /**
  * Per-side `hitSlop` for {@link COMPACT_CONTROL_BOX_CLASS}, so the touch region

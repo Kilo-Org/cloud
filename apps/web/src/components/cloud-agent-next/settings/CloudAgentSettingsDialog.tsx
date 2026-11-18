@@ -35,6 +35,7 @@ import { DefaultSandboxSection } from './DefaultSandboxSection';
 import { EnvironmentsSection } from './EnvironmentsSection';
 import { RepositoryOverridesSection } from './RepositoryOverridesSection';
 import { SidebarSettingsSection } from './SidebarSettingsSection';
+import { SoundPreferencesSection } from './SoundPreferencesSection';
 import { TranscriptPreferencesSection } from './TranscriptPreferencesSection';
 import { VercelComputeSettings } from './VercelComputeSettings';
 
@@ -262,6 +263,7 @@ function CloudAgentSettings({
               </Badge>
             </div>
             <TranscriptPreferencesSection />
+            <SoundPreferencesSection />
             {settings ? (
               <BuiltinAgentsSection organizationId={organizationId} settings={settings} />
             ) : settingsQuery.isError ? (

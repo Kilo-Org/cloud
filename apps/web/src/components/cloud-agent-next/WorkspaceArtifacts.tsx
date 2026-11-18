@@ -59,9 +59,9 @@ export function WorkspaceArtifactsButton({
   return (
     <Button
       type="button"
-      size="sm"
+      size="icon-sm"
       variant="ghost"
-      className="aria-expanded:bg-secondary h-11 min-w-11 shrink-0 gap-1.5 px-2 font-mono text-xs tabular-nums sm:h-8 sm:min-w-8"
+      className="text-muted-foreground aria-expanded:bg-secondary"
       aria-label="Artifacts"
       aria-description={entries.length ? summary : undefined}
       title={summary}
@@ -70,9 +70,6 @@ export function WorkspaceArtifactsButton({
       onClick={onToggle}
     >
       <Archive className="size-4" aria-hidden="true" />
-      {entries.length > 0 && (
-        <span className="text-muted-foreground hidden sm:inline">{entries.length}</span>
-      )}
     </Button>
   );
 }

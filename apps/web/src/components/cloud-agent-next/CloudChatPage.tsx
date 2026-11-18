@@ -92,7 +92,6 @@ import { resolveTranscriptPhase, transcriptReadyForEffects } from './transcript-
 import { billingPayerPresentation } from './billing-payer-presentation';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
-import { PreviewPortDialog } from './PreviewPortDialog';
 import { WorktreeChangesView } from './WorktreeChanges';
 import { WorkspaceArtifactsView } from './WorkspaceArtifacts';
 import { commitsByMessageAnchor, isCommitSummaryRepresented } from './message-presentation';
@@ -686,7 +685,7 @@ export default function CloudChatPage({
   );
   const { availableCommands } = useSlashCommandSets();
 
-  const { play: playCelebrationSound, soundEnabled, setSoundEnabled } = useCelebrationSound();
+  const { play: playCelebrationSound } = useCelebrationSound();
   const { collapseTools } = useCollapseToolsPreference();
 
   const prevActivityRef = useRef<string | null>(null);
@@ -891,10 +890,6 @@ export default function CloudChatPage({
   const handleStopExecution = useCallback(() => {
     void manager.interrupt();
   }, [manager]);
-
-  const handleToggleSound = useCallback(() => {
-    setSoundEnabled(prev => !prev);
-  }, [setSoundEnabled]);
 
   const fetchRouteReady = useCallback(
     async (kiloSessionId: string): Promise<boolean | undefined> => {
@@ -1625,8 +1620,7 @@ export default function CloudChatPage({
       sessionInfoOpen={sessionInfoOpen}
       onSessionInfoOpenChange={setSessionInfoOpen}
       sessionInfoTriggerRef={sessionInfoTriggerRef}
-      soundEnabled={soundEnabled}
-      onToggleSound={handleToggleSound}
+      preview={preview}
       changesOpen={changesViewOpen}
       onToggleChanges={canOpenChanges ? handleToggleChanges : undefined}
       artifactsOpen={artifactsViewOpen}
@@ -1794,10 +1788,8 @@ export default function CloudChatPage({
                             terminals={workspaceTabs.terminals}
                             terminalStatuses={terminalStatuses}
                             canCreateTerminal={canOpenTerminal}
-                            canOpenPreview={preview.links !== null}
                             onSelectTab={handleSelectWorkspaceTab}
                             onCreateTerminal={handleCreateTerminalTab}
-                            onOpenPreview={preview.openDialog}
                             onCloseTerminal={handleCloseTerminalTab}
                             onActivateTab={() => {
                               closeChangesView();
@@ -1811,17 +1803,8 @@ export default function CloudChatPage({
                         review={review}
                         onOpenComment={handleOpenReviewComment}
                       />
-                      {preview.dialog !== null && <PreviewPortDialog {...preview.dialog} />}
-                      {(sessionIdFromParams || workspaceControlSession) && (
-                        <div
-                          className={cn(
-                            // Reserve the late-loading Changes, Artifacts, and sandbox controls,
-                            // which are touch-sized below `sm`, so they do not resize the header row.
-                            'ml-auto flex min-h-11 shrink-0 items-center justify-end sm:min-h-8',
-                            (sessionIdFromParams || selectedWorktreeId) &&
-                              'min-w-[240px] sm:min-w-0'
-                          )}
-                        >
+                      {(sessionIdFromParams || workspaceControlSession || preview.dialog) && (
+                        <div className="ml-auto flex min-h-8 shrink-0 items-center justify-end pointer-coarse:min-h-11">
                           {sessionActions}
                         </div>
                       )}

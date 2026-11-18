@@ -27,7 +27,6 @@ export type RepositoryRow = { id: number | string; fullName: string; private?: b
 // and the rows draw the page gutter themselves.
 const LIST_STYLE = { flex: 1 } satisfies ViewStyle;
 
-
 function repositoryKey(repository: RepositoryRow): string {
   return String(repository.id);
 }

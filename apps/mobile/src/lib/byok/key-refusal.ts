@@ -1,4 +1,7 @@
-import { BYOK_PROVIDER_UNAVAILABLE_MESSAGE } from '@kilocode/app-shared/byok-errors';
+import {
+  BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
+  MANAGED_KEY_READ_ONLY_MESSAGE,
+} from '@kilocode/app-shared/byok-errors';
 import { isRetryableTrpcError, readTrpcErrorField } from '@/lib/trpc-error';
 import { i18n } from '@/i18n';
 
@@ -18,10 +21,21 @@ export type KeySaveFailure =
  * does not translate, so the code decides the copy. The unavailable-provider
  * refusal is the one exception: `FORBIDDEN` alone also covers other denials, so
  * it is recognised by the code and the sentence together, where the sentence is
- * the constant both sides import.
+ * the constant both sides import. The managed-key refusal from an update is the
+ * other exception: `CONFLICT` alone also covers an ordinary duplicate, so it is
+ * recognised by the code and the shared sentence together for the same reason.
  */
 export function refusedKeyMessage(error: unknown): string | null {
   const code = readTrpcErrorField(error, 'code');
+  // The update route refuses a coding-plan-managed key with this exact
+  // sentence; an ordinary duplicate carries a different one, so this must be
+  // matched before the bare `CONFLICT` branch.
+  if (
+    code === 'CONFLICT' &&
+    readTrpcErrorField(error, 'message') === MANAGED_KEY_READ_ONLY_MESSAGE
+  ) {
+    return i18n.t('profile.providerKeys.keyManagedByCodingPlan');
+  }
   if (code === 'CONFLICT') {
     return i18n.t('profile.providerKeys.keyAlreadyExists');
   }

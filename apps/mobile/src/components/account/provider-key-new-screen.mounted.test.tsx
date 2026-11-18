@@ -2,7 +2,10 @@
 import { createElement, type ElementType } from 'react';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
-import { BYOK_PROVIDER_UNAVAILABLE_MESSAGE } from '@kilocode/app-shared/byok-errors';
+import {
+  BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
+  MANAGED_KEY_READ_ONLY_MESSAGE,
+} from '@kilocode/app-shared/byok-errors';
 
 import '@/i18n';
 import { act, type ReactTestRenderer } from '@/test/renderer';
@@ -284,6 +287,23 @@ describe('ProviderKeyNewScreen', () => {
 
     expect(statusMessages(root)).toEqual([
       'This key is not in the format this provider expects. Check it and try again.',
+    ]);
+    expect(retryButton(root)).toBeUndefined();
+    expect(state.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('reports a managed key refused with a conflict as read-only, not as a duplicate', async () => {
+    // The update route reuses `CONFLICT` for a plan-managed key, so the screen
+    // must match the shared sentence rather than the code alone.
+    state.mutateAsync.mockRejectedValueOnce(
+      serverRefusal('CONFLICT', MANAGED_KEY_READ_ONLY_MESSAGE)
+    );
+    const root = await mount();
+
+    await submitKey(root, 'sk-test-123');
+
+    expect(statusMessages(root)).toEqual([
+      "A coding plan manages this provider's key, and the key is read-only. Cancel the coding plan to add your own.",
     ]);
     expect(retryButton(root)).toBeUndefined();
     expect(state.dismissTo).not.toHaveBeenCalled();

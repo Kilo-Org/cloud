@@ -6,7 +6,10 @@ import {
   type OrganizationRole,
 } from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
-import { BYOK_PROVIDER_UNAVAILABLE_MESSAGE } from '@kilocode/app-shared/byok-errors';
+import {
+  BYOK_PROVIDER_UNAVAILABLE_MESSAGE,
+  MANAGED_KEY_READ_ONLY_MESSAGE,
+} from '@kilocode/app-shared/byok-errors';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -34,6 +37,7 @@ import {
   type BYOKKeyTestResult,
 } from '@/lib/byok/types';
 import { isUniqueViolation } from '@/lib/db-errors';
+import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 import {
   GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
@@ -95,8 +99,6 @@ import { sortByokKeysInRouteOrder } from '@kilocode/web-shared/lib/ai-gateway/by
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 
 const KEYS_CHANGED_MESSAGE = 'Your API keys changed. Reload the page and try again.';
-const MANAGED_KEY_READ_ONLY_MESSAGE =
-  'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
 const logByokWriteWarning = sentryLogger('byok-key-write', 'warning');
 
@@ -622,7 +624,7 @@ export const byokRouter = createTRPCRouter({
           } catch (lookupError) {
             logByokWriteWarning('BYOK key conflict lookup failed', {
               providerId: provider_id,
-              message: lookupError instanceof Error ? lookupError.message : undefined,
+              message: sanitizeErrorForTelemetry(lookupError).message,
             });
             throw new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
@@ -643,7 +645,7 @@ export const byokRouter = createTRPCRouter({
         }
         logByokWriteWarning('BYOK key create failed', {
           providerId: provider_id,
-          message: error instanceof Error ? error.message : undefined,
+          message: sanitizeErrorForTelemetry(error).message,
         });
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -739,7 +741,7 @@ export const byokRouter = createTRPCRouter({
       } catch (error) {
         logByokWriteWarning('BYOK key update failed', {
           providerId: existingKey.provider_id,
-          message: error instanceof Error ? error.message : undefined,
+          message: sanitizeErrorForTelemetry(error).message,
         });
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

@@ -1,5 +1,5 @@
 {
-  "id": "f30bbbd6-d7cf-494a-9963-e9274bf6acf9",
+  "id": "e7b9957b-099e-45fd-b59f-f302a88d8dae",
   "prevId": "2045b350-4045-4dbd-bb5d-19d62eb5770f",
   "version": "7",
   "dialect": "postgresql",
@@ -3224,55 +3224,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.blacklisted_domains_settings": {
-      "name": "blacklisted_domains_settings",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "default": 1
-        },
-        "blocked_signup_tlds": {
-          "name": "blocked_signup_tlds",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_by_email": {
-          "name": "updated_by_email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "blacklisted_domains_settings_singleton": {
-          "name": "blacklisted_domains_settings_singleton",
-          "value": "\"blacklisted_domains_settings\".\"id\" = 1"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.bot_request_cloud_agent_sessions": {
@@ -8565,6 +8516,19 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
+        },
+        "web_search_enabled": {
+          "name": "web_search_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "web_search_provider": {
+          "name": "web_search_provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",

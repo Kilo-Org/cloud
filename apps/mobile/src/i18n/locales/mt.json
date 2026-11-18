@@ -5079,6 +5079,8 @@
     "modelsDescription": "Itfi mudell biex timblokkjah għal kull membru. Il-mudelli mill-fornituri permessi jibdew attivi.",
     "modelsDeniedOnly": "Miċħuda biss",
     "modelsEmpty": "Ebda mudell ma jaqbel ma' din it-tfittxija.",
+    "modelsDeniedEmpty": "Ebda mudell mhu miċħud.",
+    "modelsDeniedSearchEmpty": "Ebda mudell miċħud ma jaqbel ma' din it-tfittxija.",
     "providersDescription": "Itfi fornitur biex twaqqaf lil Kilo milli jidderieġi lejh għal din l-organizzazzjoni.",
     "providersNeedCatalog": "Is-swiċċijiet tal-fornituri jibqgħu biss għall-qari sakemm jitgħabba l-katalgu sħiħ tal-mudelli. Agħfas Erġa' pprova hawn fuq biex teditjahom.",
     "providersEmpty": "Ebda fornitur ma jaqbel ma' din it-tfittxija.",

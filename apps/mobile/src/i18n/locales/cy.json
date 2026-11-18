@@ -5150,6 +5150,8 @@
     "modelsDescription": "Diffoddwch fodel i'w flocio i bob aelod. Mae modelau gan ddarparwyr a ganiateir wedi'u troi ymlaen i ddechrau.",
     "modelsDeniedOnly": "Wedi'u gwrthod yn unig",
     "modelsEmpty": "Does dim modelau'n cyfateb i'r chwiliad hwn.",
+    "modelsDeniedEmpty": "Does dim model wedi'i wrthod.",
+    "modelsDeniedSearchEmpty": "Does dim model wedi'i wrthod yn cyfateb i'r chwiliad hwn.",
     "providersDescription": "Diffoddwch ddarparwr i atal Kilo rhag anfon ceisiadau ato ar gyfer y sefydliad hwn.",
     "providersNeedCatalog": "Bydd switshis darparwyr yn aros yn ddarllen-yn-unig nes i'r catalog modelau llawn lwytho. Tapiwch Rhoi cynnig eto uchod i'w golygu.",
     "providersEmpty": "Does dim darparwyr yn cyfateb i'r chwiliad hwn.",

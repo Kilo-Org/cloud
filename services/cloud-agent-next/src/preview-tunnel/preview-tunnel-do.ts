@@ -328,6 +328,7 @@ export class PreviewTunnel extends DurableObject<Env> {
       }
       const outcome = await stream.ack.wait(this.limits.ackTimeoutMs);
       if (outcome === 'acked') return { ok: true, stream };
+      if (outcome === 'failed') return { ok: false, failure: 'unavailable' };
       if (outcome === 'timeout' && tunnel.framesReceived > heard) return { ok: true, stream };
       if (outcome === 'timeout') {
         this.dropTunnel(tunnel, { code: PREVIEW_TUNNEL_CLOSE.noAck, reason: 'No acknowledgement' });

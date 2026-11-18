@@ -113,6 +113,17 @@ describe('PreviewTunnel connect', () => {
     await expectFailure(await pending, 503, PREVIEW_UNAVAILABLE_TEXT);
     await roundTrip(stub, next, allocationId);
   });
+
+  it('fails an unacknowledged stream instead of resending it on the replacement tunnel', async () => {
+    const { stub, peer, allocationId } = await connectedTunnel();
+    peer.autoAck = false;
+    const pending = stub.fetch(previewRequest('/slow', { allocationId }));
+    await peer.takeType('open');
+    const next = await connectTunnelPeer(stub, allocationId);
+    expect(await peer.waitForClose()).toMatchObject({ code: 4001 });
+    await expectFailure(await pending, 503, PREVIEW_UNAVAILABLE_TEXT);
+    await roundTrip(stub, next, allocationId);
+  });
 });
 
 describe('PreviewTunnel HTTP streams', () => {

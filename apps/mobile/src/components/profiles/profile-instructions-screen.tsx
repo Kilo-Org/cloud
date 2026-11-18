@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- profile-editor instructions: section body, sheet and delete flow share one screen */
 import { type Href } from 'expo-router';
-import { type ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -21,9 +21,8 @@ import { FileText, Trash2 } from '@/components/ui/icons';
 import { IconTile } from '@/components/ui/icon-tile';
 import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
-import { RowIconAction } from '@/components/ui/row-trailing';
+import { renderRowTrailing, RowIconAction } from '@/components/ui/row-trailing';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
@@ -82,13 +81,17 @@ function InstructionRow({
   const { t } = useTranslation();
   const colors = useThemeColors();
   const trailing: ReactNode[] = [
-    <Switch
-      key="enable"
-      value={instruction.enabled}
-      accessibilityLabel={instruction.name}
-      disabled={onToggle === undefined}
-      onValueChange={onToggle}
-    />,
+    <Fragment key="enable">
+      {renderRowTrailing({
+        kind: 'switch',
+        value: instruction.enabled,
+        accessibilityLabel: instruction.name,
+        disabled: onToggle === undefined,
+        onValueChange: next => {
+          onToggle?.(next);
+        },
+      })}
+    </Fragment>,
   ];
   if (onDelete !== undefined) {
     trailing.push(

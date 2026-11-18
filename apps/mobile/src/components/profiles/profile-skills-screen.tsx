@@ -1,8 +1,8 @@
 /* eslint-disable max-lines -- profile-editor skills: section body, sheet and delete flow share one screen */
 import { type Href } from 'expo-router';
-import { type ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -15,11 +15,12 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { Pencil, Sparkles, Trash2 } from '@/components/ui/icons';
+import { Sparkles, Trash2 } from '@/components/ui/icons';
 import { IconTile } from '@/components/ui/icon-tile';
+import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing, RowIconAction } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
@@ -31,12 +32,11 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
-import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
-import { cn } from '@/lib/utils';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
@@ -50,6 +50,12 @@ type SaveFailure = { message: string; tone: 'error' | 'warn' };
 
 type SkillRowProps = Readonly<{
   skill: AgentProfileDetail['skills'][number];
+  /**
+   * The list holds more than one source kind, so the source tells rows apart.
+   * When every row has the same source it repeats what the whole list already
+   * says, and the row leaves it out.
+   */
+  showSource: boolean;
   onToggle?: (enabled: boolean) => void;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -64,54 +70,64 @@ function hasUsableMessage(error: unknown): boolean {
 }
 
 /**
- * One skill row: the name in mono, its source type, the enabled switch, and
- * delete plus edit for local skills. The name is painted only and hidden from
- * assistive technology, so the switch's label stays the only element a screen
- * reader matches by the skill's name; the source type keeps its own stop
- * because it says what the name does not.
+ * One skill row: the name in mono, its source when the list mixes sources, the
+ * enabled switch and delete. The content is the edit action — the form sheet has
+ * no delete of its own — so the row carries two trailing controls instead of
+ * three; a skills.sh reference has no edit surface here, so its content is inert.
+ * The painted lines are hidden from assistive technology, and the content press
+ * and the switch are what a reader reaches.
  */
-function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>) {
+function SkillRow({ skill, showSource, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const subtitleKey = skillRowSubtitle(skill);
   const subtitle = subtitleKey === null ? skill.sourceType : t(subtitleKey);
   const canEdit = skill.sourceType !== 'skills-sh';
+  const edit = canEdit ? onEdit : undefined;
+  const trailing: ReactNode[] = [
+    <Fragment key="enable">
+      {renderRowTrailing({
+        kind: 'switch',
+        value: skill.enabled,
+        accessibilityLabel: skill.name,
+        disabled: onToggle === undefined,
+        onValueChange: next => {
+          onToggle?.(next);
+        },
+      })}
+    </Fragment>,
+  ];
+  if (onDelete !== undefined) {
+    trailing.push(
+      <RowIconAction
+        key="delete"
+        label={t('profiles.skillDelete', { name: skill.name })}
+        onPress={onDelete}
+      >
+        <Trash2 size={18} color={colors.mutedForeground} />
+      </RowIconAction>
+    );
+  }
   return (
-    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
-      <IconTile icon={Sparkles} tint={NEUTRAL_TINT} />
-      <View className="min-w-0 flex-1 gap-0.5">
-        <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
-          {skill.name}
+    <RowFrame
+      leading={<IconTile icon={Sparkles} tint={NEUTRAL_TINT} />}
+      pressTarget="content"
+      onPress={edit}
+      contentAccessibilityLabel={
+        edit === undefined ? undefined : t('profiles.skillEdit', { name: skill.name })
+      }
+      disabled={edit === undefined}
+      trailing={{ kind: 'nodes', nodes: trailing }}
+    >
+      <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
+        {skill.name}
+      </Text>
+      {showSource ? (
+        <Text variant="caption" className="mt-0.5" {...HIDDEN_LABEL_PROPS}>
+          {subtitle}
         </Text>
-        <Text variant="caption">{subtitle}</Text>
-      </View>
-      <Switch
-        value={skill.enabled}
-        accessibilityLabel={skill.name}
-        disabled={onToggle === undefined}
-        onValueChange={onToggle}
-      />
-      {onEdit !== undefined && canEdit ? (
-        <Pressable
-          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-          accessibilityRole="button"
-          accessibilityLabel={t('profiles.skillEdit', { name: skill.name })}
-          onPress={onEdit}
-        >
-          <Pencil size={18} color={colors.mutedForeground} />
-        </Pressable>
       ) : null}
-      {onDelete !== undefined ? (
-        <Pressable
-          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-          accessibilityRole="button"
-          accessibilityLabel={t('profiles.skillDelete', { name: skill.name })}
-          onPress={onDelete}
-        >
-          <Trash2 size={18} color={colors.mutedForeground} />
-        </Pressable>
-      ) : null}
-    </View>
+    </RowFrame>
   );
 }
 
@@ -141,6 +157,9 @@ export function ProfileSkillsScreen({
 
   const skills = profileQuery.data ?? NO_SKILLS;
   const atSkillCap = skills.length >= MAX_PROFILE_SKILLS;
+  // The source only tells rows apart in a list that holds more than one kind; a
+  // list of one kind says it once for the whole group instead of on every row.
+  const mixedSources = skills.some(skill => skill.sourceType !== skills[0]?.sourceType);
   // `null` = closed, the add form, or the skill being edited. The sheet and the
   // fields it holds are a draft (`lib/form-draft`), so a remount reopens it on
   // what was typed instead of dropping it.
@@ -266,6 +285,7 @@ export function ProfileSkillsScreen({
             <SkillRow
               key={skill.id}
               skill={skill}
+              showSource={mixedSources}
               onToggle={
                 canManage
                   ? guardRowPress(enabled => {

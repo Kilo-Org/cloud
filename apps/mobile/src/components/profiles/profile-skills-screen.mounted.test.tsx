@@ -189,7 +189,13 @@ describe('ProfileSkillsScreen', () => {
     const { renderer, unmount } = await mountScreen();
 
     expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('code-review');
-    expect(findAll(renderer.root, 'Pressable')).toHaveLength(0);
+    // The row content is the edit action, so without the manage role it renders
+    // no labelled control at all.
+    expect(
+      findAll(renderer.root, 'Pressable')
+        .map(node => node.props.accessibilityLabel)
+        .filter((label): label is string => typeof label === 'string')
+    ).toEqual([]);
     expect(findAll(renderer.root, 'Button')).toHaveLength(0);
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
       i18n.t('profiles.organizationRoleRequired')
@@ -213,8 +219,11 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
-  it('happy: a row shows the name and source type; the switch toggles', async () => {
-    h.query.data = testSkills([testSkill()]);
+  it('happy: rows show the name, and the source only when the list mixes sources', async () => {
+    h.query.data = testSkills([
+      testSkill(),
+      testSkill({ id: 'skill-2', name: 'web-search', sourceType: 'marketplace' }),
+    ]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -244,8 +253,24 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
+  it('leaves the source out when every row has the same one', async () => {
+    h.query.data = testSkills([testSkill(), testSkill({ id: 'skill-2', name: 'web-search' })]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).toContain('code-review');
+    expect(texts).not.toContain('Custom');
+
+    unmount();
+  });
+
   it('hides the edit control for skills.sh references but keeps the toggle and delete', async () => {
-    h.query.data = testSkills([testSkill({ sourceType: 'skills-sh', rawMarkdown: '' })]);
+    h.query.data = testSkills([
+      testSkill({ sourceType: 'skills-sh', rawMarkdown: '' }),
+      testSkill({ id: 'skill-2', name: 'web-search' }),
+    ]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();

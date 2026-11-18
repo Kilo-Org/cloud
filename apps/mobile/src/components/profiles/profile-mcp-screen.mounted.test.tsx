@@ -177,7 +177,13 @@ describe('ProfileMcpScreen', () => {
     const { renderer, unmount } = await mountScreen();
 
     expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('docs');
-    expect(findAll(renderer.root, 'Pressable')).toHaveLength(0);
+    // The row content is the edit action, so without the manage role it renders
+    // no labelled control at all.
+    expect(
+      findAll(renderer.root, 'Pressable')
+        .map(node => node.props.accessibilityLabel)
+        .filter((label): label is string => typeof label === 'string')
+    ).toEqual([]);
     expect(findAll(renderer.root, 'Button')).toHaveLength(0);
     expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
       i18n.t('profiles.organizationRoleRequired')
@@ -202,7 +208,15 @@ describe('ProfileMcpScreen', () => {
   });
 
   it('happy: a row shows name, type and summary; the switch toggles the server', async () => {
-    h.query.data = testProfile([testServer()]);
+    h.query.data = testProfile([
+      testServer(),
+      testServer({
+        id: 'mcp-2',
+        name: 'remote-docs',
+        type: 'remote',
+        config: { url: 'https://mcp.example.com/docs' },
+      }),
+    ]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -222,6 +236,20 @@ describe('ProfileMcpScreen', () => {
       mcpServerId: 'mcp-1',
       enabled: false,
     });
+
+    unmount();
+  });
+
+  it('leaves the type out when every server has the same one', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).toContain('docs');
+    expect(texts).toContain('npx @example/mcp');
+    expect(texts).not.toContain('Local');
 
     unmount();
   });

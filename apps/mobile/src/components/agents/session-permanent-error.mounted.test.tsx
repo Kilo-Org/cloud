@@ -15,6 +15,7 @@ vi.mock('./restored-route-fallback', () => ({ RestoredRouteFallback: 'RestoredRo
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalArrowLeft: 'DirectionalArrowLeft',
 }));
+vi.mock('@/components/ui/icons', () => ({ RotateCcw: 'RotateCcw' }));
 vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
 // The body of the shared state is another suite's; this one reads the state it
 // asks for, so the stub forwards the recovery slot it was handed.
@@ -22,7 +23,7 @@ vi.mock('@/components/query-error', () => ({
   QueryError: ({ action }: { action?: ReactNode }) => action ?? null,
 }));
 
-function mountCard(retry?: () => void): TestRenderer.ReactTestRenderer {
+function mountCard(retry?: () => void, isRetrying = false): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
@@ -31,7 +32,7 @@ function mountCard(retry?: () => void): TestRenderer.ReactTestRenderer {
         title: 'Session not found',
         message: 'This session is no longer available.',
         retry,
-        isRetrying: false,
+        isRetrying,
         restoredRouteOpen: false,
       })
     );
@@ -42,29 +43,46 @@ function mountCard(retry?: () => void): TestRenderer.ReactTestRenderer {
   return ref.current;
 }
 
+function actions(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(node => String(node.type) === 'StateAction');
+}
+
 describe('SessionPermanentError recovery', () => {
   it('offers the way back to the sessions and returns to the sessions index', () => {
     const renderer = mountCard();
-    const actions = renderer.root.findAll(node => String(node.type) === 'StateAction');
-    expect(actions).toHaveLength(1);
-    const [action] = actions;
-    if (!action) {
+    const [back] = actions(renderer);
+    if (!back) {
       throw new Error('the card rendered no action');
     }
-    expect(action.props.label).toBe(i18n.t('agentChat.session.backToSessions'));
+    expect(back.props.label).toBe(i18n.t('agentChat.session.backToSessions'));
 
     act(() => {
-      (action.props.onPress as () => void)();
+      (back.props.onPress as () => void)();
     });
     expect(router.dismissTo).toHaveBeenCalledWith(AGENTS_SESSIONS_INDEX_HREF);
   });
 
-  it('leaves the retry slot to the denial a retry can clear', () => {
+  it('offers a retry beside the way back, and spins while it runs', () => {
     const retry = vi.fn<() => void>();
-    const renderer = mountCard(retry);
-    expect(renderer.root.findAll(node => String(node.type) === 'StateAction')).toHaveLength(0);
+    const renderer = mountCard(retry, true);
+    const [attempt, back] = actions(renderer);
+    if (!attempt || !back) {
+      throw new Error('the card rendered fewer than two actions');
+    }
+    expect(attempt.props.label).toBe(i18n.t('common.retry'));
+    expect(attempt.props.loading).toBe(true);
+    expect(back.props.label).toBe(i18n.t('agentChat.session.backToSessions'));
+
+    act(() => {
+      (attempt.props.onPress as () => void)();
+    });
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(router.dismissTo).not.toHaveBeenCalled();
+  });
+
+  it('keeps the error body out of the action slot', () => {
+    const renderer = mountCard();
     const error = renderer.root.findByType(QueryError);
-    expect(error.props.onRetry).toBe(retry);
-    expect(error.props.action).toBeUndefined();
+    expect(error.props.onRetry).toBeUndefined();
   });
 });

@@ -1556,7 +1556,14 @@ describe('SessionDetailScreen owner-scoped metadata and recovery', () => {
     expect(propOf(error, 'variant')).toBe(variant);
     expect(propOf(error, 'onRetry')).toBeUndefined();
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
-    expect(findByType(renderer.root, 'Button')).toHaveLength(2);
+    // Copy left the card when the state took one recovery action; the way back
+    // is the only button the body draws.
+    const buttons = findByType(renderer.root, 'Button');
+    expect(buttons).toHaveLength(1);
+    expect(
+      buttons[0] &&
+        findByType(buttons[0], 'Text').flatMap(text => text.children)
+    ).toEqual([i18n.t('agentChat.session.backToSessions')]);
   });
 });
 

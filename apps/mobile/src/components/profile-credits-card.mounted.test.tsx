@@ -229,11 +229,10 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const BALANCE_KEY = [['user', 'getContextBalance'], { input: {}, type: 'query' }] as const;
-const organizationName = 'A very long organization name that must leave the credits label visible';
 const savedMetadata = new Map<string, string>();
 let saveCompletion: Promise<undefined> | undefined = undefined;
 
-const organizationSwitch = { set: (_id: string | null) => undefined as void };
+const organizationSwitch: { set: (id: string | null) => void } = { set: () => undefined };
 
 /**
  * The card plus the provider's own switch, which the header's account control
@@ -467,7 +466,7 @@ describe('CreditsCard balance state', () => {
     listState.payload = orgs;
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
 
-    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
     await waitFor(() => texts().includes('$10.00'));
 
     // The newly selected account's read never answers: the previous account's
@@ -587,7 +586,7 @@ describe('CreditsCard balance state', () => {
     orgCreditBlocksQueryFn.mockResolvedValue({
       creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
     });
-    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
     const previousNote =
       '$2.00 in credits expires 12/17/2099 (UTC). Credits with the earliest expiry are used first.';
     await waitFor(() =>

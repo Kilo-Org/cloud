@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one save-contract suite: the switch, both fields, the rejected writes and the screen states share one mocked data layer */
 // The low balance alert screen's save contract: the switch writes at once, the
 // fields write on blur and on submit under one all-valid rule, and a rejected
 // write keeps the draft, names itself in localized copy and offers Retry.
@@ -154,7 +155,7 @@ beforeEach(() => {
   });
 });
 
-async function mountScreen() {
+function mountScreen() {
   return renderWithProviders(createElement(LowBalanceAlertScreen));
 }
 
@@ -346,8 +347,11 @@ describe('low balance alert screen', () => {
 
     const retry = retryButtonOf(renderer);
     expect(retry).toBeDefined();
+    if (!retry) {
+      throw new Error('the retry control did not render');
+    }
     await act(() => {
-      (retry?.props.onPress as () => void)();
+      (retry.props.onPress as () => void)();
     });
 
     expect(calls.list).toHaveLength(2);

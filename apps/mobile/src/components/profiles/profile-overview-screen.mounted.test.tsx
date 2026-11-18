@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one overview suite: identity, counts, deletion and every configuration section ride one shared harness */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -131,8 +132,10 @@ function rowCounts(root: ReactTestInstance): (string | null)[] {
   return findAll(root, 'ConfigureRow')
     .filter(node => node.props.title !== 'Import config')
     .map(node => {
-      const value = node.props.trailing?.props?.children?.[0] as { props?: { text?: string } };
-      return value?.props?.text ?? null;
+      const trailing = node.props.trailing as
+        | { props?: { children?: { props?: { text?: string } }[] } }
+        | undefined;
+      return trailing?.props?.children?.[0]?.props?.text ?? null;
     });
 }
 

@@ -51,15 +51,16 @@ export function nativeTurnError(error: z.infer<typeof nativeErrorSchema>) {
   const data = status === undefined ? {} : { statusCode: status };
   const message = classifyAssistantFailure(error.message);
   // Generic request rejections omit the native context-overflow classification.
+  const isContextOrOutputLimit =
+    error.type === 'provider.invalid-request' &&
+    (status === undefined || status === 400 || status === 413) &&
+    (message.reason === 'context_limit' || message.reason === 'output_limit');
+  const isUnknownProviderError = error.type === 'provider.unknown' && reportedStatus === undefined;
   const structured = classifyAssistantFailure({
     name,
     data: {
       ...data,
-      ...(error.type === 'provider.invalid-request' &&
-      (status === undefined || status === 400 || status === 413) &&
-      (message.reason === 'context_limit' || message.reason === 'output_limit')
-        ? { message: error.message }
-        : {}),
+      ...(isContextOrOutputLimit || isUnknownProviderError ? { message: error.message } : {}),
     },
   });
   // V1 lets specific message text override structured errors. Canonicalize only

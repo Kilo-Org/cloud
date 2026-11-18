@@ -3879,6 +3879,11 @@ describe('GitHub review publication recovery', () => {
     [{ type: 'provider.quota', message: 'Request failed', status: 402.5 }, 'insufficient_credits'],
     [{ type: 'provider.rate-limit', message: 'Request failed' }, 'rate_limited'],
     [{ type: 'provider.unknown', message: 'Request failed', status: 200 }, 'provider_unavailable'],
+    [
+      { type: 'provider.unknown', message: 'Request failed: insufficient credits', status: 200 },
+      'insufficient_credits',
+    ],
+    [{ type: 'provider.unknown', message: 'Too many requests', status: 200 }, 'rate_limited'],
     [{ type: 'provider.future-error', message: 'Request failed' }, 'unknown'],
   ] as const)(
     'reports Kilo v2 assistant error %j as %s when the root closes completed',
@@ -3914,67 +3919,93 @@ describe('GitHub review publication recovery', () => {
     }
   );
 
-  it('completes when a later error-free assistant message supersedes a recovered error', async () => {
-    const h = createHarness();
-    const spec = reviewSpec();
-    h.registerRoute(spec);
-    h.manager.submit(SESSION_ID, promptPayload('m1'));
-    await settle();
+  it.each(['none', 'older message update', 'older text delta'] as const)(
+    'completes after assistant recovery with late activity: %s',
+    async lateActivity => {
+      const h = createHarness();
+      const spec = reviewSpec();
+      h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
 
-    const errored = kilo2MessageActivity(
-      KILO_SESSION,
-      kilo2MessageSchema.parse({
-        id: 'msg_failed',
-        type: 'assistant',
-        time: { created: 1, completed: 2 },
-        error: { type: 'provider.unknown', message: 'Request failed', status: 200 },
-      })
-    );
-    const recovered = kilo2MessageActivity(
-      KILO_SESSION,
-      kilo2MessageSchema.parse({
-        id: 'msg_recovered',
-        type: 'assistant',
-        time: { created: 3, completed: 4 },
-      })
-    );
-    if (!errored || !recovered) throw new Error('Expected assistant activity');
-    h.manager.observeActivity({
-      activity: { type: 'message', message: errored },
-      nativeRuntimeId: 'rt',
-      runtimeKey: runtimeKey(spec),
-    });
-    h.manager.observeActivity({
-      activity: { type: 'message', message: recovered },
-      nativeRuntimeId: 'rt',
-      runtimeKey: runtimeKey(spec),
-    });
-    h.manager.observeActivity({
-      activity: {
-        type: 'part',
-        part: {
-          sessionId: KILO_SESSION,
-          messageId: 'msg_recovered',
-          id: 'prt_publication',
-          kind: 'tool',
-          tool: {
-            callId: 'call_publication',
-            name: 'code_review_publish_review_summary',
-            status: 'completed',
-            interactive: false,
-            output: '{"verified":true,"commentId":99}',
+      const errored = kilo2MessageActivity(
+        KILO_SESSION,
+        kilo2MessageSchema.parse({
+          id: 'msg_failed',
+          type: 'assistant',
+          time: { created: 1, completed: 2 },
+          error: { type: 'provider.unknown', message: 'Request failed', status: 200 },
+        })
+      );
+      const recovered = kilo2MessageActivity(
+        KILO_SESSION,
+        kilo2MessageSchema.parse({
+          id: 'msg_recovered',
+          type: 'assistant',
+          time: { created: 3, completed: 4 },
+        })
+      );
+      if (!errored || !recovered) throw new Error('Expected assistant activity');
+      h.manager.observeActivity({
+        activity: { type: 'message', message: errored },
+        nativeRuntimeId: 'rt',
+        runtimeKey: runtimeKey(spec),
+      });
+      h.manager.observeActivity({
+        activity: { type: 'message', message: recovered },
+        nativeRuntimeId: 'rt',
+        runtimeKey: runtimeKey(spec),
+      });
+      h.manager.observeActivity({
+        activity: {
+          type: 'part',
+          part: {
+            sessionId: KILO_SESSION,
+            messageId: 'msg_recovered',
+            id: 'prt_publication',
+            kind: 'tool',
+            tool: {
+              callId: 'call_publication',
+              name: 'code_review_publish_review_summary',
+              status: 'completed',
+              interactive: false,
+              output: '{"verified":true,"commentId":99}',
+            },
           },
         },
-      },
-      nativeRuntimeId: 'rt',
-      runtimeKey: runtimeKey(spec),
-    });
-    h.manager.observeKiloEvent(completedKiloTurn());
-    await settle();
+        nativeRuntimeId: 'rt',
+        runtimeKey: runtimeKey(spec),
+      });
+      if (lateActivity === 'older message update') {
+        h.manager.observeActivity({
+          activity: {
+            type: 'message',
+            message: { ...errored, time: { created: 1, completed: 5 } },
+          },
+          nativeRuntimeId: 'rt',
+          runtimeKey: runtimeKey(spec),
+        });
+      }
+      if (lateActivity === 'older text delta') {
+        h.manager.observeActivity({
+          activity: {
+            type: 'delta',
+            sessionId: KILO_SESSION,
+            messageId: errored.id,
+            partId: 'prt_failed_text',
+            text: 'The model reached its output limit. No actionable output was produced.',
+          },
+          nativeRuntimeId: 'rt',
+          runtimeKey: runtimeKey(spec),
+        });
+      }
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
 
-    expect(h.client(spec).prompts).toHaveLength(1);
-    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
-  });
+      expect(h.client(spec).prompts).toHaveLength(1);
+      expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm1' }]);
+    }
+  );
 
   it('still fails when the terminal assistant message carries the only error', async () => {
     const h = createHarness();

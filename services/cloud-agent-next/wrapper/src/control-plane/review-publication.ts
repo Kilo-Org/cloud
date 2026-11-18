@@ -26,7 +26,7 @@ export function createReviewPublication(input: {
   let signal: PublicationRecoverySignal | null = null;
   let failure: unknown;
   let failureMessageId: string | undefined;
-  let assistantMessageId: string | undefined;
+  let assistantMessage: { id: string; created?: number } | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const abort = new AbortController();
   const texts = new Map<string, string>();
@@ -54,13 +54,21 @@ export function createReviewPublication(input: {
         roles.set(message.id, message.role);
         if (roles.size > 128) roles.delete(roles.keys().next().value ?? '');
         if (message.role === 'assistant') {
-          // Only the terminal assistant message owns the failure: a later error-free
-          // message supersedes a recovered mid-run error and its retained text.
-          if (message.id !== assistantMessageId) {
-            assistantMessageId = message.id;
+          const created = message.time?.created;
+          if (message.id !== assistantMessage?.id) {
+            if (
+              created !== undefined &&
+              assistantMessage?.created !== undefined &&
+              created < assistantMessage.created
+            ) {
+              return;
+            }
+            assistantMessage = { id: message.id, created };
             texts.clear();
             failure = undefined;
             failureMessageId = undefined;
+          } else if (assistantMessage.created === undefined) {
+            assistantMessage.created = created;
           }
           if (messageInfoReportsAssistantError(message)) {
             failure = message.error;
@@ -71,6 +79,11 @@ export function createReviewPublication(input: {
       }
       const messageId = activity.type === 'part' ? activity.part.messageId : activity.messageId;
       if (roles.get(messageId) !== 'assistant') return;
+      if (activity.type === 'part' && activity.part.tool) {
+        const result = classifyPublicationToolPart(activity.part.tool);
+        if (result) signal = result;
+      }
+      if (messageId !== assistantMessage?.id) return;
       if (activity.type === 'delta') {
         texts.set(
           activity.partId,
@@ -78,8 +91,6 @@ export function createReviewPublication(input: {
         );
       } else {
         const part = activity.part;
-        const result = part.tool ? classifyPublicationToolPart(part.tool) : null;
-        if (result) signal = result;
         if (part.kind === 'text' && part.text !== undefined)
           texts.set(part.id, part.text.slice(-8192));
       }

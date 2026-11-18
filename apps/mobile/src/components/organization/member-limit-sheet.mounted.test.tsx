@@ -8,7 +8,6 @@ import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { InviteMemberSheet } from './invite-member-sheet';
-import { LowBalanceAlertSheet } from './low-balance-alert-sheet';
 import { MemberLimitSheet } from './member-limit-sheet';
 import {
   type OrganizationBoundaryFixture,
@@ -136,7 +135,6 @@ beforeEach(() => {
 
 const sheets = [
   { name: 'member limit', element: createElement(MemberLimitSheet, { memberId: 'member-1' }) },
-  { name: 'low balance alert', element: createElement(LowBalanceAlertSheet) },
 ];
 
 describe('organization sheet surfaces', () => {

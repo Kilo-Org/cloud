@@ -4,6 +4,7 @@ import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { type OrganizationRole } from '@kilocode/app-shared/organizations';
 import ReposRoute from '@/app/(app)/code-reviewer/[scope]/[platform]/(edit)/repos';
 import { type ReviewerPlatform, type ReviewerScopePlatform } from '@/lib/code-reviewer-config';
 import type * as ReviewerStatusModule from '@/lib/code-reviewer-status';
@@ -48,7 +49,7 @@ const state = vi.hoisted(() => ({
   organizations: [] as {
     organizationId: string;
     organizationName: string;
-    role?: string;
+    role?: OrganizationRole;
   }[],
   permissionOverride: null as
     | { status: 'loading' }

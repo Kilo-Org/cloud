@@ -8,6 +8,7 @@ import {
   useCancelBillingCycleChange,
 } from '@/app/api/organizations/hooks';
 import { SubscriptionStatusBadge } from './SubscriptionStatusBadge';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type {
   SubscriptionItemWithPeriod,
   SubscriptionWithPeriod,
@@ -107,7 +108,7 @@ export function SubscriptionOverviewCard({
 }: {
   subscription: SubscriptionWithPeriod;
   organizationId: string;
-  userRole: string;
+  userRole: OrganizationRole;
   seatsUsed: number;
   totalSeats: number;
 }) {

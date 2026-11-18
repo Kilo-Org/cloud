@@ -282,6 +282,52 @@ describe('Claude billing grants', () => {
     await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toBeNull();
   });
 
+  it('retires a pending target row with the full retirement column set when sharing over it', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization('Claude pending target', user.id, 0);
+    const payer = await connectedPayer(user.id);
+    const [pendingTarget] = await db
+      .insert(claude_billing_connections)
+      .values({
+        kilo_user_id: null,
+        organization_id: organization.id,
+        user_profile_id: `uprof_pending_${crypto.randomUUID()}`,
+        // Synthetic: a Pending row that somehow carries the retirement columns.
+        // The retirement write must clear them, not only flip the status.
+        connection_id: `ocon_${crypto.randomUUID()}`,
+        connected_at: new Date().toISOString(),
+        status: 'pending',
+        created_by: user.id,
+      })
+      .returning();
+    if (!pendingTarget) throw new Error('Missing pending target fixture');
+    const personal: ClaudeBillingOwner = { kind: 'personal', kiloUserId: user.id };
+    const organizationOwner: ClaudeBillingOwner = {
+      kind: 'organization',
+      organizationId: organization.id,
+    };
+
+    await shareClaudeBillingConnection(personal, organizationOwner, user.id);
+
+    await expect(getGrantedClaudeBillingConnection(organizationOwner)).resolves.toMatchObject({
+      id: payer.id,
+    });
+    await expect(
+      db
+        .select()
+        .from(claude_billing_connections)
+        .where(eq(claude_billing_connections.id, pendingTarget.id))
+    ).resolves.toEqual([
+      expect.objectContaining({
+        status: 'removed',
+        connection_id: null,
+        connected_at: null,
+        last_refusal_code: null,
+        last_refusal_at: null,
+      }),
+    ]);
+  });
+
   it('preserves a removed target profile row across grant removal and user erasure', async () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('Claude preserved removed', user.id, 0);

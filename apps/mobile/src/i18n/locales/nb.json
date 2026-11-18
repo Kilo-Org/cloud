@@ -26,6 +26,7 @@
     "creditHistory": "Kreditthistorikk",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Avbryt",
     "done": "Ferdig",
     "retry": "Prøv igjen",
@@ -3476,12 +3477,10 @@
       "requestLogs": "Forespørselslogger"
     },
     "requestLogs": {
-      "hint": "Forespørsler fra timen før vinduet slutter, nyeste først.",
       "older": "Eldre time",
       "newer": "Nyere time",
       "truncated": "Denne timen har flere forespørsler enn listen viser.",
       "emptyTitle": "Ingen forespørsler",
-      "emptyDescription": "Denne timen har ingen gateway-forespørsler.",
       "loadError": "Kunne ikke laste inn forespørselslogger.",
       "permissionDenied": "Bare en eier, administrator eller faktureringsansvarlig i organisasjonen kan lese forespørselsloggene.",
       "tokens": "{{input}} inn · {{output}} ut",
@@ -4472,7 +4471,6 @@
     "dismiss": "Avvis brief",
     "offline": "Frakoblet · lagret brief",
     "cached": "Lagret rapport · kan ikke oppdateres",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-sammendrag",
     "summaryPending": "AI-sammendraget lages. Det legges til her når det er klart.",
     "summaryUnavailable": "AI-sammendrag er ikke tilgjengelig. Den strukturerte rapporten er fortsatt tilgjengelig.",

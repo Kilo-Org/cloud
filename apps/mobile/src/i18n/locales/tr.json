@@ -26,6 +26,7 @@
     "creditHistory": "Kredi geçmişi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "İptal",
     "done": "Bitti",
     "retry": "Tekrar dene",
@@ -3481,12 +3482,10 @@
       "requestLogs": "İstek günlükleri"
     },
     "requestLogs": {
-      "hint": "Pencerenin bitişinden önceki bir saatteki istekler, en yeniden eskiye.",
       "older": "Önceki saat",
       "newer": "Sonraki saat",
       "truncated": "Bu saatte listede gösterilenden daha fazla istek var.",
       "emptyTitle": "İstek yok",
-      "emptyDescription": "Bu saatte ağ geçidi isteği yok.",
       "loadError": "İstek günlükleri yüklenemedi.",
       "permissionDenied": "İstek günlüklerini yalnızca kuruluşun sahibi, yöneticisi veya faturalandırma yöneticisi görüntüleyebilir.",
       "tokens": "{{input}} giriş · {{output}} çıkış",
@@ -4472,7 +4471,6 @@
     "dismiss": "Raporu yok say",
     "offline": "Çevrimdışı · kayıtlı rapor",
     "cached": "Kayıtlı rapor · yenileme kullanılamıyor",
-    "window": "{{start}} – {{end}}",
     "summary": "AI özeti",
     "summaryPending": "AI özeti hazırlanıyor. Hazır olduğunda buraya eklenecek.",
     "summaryUnavailable": "AI özeti kullanılamıyor. Yapılandırılmış raporunuz hâlâ mevcut.",

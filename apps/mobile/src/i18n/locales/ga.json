@@ -26,6 +26,7 @@
     "creditHistory": "Stair chreidmheasa",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cealaigh",
     "done": "Déanta",
     "retry": "Bain triail eile as",
@@ -3647,12 +3648,10 @@
       "requestLogs": "Logaí iarratas"
     },
     "requestLogs": {
-      "hint": "Iarratais ón uair an chloig roimh dheireadh na fuinneoige, na cinn is déanaí ar dtús.",
       "older": "Uair níos luaithe",
       "newer": "Uair níos déanaí",
       "truncated": "Tá níos mó iarratas san uair seo ná mar a thaispeántar sa liosta.",
       "emptyTitle": "Níl aon iarratais",
-      "emptyDescription": "Níl aon iarratais chuig an ngeata san uair seo.",
       "loadError": "Níorbh fhéidir logaí iarratas a lódáil.",
       "permissionDenied": "Ní féidir ach le húinéir, riarthóir nó bainisteoir billeála eagraíochta a logaí iarratas a léamh.",
       "tokens": "{{input}} isteach · {{output}} amach",
@@ -4682,7 +4681,6 @@
     "dismiss": "Cuir an tuarascáil as an áireamh",
     "offline": "As líne · tuarascáil shábháilte",
     "cached": "Tuarascáil shábháilte · ní féidir athnuachan",
-    "window": "{{start}} – {{end}}",
     "summary": "Achoimre AI",
     "summaryPending": "Tá an achoimre AI á hullmhú. Ceanglófar anseo í nuair a bheidh sí réidh.",
     "summaryUnavailable": "Níl achoimre AI ar fáil. Tá do thuarascáil struchtúrtha ar fáil fós.",

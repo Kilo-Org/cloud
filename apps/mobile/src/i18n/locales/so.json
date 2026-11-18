@@ -26,6 +26,7 @@
     "creditHistory": "Taariikhda kiredit-ka",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Jooji",
     "done": "Dhammaystiran",
     "retry": "Mar kale isku day",
@@ -3476,12 +3477,10 @@
       "requestLogs": "Diiwaannada codsiyada"
     },
     "requestLogs": {
-      "hint": "Codsiyadii saacadda ka horreysay dhammaadka muddada, kuwa ugu cusub ayaa ugu horreeya.",
       "older": "Saacaddii hore",
       "newer": "Saacadda xigta",
       "truncated": "Saacaddan waxay leedahay codsiyo ka badan inta liisku muujinayo.",
       "emptyTitle": "Ma jiraan codsiyo",
-      "emptyDescription": "Saacaddan ma jiraan codsiyo gateway.",
       "loadError": "Lama soo rari karin diiwaannada codsiyada.",
       "permissionDenied": "Kaliya milkiilaha ururka, maamulaha ama maareeyaha biilasha ayaa akhrin kara diiwaannada codsiyada ururka.",
       "tokens": "{{input}} gal · {{output}} bax",
@@ -4472,7 +4471,6 @@
     "dismiss": "Iska dhaaf warbixinta",
     "offline": "Khadka ka maqan · warbixin la kaydiyay",
     "cached": "Warbixin la kaydiyay · cusboonaysiin lama heli karo",
-    "window": "{{start}} – {{end}}",
     "summary": "Soo koobid AI",
     "summaryPending": "Soo koobidda AI waa socotaa. Halkan ayay ku soo xirmi doontaa marka ay diyaar noqoto.",
     "summaryUnavailable": "Soo koobidda AI lama heli karo. Warbixintaada habaysan weli waa la heli karaa.",

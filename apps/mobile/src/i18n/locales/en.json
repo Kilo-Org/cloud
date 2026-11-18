@@ -14,7 +14,6 @@
     "dismiss": "Dismiss brief",
     "offline": "Offline · saved brief",
     "cached": "Saved report · refresh unavailable",
-    "window": "{{start}} – {{end}}",
     "summary": "AI summary",
     "summaryPending": "AI summary is in progress. It will attach here when ready.",
     "summaryUnavailable": "AI summary unavailable. Your structured report is still available.",
@@ -93,6 +92,7 @@
     "creditHistory": "Credit history",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancel",
     "done": "Done",
     "retry": "Retry",
@@ -3556,12 +3556,10 @@
       "requestLogs": "Request logs"
     },
     "requestLogs": {
-      "hint": "Requests from the hour before the window ends, newest first.",
       "older": "Older hour",
       "newer": "Newer hour",
       "truncated": "This hour has more requests than the list shows.",
       "emptyTitle": "No requests",
-      "emptyDescription": "This hour has no gateway requests.",
       "loadError": "Couldn't load request logs.",
       "permissionDenied": "Only an organization owner, admin or billing manager can read its request logs.",
       "tokens": "{{input}} in · {{output}} out",

@@ -26,6 +26,7 @@
     "creditHistory": "Krediittihistoria",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Peruuta",
     "done": "Valmis",
     "retry": "Yritä uudelleen",
@@ -3476,12 +3477,10 @@
       "requestLogs": "Pyyntölokit"
     },
     "requestLogs": {
-      "hint": "Aikaikkunan päättymistä edeltävän tunnin pyynnöt, uusimmat ensin.",
       "older": "Edellinen tunti",
       "newer": "Seuraava tunti",
       "truncated": "Tällä tunnilla on enemmän pyyntöjä kuin luettelossa näytetään.",
       "emptyTitle": "Ei pyyntöjä",
-      "emptyDescription": "Tällä tunnilla ei ole yhdyskäytäväpyyntöjä.",
       "loadError": "Pyyntölokien lataaminen epäonnistui.",
       "permissionDenied": "Vain organisaation omistaja, ylläpitäjä tai laskutusvastaava voi lukea organisaation pyyntölokeja.",
       "tokens": "{{input}} sisään · {{output}} ulos",
@@ -4472,7 +4471,6 @@
     "dismiss": "Sivuuta katsaus",
     "offline": "Offline · tallennettu katsaus",
     "cached": "Tallennettu katsaus · päivitys ei käytettävissä",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-yhteenveto",
     "summaryPending": "AI-yhteenvetoa luodaan. Se liitetään tähän, kun se on valmis.",
     "summaryUnavailable": "AI-yhteenveto ei ole saatavilla. Jäsennelty katsauksesi on edelleen käytettävissä.",

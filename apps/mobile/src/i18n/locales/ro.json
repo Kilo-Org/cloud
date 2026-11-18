@@ -26,6 +26,7 @@
     "creditHistory": "Istoric credite",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Anulează",
     "done": "Gata",
     "retry": "Reîncearcă",
@@ -3533,12 +3534,10 @@
       "requestLogs": "Jurnale de cereri"
     },
     "requestLogs": {
-      "hint": "Cererile din ora dinaintea finalului intervalului, cele mai recente primele.",
       "older": "Ora anterioară",
       "newer": "Ora următoare",
       "truncated": "Această oră are mai multe cereri decât arată lista.",
       "emptyTitle": "Nicio cerere",
-      "emptyDescription": "Nu există cereri către gateway în această oră.",
       "loadError": "Jurnalele de cereri nu au putut fi încărcate.",
       "permissionDenied": "Jurnalele de cereri pot fi citite doar de proprietarul, un administrator sau un manager de facturare al organizației.",
       "tokens": "{{input}} intrare · {{output}} ieșire",
@@ -4542,7 +4541,6 @@
     "dismiss": "Ignoră raportul",
     "offline": "Offline · raport salvat",
     "cached": "Raport salvat · reîmprospătare indisponibilă",
-    "window": "{{start}} – {{end}}",
     "summary": "Rezumat AI",
     "summaryPending": "Rezumatul AI este în curs. Va fi atașat aici când este gata.",
     "summaryUnavailable": "Rezumatul AI nu este disponibil. Raportul structurat este în continuare disponibil.",

@@ -26,6 +26,7 @@
     "creditHistory": "Histórico de créditos",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancelar",
     "done": "Concluir",
     "retry": "Tentar novamente",
@@ -3544,12 +3545,10 @@
       "requestLogs": "Registros de solicitações"
     },
     "requestLogs": {
-      "hint": "Solicitações da hora anterior ao fim da janela, mais recentes primeiro.",
       "older": "Hora anterior",
       "newer": "Hora seguinte",
       "truncated": "Esta hora tem mais solicitações do que a lista mostra.",
       "emptyTitle": "Nenhuma solicitação",
-      "emptyDescription": "Esta hora não tem solicitações ao gateway.",
       "loadError": "Não foi possível carregar os registros de solicitações.",
       "permissionDenied": "Somente proprietários, administradores ou gerentes de faturamento de uma organização podem ver os registros de solicitações dela.",
       "tokens": "{{input}} de entrada · {{output}} de saída",
@@ -4548,7 +4547,6 @@
     "dismiss": "Ignorar relatório",
     "offline": "Offline · relatório salvo",
     "cached": "Relatório salvo · atualização indisponível",
-    "window": "{{start}} – {{end}}",
     "summary": "Resumo por IA",
     "summaryPending": "O resumo por IA está em andamento. Ele aparecerá aqui quando estiver pronto.",
     "summaryUnavailable": "Resumo por IA indisponível. Seu relatório estruturado continua disponível.",

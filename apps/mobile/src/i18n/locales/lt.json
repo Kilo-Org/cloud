@@ -26,6 +26,7 @@
     "creditHistory": "Kreditų istorija",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Atšaukti",
     "done": "Baigti",
     "retry": "Bandyti dar kartą",
@@ -3590,12 +3591,10 @@
       "requestLogs": "Užklausų žurnalai"
     },
     "requestLogs": {
-      "hint": "Užklausos per valandą iki lango pabaigos, naujausios pirmos.",
       "older": "Ankstesnė valanda",
       "newer": "Vėlesnė valanda",
       "truncated": "Šią valandą užklausų buvo daugiau, nei rodoma sąraše.",
       "emptyTitle": "Užklausų nėra",
-      "emptyDescription": "Šią valandą šliuzo užklausų nebuvo.",
       "loadError": "Nepavyko įkelti užklausų žurnalų.",
       "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų valdytojas.",
       "tokens": "Įvestis {{input}} · išvestis {{output}}",
@@ -4612,7 +4611,6 @@
     "dismiss": "Atmesti suvestinę",
     "offline": "Neprisijungta · išsaugota suvestinė",
     "cached": "Išsaugota suvestinė · atnaujinti negalima",
-    "window": "{{start}} – {{end}}",
     "summary": "AI santrauka",
     "summaryPending": "AI santrauka rengiama. Kai bus paruošta, ji atsiras čia.",
     "summaryUnavailable": "AI santrauka nepasiekiama. Struktūruota suvestinė vis dar prieinama.",

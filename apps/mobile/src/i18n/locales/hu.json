@@ -26,6 +26,7 @@
     "creditHistory": "Kreditelőzmények",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Mégse",
     "done": "Kész",
     "retry": "Újrapróbálkozás",
@@ -3476,12 +3477,10 @@
       "requestLogs": "Kérésnaplók"
     },
     "requestLogs": {
-      "hint": "Az időablak vége előtti egy óra kérései, a legújabbak elöl.",
       "older": "Korábbi óra",
       "newer": "Későbbi óra",
       "truncated": "Ebben az órában több kérés van, mint amennyi a listán látható.",
       "emptyTitle": "Nincsenek kérések",
-      "emptyDescription": "Ebben az órában nem volt gateway-kérés.",
       "loadError": "Nem sikerült betölteni a kérésnaplókat.",
       "permissionDenied": "A kérésnaplókat csak a szervezet tulajdonosa, adminisztrátora vagy számlázási felelőse olvashatja.",
       "tokens": "{{input}} be · {{output}} ki",
@@ -4472,7 +4471,6 @@
     "dismiss": "Jelentés elvetése",
     "offline": "Offline · mentett jelentés",
     "cached": "Mentett jelentés · frissítés nem érhető el",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-összefoglaló",
     "summaryPending": "Az AI-összefoglaló készül. Elkészülte után itt jelenik meg.",
     "summaryUnavailable": "Az AI-összefoglaló nem érhető el. A strukturált jelentés továbbra is elérhető.",

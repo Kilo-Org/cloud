@@ -26,6 +26,7 @@
     "creditHistory": "积分记录",
     "sentenceJoiner": "。",
     "listJoiner": "、",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "取消",
     "done": "完成",
     "retry": "重试",
@@ -3481,12 +3482,10 @@
       "requestLogs": "请求日志"
     },
     "requestLogs": {
-      "hint": "显示时段结束前一小时内的请求，最新的在前。",
       "older": "上一小时",
       "newer": "下一小时",
       "truncated": "该小时的请求数超出列表可显示的数量。",
       "emptyTitle": "暂无请求",
-      "emptyDescription": "该小时内没有网关请求。",
       "loadError": "无法加载请求日志。",
       "permissionDenied": "只有组织的所有者、管理员或账单管理员才能查看其请求日志。",
       "tokens": "输入 {{input}} · 输出 {{output}}",
@@ -4472,7 +4471,6 @@
     "dismiss": "忽略简报",
     "offline": "离线 · 已保存的简报",
     "cached": "已保存的报告 · 无法刷新",
-    "window": "{{start}} – {{end}}",
     "summary": "AI 摘要",
     "summaryPending": "AI 摘要生成中，完成后将附在此处。",
     "summaryUnavailable": "AI 摘要不可用。结构化报告仍可查看。",

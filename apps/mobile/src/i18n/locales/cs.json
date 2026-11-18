@@ -26,6 +26,7 @@
     "creditHistory": "Historie kreditů",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Zrušit",
     "done": "Hotovo",
     "retry": "Zkusit znovu",
@@ -3590,12 +3591,10 @@
       "requestLogs": "Protokoly požadavků"
     },
     "requestLogs": {
-      "hint": "Požadavky z hodiny před koncem časového okna, od nejnovějších.",
       "older": "Starší hodina",
       "newer": "Novější hodina",
       "truncated": "V této hodině je více požadavků, než seznam zobrazuje.",
       "emptyTitle": "Žádné požadavky",
-      "emptyDescription": "V této hodině nejsou žádné požadavky na bránu.",
       "loadError": "Protokoly požadavků se nepodařilo načíst.",
       "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
       "tokens": "{{input}} vstup · {{output}} výstup",
@@ -4612,7 +4611,6 @@
     "dismiss": "Skrýt přehled",
     "offline": "Offline · uložený přehled",
     "cached": "Uložený přehled · obnovení nedostupné",
-    "window": "{{start}} – {{end}}",
     "summary": "AI shrnutí",
     "summaryPending": "AI shrnutí se připravuje. Až bude hotové, objeví se zde.",
     "summaryUnavailable": "AI shrnutí není k dispozici. Strukturovaný přehled je stále dostupný.",

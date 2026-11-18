@@ -26,6 +26,7 @@
     "creditHistory": "Historique des crédits",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Annuler",
     "done": "Terminé",
     "retry": "Réessayer",
@@ -3538,12 +3539,10 @@
       "requestLogs": "Journaux des requêtes"
     },
     "requestLogs": {
-      "hint": "Requêtes de l'heure précédant la fin de la plage, les plus récentes en premier.",
       "older": "Heure précédente",
       "newer": "Heure suivante",
       "truncated": "Cette heure compte plus de requêtes que la liste n'en affiche.",
       "emptyTitle": "Aucune requête",
-      "emptyDescription": "Aucune requête de passerelle pendant cette heure.",
       "loadError": "Impossible de charger les journaux des requêtes.",
       "permissionDenied": "Seuls un propriétaire, un administrateur ou un responsable de la facturation d'une organisation peuvent consulter ses journaux des requêtes.",
       "tokens": "{{input}} en entrée · {{output}} en sortie",
@@ -4542,7 +4541,6 @@
     "dismiss": "Ignorer le briefing",
     "offline": "Hors ligne · briefing enregistré",
     "cached": "Rapport enregistré · actualisation indisponible",
-    "window": "{{start}} – {{end}}",
     "summary": "Résumé IA",
     "summaryPending": "Résumé IA en cours. Il s’affichera ici une fois prêt.",
     "summaryUnavailable": "Résumé IA indisponible. Votre rapport structuré reste disponible.",

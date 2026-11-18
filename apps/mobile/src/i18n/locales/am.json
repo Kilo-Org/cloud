@@ -26,6 +26,7 @@
     "creditHistory": "የክሬዲት ታሪክ",
     "sentenceJoiner": "። ",
     "listJoiner": "፣ ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "ተው",
     "done": "ጨርስ",
     "retry": "እንደገና ሞክር",
@@ -3476,12 +3477,10 @@
       "requestLogs": "የጥያቄ መዝገቦች"
     },
     "requestLogs": {
-      "hint": "መስኮቱ ከማብቃቱ በፊት ባለው አንድ ሰዓት ውስጥ የተደረጉ ጥያቄዎች፣ አዲሶቹ በመጀመሪያ።",
       "older": "ቀዳሚ ሰዓት",
       "newer": "ቀጣይ ሰዓት",
       "truncated": "በዚህ ሰዓት ዝርዝሩ ከሚያሳየው በላይ ጥያቄዎች አሉ።",
       "emptyTitle": "ምንም ጥያቄዎች የሉም",
-      "emptyDescription": "በዚህ ሰዓት ውስጥ ምንም የጌትዌይ ጥያቄዎች የሉም።",
       "loadError": "የጥያቄ መዝገቦችን መጫን አልተቻለም።",
       "permissionDenied": "የጥያቄ መዝገቦቹን ማንበብ የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው።",
       "tokens": "{{input}} ግብዓት · {{output}} ውጤት",
@@ -4472,7 +4471,6 @@
     "dismiss": "ሪፖርቱን አስወግድ",
     "offline": "ከመስመር ውጭ · የተቀመጠ ሪፖርት",
     "cached": "የተቀመጠ ሪፖርት · ማደስ አይቻልም",
-    "window": "{{start}} – {{end}}",
     "summary": "AI ማጠቃለያ",
     "summaryPending": "AI ማጠቃለያ በሂደት ላይ ነው። ሲዘጋጅ እዚህ ይያያዛል።",
     "summaryUnavailable": "AI ማጠቃለያ አይገኝም። የተዋቀረ ሪፖርትዎ አሁንም ይገኛል።",

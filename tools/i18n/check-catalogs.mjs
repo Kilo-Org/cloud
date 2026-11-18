@@ -263,10 +263,13 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // A placeholder-only accessibility label: the list's name and its open
   // counter joined by a comma, so a catalog may keep English punctuation.
   'todos.lists.rowA11y',
-  // Format-only briefing values: a lower-bound marker and a time range built
-  // from localized placeholders, with no translatable words.
+  // Format-only values with no translatable words: the briefing's lower-bound
+  // marker, and the `{{start}} – {{end}}` join the brief window and the
+  // organization request-logs window both read. The join is a separator
+  // between two placeholders already formatted in the reader's locale, so
+  // every catalog keeps English punctuation here.
   'agentBriefing.atLeast',
-  'agentBriefing.window',
+  'common.timeRange',
   // The organization plan's own tier names. They are product names, so every
   // catalog keeps them as the billing pages and the invoices spell them.
   'organization.hub.planTeams',

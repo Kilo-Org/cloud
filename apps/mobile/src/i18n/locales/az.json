@@ -26,6 +26,7 @@
     "creditHistory": "Kredit tarixçəsi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Ləğv et",
     "done": "Hazır",
     "retry": "Yenidən cəhd et",
@@ -3476,12 +3477,10 @@
       "requestLogs": "Sorğu jurnalları"
     },
     "requestLogs": {
-      "hint": "Pəncərə bitənədək son bir saatın sorğuları, ən yeniləri əvvəldə.",
       "older": "Əvvəlki saat",
       "newer": "Sonrakı saat",
       "truncated": "Bu saatda siyahıda göstəriləndən daha çox sorğu var.",
       "emptyTitle": "Sorğu yoxdur",
-      "emptyDescription": "Bu saatda şlüz sorğusu yoxdur.",
       "loadError": "Sorğu jurnallarını yükləmək mümkün olmadı.",
       "permissionDenied": "Sorğu jurnallarını yalnız təşkilatın sahibi, administratoru və ya ödəniş meneceri oxuya bilər.",
       "tokens": "{{input}} giriş · {{output}} çıxış",
@@ -4472,7 +4471,6 @@
     "dismiss": "Hesabatı rədd et",
     "offline": "Oflayn · saxlanmış hesabat",
     "cached": "Saxlanmış hesabat · yeniləmə mümkün deyil",
-    "window": "{{start}} – {{end}}",
     "summary": "AI xülasəsi",
     "summaryPending": "AI xülasəsi hazırlanır. Hazır olanda bura əlavə ediləcək.",
     "summaryUnavailable": "AI xülasəsi əlçatan deyil. Strukturlu hesabatınız hələ də mövcuddur.",

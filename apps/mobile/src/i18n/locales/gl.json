@@ -26,6 +26,7 @@
     "creditHistory": "Historial de créditos",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancelar",
     "done": "Feito",
     "retry": "Tentar de novo",
@@ -3476,12 +3477,10 @@
       "requestLogs": "Rexistros de solicitudes"
     },
     "requestLogs": {
-      "hint": "Solicitudes da hora previa ao fin do intervalo, primeiro as máis recentes.",
       "older": "Hora anterior",
       "newer": "Hora seguinte",
       "truncated": "Esta hora ten máis solicitudes das que mostra a lista.",
       "emptyTitle": "Non hai solicitudes",
-      "emptyDescription": "Nesta hora non hai solicitudes á pasarela.",
       "loadError": "Non se puideron cargar os rexistros de solicitudes.",
       "permissionDenied": "Só un propietario, administrador ou xestor de facturación da organización pode ler os seus rexistros de solicitudes.",
       "tokens": "{{input}} de entrada · {{output}} de saída",
@@ -4472,7 +4471,6 @@
     "dismiss": "Descartar o informe",
     "offline": "Sen conexión · informe gardado",
     "cached": "Informe gardado · non se pode actualizar",
-    "window": "{{start}} – {{end}}",
     "summary": "Resumo con IA",
     "summaryPending": "O resumo con IA está en curso. Engadirase aquí cando estea listo.",
     "summaryUnavailable": "Resumo con IA non dispoñible. O teu informe estruturado segue dispoñible.",

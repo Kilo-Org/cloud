@@ -26,6 +26,7 @@
     "creditHistory": "Storja tal-krediti",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Ikkanċella",
     "done": "Lest",
     "retry": "Erġa' pprova",
@@ -3647,12 +3648,10 @@
       "requestLogs": "Reġistri tat-talbiet"
     },
     "requestLogs": {
-      "hint": "Talbiet tas-siegħa sa tmiem il-perjodu, l-aktar riċenti l-ewwel.",
       "older": "Siegħa qabel",
       "newer": "Siegħa wara",
       "truncated": "Din is-siegħa għandha aktar talbiet milli turi l-lista.",
       "emptyTitle": "L-ebda talba",
-      "emptyDescription": "Din is-siegħa m'għandha l-ebda talba tal-gateway.",
       "loadError": "Ma setgħux jitgħabbew ir-reġistri tat-talbiet.",
       "permissionDenied": "Ir-reġistri tat-talbiet jista' jaqrahom biss sid, amministratur jew maniġer tal-fatturazzjoni tal-organizzazzjoni.",
       "tokens": "{{input}} dħul · {{output}} ħruġ",
@@ -4682,7 +4681,6 @@
     "dismiss": "Warrab il-briefing",
     "offline": "Offline · briefing issejvjat",
     "cached": "Rapport issejvjat · aġġornament mhux disponibbli",
-    "window": "{{start}} – {{end}}",
     "summary": "Sommarju AI",
     "summaryPending": "Is-sommarju AI qed jitħejja. Jitwaħħal hawn meta jkun lest.",
     "summaryUnavailable": "Is-sommarju AI mhux disponibbli. Ir-rapport strutturat tiegħek għadu disponibbli.",

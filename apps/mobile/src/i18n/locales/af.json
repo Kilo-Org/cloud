@@ -26,6 +26,7 @@
     "creditHistory": "Kredietgeskiedenis",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Kanselleer",
     "done": "Klaar",
     "retry": "Probeer weer",
@@ -3476,12 +3477,10 @@
       "requestLogs": "Versoeklogs"
     },
     "requestLogs": {
-      "hint": "Versoeke uit die uur voordat die venster eindig, nuutste eerste.",
       "older": "Vroeër uur",
       "newer": "Later uur",
       "truncated": "Hierdie uur het meer versoeke as wat die lys wys.",
       "emptyTitle": "Geen versoeke nie",
-      "emptyDescription": "Hierdie uur het geen gateway-versoeke nie.",
       "loadError": "Kon nie versoeklogs laai nie.",
       "permissionDenied": "Slegs 'n organisasie-eienaar, -administrateur of -faktuurbestuurder kan die organisasie se versoeklogs lees.",
       "tokens": "{{input}} in · {{output}} uit",
@@ -4472,7 +4471,6 @@
     "dismiss": "Verwerp verslag",
     "offline": "Vanlyn · gestoorde verslag",
     "cached": "Gestoorde verslag · verfris nie beskikbaar nie",
-    "window": "{{start}} – {{end}}",
     "summary": "AI-opsomming",
     "summaryPending": "AI-opsomming word voorberei. Dit sal hier verskyn wanneer dit gereed is.",
     "summaryUnavailable": "AI-opsomming nie beskikbaar nie. Jou gestruktureerde verslag is steeds beskikbaar.",

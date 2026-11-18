@@ -26,6 +26,7 @@
     "creditHistory": "Historia kredytów",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Anuluj",
     "done": "Gotowe",
     "retry": "Spróbuj ponownie",
@@ -3595,12 +3596,10 @@
       "requestLogs": "Dzienniki żądań"
     },
     "requestLogs": {
-      "hint": "Żądania z godziny przed końcem okna, od najnowszych.",
       "older": "Wcześniejsza godzina",
       "newer": "Późniejsza godzina",
       "truncated": "W tej godzinie jest więcej żądań, niż pokazuje lista.",
       "emptyTitle": "Brak żądań",
-      "emptyDescription": "W tej godzinie nie było żądań do bramy.",
       "loadError": "Nie udało się wczytać dzienników żądań.",
       "permissionDenied": "Dzienniki żądań może przeglądać tylko właściciel, administrator lub menedżer rozliczeń organizacji.",
       "tokens": "{{input}} wej. · {{output}} wyj.",
@@ -4612,7 +4611,6 @@
     "dismiss": "Odrzuć raport",
     "offline": "Offline · zapisany raport",
     "cached": "Zapisany raport · odświeżanie niedostępne",
-    "window": "{{start}} – {{end}}",
     "summary": "Podsumowanie AI",
     "summaryPending": "Trwa tworzenie podsumowania AI. Pojawi się tutaj, gdy będzie gotowe.",
     "summaryUnavailable": "Podsumowanie AI niedostępne. Raport ustrukturyzowany jest nadal dostępny.",

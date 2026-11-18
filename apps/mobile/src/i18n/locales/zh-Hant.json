@@ -26,6 +26,7 @@
     "creditHistory": "點數紀錄",
     "sentenceJoiner": "。",
     "listJoiner": "、",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "取消",
     "done": "完成",
     "retry": "再試一次",
@@ -3481,12 +3482,10 @@
       "requestLogs": "請求記錄"
     },
     "requestLogs": {
-      "hint": "顯示時段結束前一小時內的請求，由新到舊排列。",
       "older": "較早一小時",
       "newer": "較晚一小時",
       "truncated": "這一小時的請求多於清單顯示的數量。",
       "emptyTitle": "沒有請求",
-      "emptyDescription": "這一小時沒有閘道請求。",
       "loadError": "無法載入請求記錄。",
       "permissionDenied": "只有組織的擁有者、管理員或帳務管理員可以查看其請求記錄。",
       "tokens": "輸入 {{input}} · 輸出 {{output}}",
@@ -4472,7 +4471,6 @@
     "dismiss": "忽略簡報",
     "offline": "離線 · 已儲存的簡報",
     "cached": "已儲存的報告 · 無法重新整理",
-    "window": "{{start}} – {{end}}",
     "summary": "AI 摘要",
     "summaryPending": "AI 摘要產生中，完成後會附加於此。",
     "summaryUnavailable": "無法使用 AI 摘要。你的結構化報告仍可查看。",

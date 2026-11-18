@@ -26,6 +26,7 @@
     "creditHistory": "クレジット履歴",
     "sentenceJoiner": "。",
     "listJoiner": "、",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "キャンセル",
     "done": "完了",
     "retry": "再試行",
@@ -3481,12 +3482,10 @@
       "requestLogs": "リクエストログ"
     },
     "requestLogs": {
-      "hint": "表示期間の終了時刻までの1時間のリクエストを新しい順に表示しています。",
       "older": "前の1時間",
       "newer": "次の1時間",
       "truncated": "この1時間には、一覧に表示しきれないリクエストがあります。",
       "emptyTitle": "リクエストはありません",
-      "emptyDescription": "この1時間にゲートウェイへのリクエストはありません。",
       "loadError": "リクエストログを読み込めませんでした。",
       "permissionDenied": "リクエストログを閲覧できるのは、組織のオーナー、管理者、または請求管理者のみです。",
       "tokens": "入力 {{input}} · 出力 {{output}}",
@@ -4472,7 +4471,6 @@
     "dismiss": "ブリーフィングを非表示にする",
     "offline": "オフライン · 保存済みブリーフィング",
     "cached": "保存済みレポート · 更新できません",
-    "window": "{{start}} – {{end}}",
     "summary": "AI要約",
     "summaryPending": "AI要約を作成中です。完了するとここに追加されます。",
     "summaryUnavailable": "AI要約は利用できません。構造化レポートは引き続き利用できます。",

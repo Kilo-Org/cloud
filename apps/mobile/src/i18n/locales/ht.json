@@ -26,6 +26,7 @@
     "creditHistory": "Istorik kredi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Anile",
     "done": "Fèt",
     "retry": "Eseye ankò",
@@ -3476,12 +3477,10 @@
       "requestLogs": "Jounal demann"
     },
     "requestLogs": {
-      "hint": "Demann nan èdtan anvan fen fenèt la, pi resan yo an premye.",
       "older": "Èdtan anvan",
       "newer": "Èdtan apre",
       "truncated": "Èdtan sa a gen plis demann pase sa lis la montre.",
       "emptyTitle": "Pa gen demann",
-      "emptyDescription": "Pa gen demann pasrèl nan èdtan sa a.",
       "loadError": "Nou pa t ka chaje jounal demann yo.",
       "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon nan òganizasyon an ki ka li jounal demann li.",
       "tokens": "{{input}} antre · {{output}} soti",
@@ -4472,7 +4471,6 @@
     "dismiss": "Rejte rapò a",
     "offline": "Hò liy · rapò anrejistre",
     "cached": "Rapò anrejistre · pa ka rafrechi",
-    "window": "{{start}} – {{end}}",
     "summary": "Rezime AI",
     "summaryPending": "Rezime AI a ap prepare. L ap parèt isit la lè l pare.",
     "summaryUnavailable": "Rezime AI a pa disponib. Rapò estriktire ou a toujou disponib.",

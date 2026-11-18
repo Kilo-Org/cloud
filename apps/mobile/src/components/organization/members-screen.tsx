@@ -282,6 +282,8 @@ export function OrganizationMembersScreen() {
       {emptyBody ?? (
         <FlashList
           style={listStyle}
+          // The design gate's proof readiness marker for this route.
+          testID="organization-members-list"
           data={items}
           renderItem={renderItem}
           keyExtractor={item => {

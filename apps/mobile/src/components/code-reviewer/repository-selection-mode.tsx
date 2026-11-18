@@ -37,7 +37,9 @@ export function RepositoryModeChoice({
         {(['all', 'selected'] as const).map(option => (
           <ChoiceRow
             key={option}
-            label={option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')}
+            label={
+              option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')
+            }
             selected={mode === option}
             disabled={disabled}
             onPress={() => {

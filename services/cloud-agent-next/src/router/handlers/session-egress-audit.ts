@@ -1,4 +1,4 @@
-import { providerSupports } from '@kilocode/worker-utils/sandbox-provider-capabilities';
+import { egressRequestSupported } from '@kilocode/worker-utils/sandbox-provider-capabilities';
 import { TRPCError } from '@trpc/server';
 import { egressAuditStore } from '../../egress/sandbox-egress.js';
 import { withLogTags } from '../../logger.js';
@@ -50,7 +50,7 @@ export function createSessionEgressAuditHandlers() {
           }
           if (
             workspace.sandboxProvider === undefined ||
-            !providerSupports(workspace.sandboxProvider, 'egressProxy') ||
+            !egressRequestSupported(workspace.sandboxProvider, workspace) ||
             workspace.sandboxRoute !== undefined ||
             (workspace.sandboxKind !== undefined
               ? workspace.sandboxKind !== 'isolated'

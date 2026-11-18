@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
-import { CenteredState } from '@/components/centered-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketSetupRecovery } from '@/components/code-reviewer/bitbucket-setup-recovery';
 import {
@@ -16,13 +16,16 @@ import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { GitMerge } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { bitbucketRepair } from '@/lib/code-reviewer-bitbucket';
+import { bitbucketConnectHref } from '@/lib/bitbucket-connect-navigation';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
-import { SCREEN_BODY_CLASS, SCREEN_GUTTER_CLASS } from '@/lib/layout';
+import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useQueryBodyState } from '@/lib/hooks/use-query-body-state';
 import {
@@ -104,23 +107,39 @@ export function BitbucketOverview({
 
   if (!isLoading && !connected) {
     const readinessData = readiness.data;
+    // The state is the screen's whole surface, so its action carries the repair
+    // the readiness read names: a first connection or a replaced token. A reader
+    // the role rule refuses gets the sentence naming who can connect instead of
+    // a press it cannot finish.
+    const repair = readinessData === undefined ? null : bitbucketRepair(readinessData);
     return (
       <View className="flex-1 bg-background">
         <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <CenteredState contentContainerClassName={SCREEN_GUTTER_CLASS}>
-          {canEdit && readinessData ? (
-            <BitbucketSetupRecovery
-              scope={scope}
-              readiness={readinessData}
-              message={t('prReview.connect.bitbucketNotConnectedTitle')}
-              className="w-full"
-            />
-          ) : (
-            <Text className="text-center text-xs text-muted-foreground">
-              {t('codeReviewer.bitbucket.notConnectedReadOnly')}
-            </Text>
-          )}
-        </CenteredState>
+        <EmptyState
+          icon={GitMerge}
+          iconSize={28}
+          title={t('prReview.connect.bitbucketNotConnectedTitle')}
+          description={
+            canEdit && readinessData
+              ? t('codeReviewer.bitbucketConnect.description')
+              : t('codeReviewer.bitbucket.notConnectedReadOnly')
+          }
+          action={
+            canEdit && repair !== null ? (
+              <StateAction
+                label={
+                  repair.kind === 'replace-token'
+                    ? t('prReview.connect.reconnectTitleBitbucket')
+                    : t('common.connectBitbucket')
+                }
+                icon={GitMerge}
+                onPress={() => {
+                  pushOnce(bitbucketConnectHref(scope));
+                }}
+              />
+            ) : undefined
+          }
+        />
       </View>
     );
   }

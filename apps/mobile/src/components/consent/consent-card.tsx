@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConsentRequiredRows } from '@/components/consent/consent-required-rows';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { ConsentPolicySentence } from '@/components/consent/consent-policy-sentence';
+import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
@@ -64,7 +65,10 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const actions = getConsentActions(mode);
-  const rootStyle = { paddingTop: top, ...sideInsetStyle };
+  // The review surface is a pushed screen, so its header clears the status
+  // bar; onboarding has no header and keeps clearing it here. Both keep the
+  // side insets around the body and the pinned footer.
+  const bodyStyle = mode === 'review' ? sideInsetStyle : { paddingTop: top, ...sideInsetStyle };
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
   // The catalogue key, not the copy: the card translates it at render, so the
   // line follows an applied language instead of keeping the words of the
@@ -129,11 +133,6 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   }, [mode, userId]);
 
   const handlePrimaryAction = async () => {
-    if (mode === 'review') {
-      router.back();
-      return;
-    }
-
     if (!userId) {
       setError('consent.couldNotLoadAccount');
       return;
@@ -230,12 +229,17 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   );
 
   return (
-    <View className="flex-1 bg-background" style={rootStyle}>
+    <View className="flex-1 bg-background">
+      {mode === 'review' ? <ScreenHeader title={t('consent.summaryTitle')} /> : null}
       {/* The body keeps the platform scroll indicator: at a compact window it
-          is taller than the viewport, and the hidden thumb made the rest of it
-          read as missing rather than as one scroll away. */}
-      <ScrollView className="flex-1" contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}>
-        {/* The badge alone carries the brand: the title below already states
+          is taller than the viewport, and the hidden thumb made the rest of
+          it read as missing rather than as one scroll away. */}
+      <ScrollView
+        className="flex-1"
+        style={bodyStyle}
+        contentContainerClassName={cn(SCREEN_BODY_CLASS, 'pb-6')}
+      >
+        {/* The badge alone carries the brand: the title above already states
             what the screen is about, and repeating the product name beside
             the mark said nothing a reader did not already see. The mark keeps
             the name for assistive tech, which cannot read the glyph. */}
@@ -249,9 +253,11 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         </View>
 
         <View className="gap-1">
-          <Text variant="large">
-            {mode === 'review' ? t('consent.summaryTitle') : t('consent.beforeWeGetStarted')}
-          </Text>
+          {/* Review mode's title sits in the header above, so the body starts
+              with the sentence that explains the summary. */}
+          {mode === 'review' ? null : (
+            <Text variant="large">{t('consent.beforeWeGetStarted')}</Text>
+          )}
           <Text variant="muted">{t('consent.introDescription')}</Text>
         </View>
 
@@ -329,19 +335,21 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           <View className="min-h-5 justify-center">
             <AccessibleStatus message={error ? t(error) : null} />
           </View>
-          <Button
-            onPress={() => {
-              void handlePrimaryAction();
-            }}
-            size="lg"
-            accessibilityLabel={actions.primaryLabel}
-            // Accepting before the stored (or carried) choice has loaded would
-            // write the default over a decision the user already made.
-            disabled={pendingAction === 'secondary' || optionalControlPending}
-            loading={pendingAction === 'primary'}
-          >
-            <Text>{actions.primaryLabel}</Text>
-          </Button>
+          {actions.primaryLabel ? (
+            <Button
+              onPress={() => {
+                void handlePrimaryAction();
+              }}
+              size="lg"
+              accessibilityLabel={actions.primaryLabel}
+              // Accepting before the stored (or carried) choice has loaded would
+              // write the default over a decision the user already made.
+              disabled={pendingAction === 'secondary' || optionalControlPending}
+              loading={pendingAction === 'primary'}
+            >
+              <Text>{actions.primaryLabel}</Text>
+            </Button>
+          ) : null}
           <Button
             variant={mode === 'review' ? 'outline-destructive' : 'outline'}
             size="lg"

@@ -14,7 +14,7 @@ import {
   useRouter,
 } from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
-import { MessageSquare, RotateCcw } from '@/components/ui/icons';
+import { ArrowLeft, MessageSquare, RotateCcw } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic } from '@/lib/haptics';
@@ -3391,48 +3391,36 @@ export function SessionDetailContent({
 
   function renderContent() {
     if (shownTerminalError) {
+      const error = shownTerminalError;
       return (
-        <CenteredState>
-          <View className="items-center gap-3 px-4">
-            <QueryError
-              variant={shownTerminalError.variant}
-              placement="top"
-              className="pt-0"
-              title={shownTerminalError.title}
-              message={shownTerminalError.message}
-              onRetry={
-                shownTerminalError.retryable
-                  ? () => {
-                      handleTerminalRetry(shownTerminalError);
-                    }
-                  : undefined
-              }
-              isRetrying={terminalRetryPending}
-            />
-            {/* One primary action per surface (DESIGN.md): Back is the recovery
-                action, so it fills. A read-only transcript keeps its footer
-                beside this card, and that footer's Continue in a new session is
-                the surface's filled primary, so Back steps back to the outline
-                there instead. Dark takes the lifted olive `--selection` with its
-                own label tone instead of the glare of #ffdd00, so both themes
-                give the control the light mode's weight. */}
-            <Button
-              variant={isReadOnlyContinueVisible ? 'outline' : undefined}
-              size="action"
-              className={cn(!isReadOnlyContinueVisible && 'bg-primary dark:bg-selection')}
-              onPress={handleBackToSessions}
-            >
-              <Text
-                className={cn(
-                  !isReadOnlyContinueVisible &&
-                    'text-primary-foreground dark:text-selection-foreground'
-                )}
-              >
-                {t('agentChat.session.backToSessions')}
-              </Text>
-            </Button>
-          </View>
-        </CenteredState>
+        <QueryError
+          variant={error.variant}
+          title={error.title}
+          message={error.message}
+          isRetrying={terminalRetryPending}
+          action={
+            <View className="flex-row items-center gap-3">
+              {error.retryable ? (
+                <StateAction
+                  label={t('common.retry')}
+                  icon={RotateCcw}
+                  loading={terminalRetryPending}
+                  onPress={() => {
+                    handleTerminalRetry(error);
+                  }}
+                />
+              ) : null}
+              {/* Back keeps truncating the stack to the outline, which the
+                  header's own back does not, so both actions share the state's
+                  one action slot instead of the card handing one its own. */}
+              <StateAction
+                label={t('agentChat.session.backToSessions')}
+                icon={ArrowLeft}
+                onPress={handleBackToSessions}
+              />
+            </View>
+          }
+        />
       );
     }
     if (sessionLoadPhase === 'slow') {

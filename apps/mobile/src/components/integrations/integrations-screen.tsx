@@ -109,7 +109,16 @@ export function IntegrationsScreen({ organizationId }: IntegrationsScreenProps) 
   // once they exist; only a read that never landed takes over the screen.
   if (statuses.isError && statuses.data == null) {
     if (isPermissionDeniedError(statuses.error)) {
-      return <PermissionDenied description={t('integrations.permissionDenied')} />;
+      return (
+        <View className="flex-1 bg-background">
+          <ScreenHeader
+            title={t('integrations.title')}
+            subtitle={organizationName}
+            backFallback={PROFILE_TAB_HREF}
+          />
+          <PermissionDenied description={t('integrations.permissionDenied')} showBack={false} />
+        </View>
+      );
     }
     return (
       <View className="flex-1 bg-background">

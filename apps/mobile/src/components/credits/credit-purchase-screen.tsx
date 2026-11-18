@@ -387,14 +387,16 @@ export function CreditPurchaseScreen() {
               <Card>
                 <Text variant="heading">{t('queryError.serverTitle')}</Text>
                 <Text variant="muted">{t('organization.boundary.loadErrorMessage')}</Text>
-                <StateAction
-                  label={t('common.tryAgain')}
-                  icon={RotateCcw}
-                  loading={isRetryingIdentity}
-                  onPress={() => {
-                    void retryIdentity();
-                  }}
-                />
+                <View className="self-start">
+                  <StateAction
+                    label={t('common.tryAgain')}
+                    icon={RotateCcw}
+                    loading={isRetryingIdentity}
+                    onPress={() => {
+                      void retryIdentity();
+                    }}
+                  />
+                </View>
               </Card>
             )}
 
@@ -406,14 +408,16 @@ export function CreditPurchaseScreen() {
                 <Text variant="muted" numberOfLines={3}>
                   {t(storeBannerBodyKey)}
                 </Text>
-                <StateAction
-                  label={t('common.tryAgain')}
-                  icon={RotateCcw}
-                  loading={isRefetching}
-                  onPress={() => {
-                    void refetch();
-                  }}
-                />
+                <View className="self-start">
+                  <StateAction
+                    label={t('common.tryAgain')}
+                    icon={RotateCcw}
+                    loading={isRefetching}
+                    onPress={() => {
+                      void refetch();
+                    }}
+                  />
+                </View>
               </Card>
             )}
 

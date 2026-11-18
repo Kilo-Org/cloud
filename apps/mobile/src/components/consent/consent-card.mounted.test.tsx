@@ -56,6 +56,7 @@ vi.mock('@/components/ui/icons', () => ({
   User: 'User',
 }));
 vi.mock('@/components/ui/configure-row', () => ({ ConfigureRow: 'ConfigureRow' }));
+vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
@@ -262,10 +263,14 @@ describe('ConsentCard', () => {
     expect(marks[0]?.props.accessibilityRole).toBe('image');
   });
 
-  it('renders review wording in review mode', () => {
+  it('renders review wording in the screen header and revoke alone', () => {
     const renderer = mountCard('review');
+    const header = renderer.root.find(node => String(node.type) === 'ScreenHeader');
+    expect(header.props.title).toBe(i18n.t('consent.summaryTitle'));
     const t = texts(renderer.root);
-    expect(t).toContain('Data sharing preferences');
+    // The title lives in the header, so the body does not repeat it as a large
+    // title beside it.
+    expect(t).not.toContain(i18n.t('consent.summaryTitle'));
     // The optional section header is the headword alone: the toggle card's own
     // description already says the choice can be changed in Settings.
     expect(t).toContain('Optional');
@@ -273,11 +278,16 @@ describe('ConsentCard', () => {
     expect(t).not.toContain('Before we get started');
     expect(t).not.toContain('Optional — on unless you turn it off');
 
-    // One filled action per footer: the safe way out keeps the fill, and the
-    // destructive one is outlined so it cannot compete with it.
-    const back = findButton(renderer.root, 'Back');
+    // The header carries the way back, so the footer offers the destructive
+    // action alone, outlined.
+    const back = renderer.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Button' &&
+        (n.props.accessibilityLabel as string) === 'Back'
+    );
+    expect(back).toHaveLength(0);
     const revoke = findButton(renderer.root, 'Revoke consent');
-    expect(back.props.variant ?? 'default').toBe('default');
     expect(revoke.props.variant).toBe('outline-destructive');
   });
 
@@ -626,7 +636,7 @@ describe('ConsentCard', () => {
       const disclosure = requireDisclosure(root);
       expect(hasAncestorOfType(disclosure, 'ScrollView')).toBe(false);
 
-      const primary = mode === 'onboarding' ? 'Accept and continue' : 'Back';
+      const primary = mode === 'onboarding' ? 'Accept and continue' : 'Revoke consent';
       const footer = requireParent(findButton(root, primary));
       expect(disclosureTexts(footer).length).toBe(1);
     }
@@ -638,7 +648,7 @@ describe('ConsentCard', () => {
     await act(flush);
     const root = renderer.root;
     expect(texts(root)).toContain('Could not load your consent settings. Please try again.');
-    const footer = requireParent(findButton(root, 'Back'));
+    const footer = requireParent(findButton(root, 'Revoke consent'));
     expect(disclosureTexts(footer).length).toBe(1);
     expect(hasAncestorOfType(requireDisclosure(root), 'ScrollView')).toBe(false);
   });

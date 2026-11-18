@@ -329,7 +329,11 @@ vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
   StateAction: 'StateAction',
 }));
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+// The state's action slot is what these tests press, so the stub forwards it
+// the way the shared state renders it.
+vi.mock('@/components/query-error', () => ({
+  QueryError: ({ action }: { action?: ReactNode }) => action ?? null,
+}));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
 // The goal-removal confirm renders through this surface; the stub keeps the
 // destructive variant out of this suite's react-native stub while still letting
@@ -1331,6 +1335,25 @@ function pressHeaderBack(renderer: ReactTestRenderer) {
     onPress: () => void;
   };
   act(onPress);
+}
+
+/**
+ * The terminal state's Retry: the shared `QueryError` carries its recovery in
+ * the one action slot, so the card states no `onRetry` of its own.
+ */
+function cardRetryAction(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(
+    node => Object.is(node.type, 'StateAction') && node.props.label === i18n.t('common.retry')
+  );
+}
+
+/** The card's way back to the sessions list, in that same action slot. */
+function cardBackAction(renderer: ReactTestRenderer): ReactTestInstance {
+  return renderer.root.find(
+    node =>
+      Object.is(node.type, 'StateAction') &&
+      node.props.label === i18n.t('agentChat.session.backToSessions')
+  );
 }
 
 describe('SessionDetailContent display scope', () => {
@@ -2628,10 +2651,10 @@ describe('session detail stored-session retry availability', () => {
     expect(typeof continueButton.props.onPress).toBe('function');
   });
 
-  // The surface states one filled primary at most: while the read-only footer
-  // is on screen its Continue in a new session is that primary, so the card's
-  // Back beside it keeps the outline instead of competing for the fill.
-  it('keeps the fill on the read-only footer while the error card offers Back', async () => {
+  // The state owns one action style: its way back is a `StateAction` in the
+  // card's action slot beside Retry, never a second hand-built control, and the
+  // read-only footer keeps the surface's only filled primary.
+  it('offers the card way back as a state action beside Retry', async () => {
     const view = await mountDetails(null);
     act(() => {
       view.store.set(view.manager.atoms.activeSessionType, 'read-only');
@@ -2648,6 +2671,17 @@ describe('session detail stored-session retry availability', () => {
     expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(1);
     expect(renderedText(view.renderer.root)).toContain(i18n.t('agentChat.session.readOnly'));
 
+    expect(cardRetryAction(view.renderer).props.onPress).toBeDefined();
+    expect(cardBackAction(view.renderer).props.onPress).toBeDefined();
+    // No second Back control outside the state's action slot.
+    expect(
+      view.renderer.root.findAll(
+        node =>
+          Object.is(node.type, 'Button') &&
+          renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
+      )
+    ).toHaveLength(0);
+
     const filled = view.renderer.root
       .findAll(node => Object.is(node.type, 'Button'))
       .filter(node => node.props.variant === undefined || node.props.variant === 'default');
@@ -2655,50 +2689,6 @@ describe('session detail stored-session retry availability', () => {
     expect(filled[0]?.props.accessibilityLabel).toBe(
       i18n.t('agentChat.session.continueInNewSession')
     );
-
-    const back = view.renderer.root.find(
-      node =>
-        Object.is(node.type, 'Button') &&
-        renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
-    );
-    expect(back.props.variant).toBe('outline');
-    // An outline control paints no fill of its own, so the dark primary fill
-    // never reaches this branch: only the surface's one filled primary carries
-    // it.
-    expect(String(back.props.className)).not.toContain('dark:bg-selection');
-  });
-
-  // A writable session has no read-only footer owning the surface's primary, so
-  // the card's Back is the filled one and it takes the same muted dark tone the
-  // read-only footer's Continue does.
-  it('fills the error card back control with the muted tone in dark mode', async () => {
-    goalMountOptions = { resolvedType: 'remote' };
-    const view = await mountDetails(null);
-    act(() => {
-      view.store.set(view.manager.atoms.activeSessionType, 'remote');
-    });
-    // The transcript read fails before any row arrives, so the terminal card
-    // paints as the whole body.
-    act(() => {
-      view.store.set<string | null, [string | null], unknown>(
-        view.manager.atoms.error,
-        'Session history temporarily unavailable'
-      );
-    });
-
-    expect(view.renderer.root.findAllByType(QueryError)).toHaveLength(1);
-    expect(view.store.get(view.manager.atoms.isReadOnly)).toBe(false);
-
-    const back = view.renderer.root.find(
-      node =>
-        Object.is(node.type, 'Button') &&
-        renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
-    );
-    expect(String(back.props.className)).toContain('bg-primary');
-    expect(String(back.props.className)).toContain('dark:bg-selection');
-    const label = back.find(node => Object.is(node.type, 'Text'));
-    expect(String(label.props.className)).toContain('text-primary-foreground');
-    expect(String(label.props.className)).toContain('dark:text-selection-foreground');
   });
 
   it('drops Retry while a writable session has no transport that can deliver', async () => {
@@ -2898,7 +2888,6 @@ describe('session detail slow load', () => {
       typeof QueryError
     >;
     expect(error.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
-    expect(error.onRetry).toBeDefined();
     // The failure is stated once: no footer status line and no send reason
     // naming the same thing beside the card.
     expect(indicatorNodes(view)).toHaveLength(0);
@@ -2907,7 +2896,7 @@ describe('session detail slow load', () => {
     // the shared leg is not the cause here.
     const switchSession = vi.spyOn(view.manager, 'switchSession').mockResolvedValue(undefined);
     act(() => {
-      (error.onRetry as () => void)();
+      (cardRetryAction(view.renderer).props.onPress as () => void)();
     });
     expect(switchSession).toHaveBeenCalledWith(ROOT_ID);
     expect(connectionHealth.retryConnection).not.toHaveBeenCalled();
@@ -3108,12 +3097,11 @@ describe('session detail slow load', () => {
       typeof QueryError
     >;
     expect(error.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
-    expect(error.onRetry).toBeDefined();
     // A spent reconnect budget is only cleared by resetting the shared
     // transport leg; reopening over the same dead socket would return here.
     const switchSession = vi.spyOn(view.manager, 'switchSession');
     act(() => {
-      (error.onRetry as () => void)();
+      (cardRetryAction(view.renderer).props.onPress as () => void)();
     });
     expect(connectionHealth.retryConnection).toHaveBeenCalledTimes(1);
     expect(switchSession).not.toHaveBeenCalled();
@@ -3255,7 +3243,7 @@ describe('session detail terminal load failure retry', () => {
       expect(card.isRetrying).toBe(false);
 
       act(() => {
-        (errorCard(view).onRetry as () => void)();
+        (cardRetryAction(view.renderer).props.onPress as () => void)();
       });
 
       // The tap is acknowledged on the card itself: it stays on screen, stating
@@ -3263,9 +3251,7 @@ describe('session detail terminal load failure retry', () => {
       // replaces it, which is what made a fast re-failure read as a lost tap.
       expect(errorCard(view).isRetrying).toBe(true);
       expect(view.renderer.root.findAllByType(SessionSkeletonMessages)).toHaveLength(0);
-      expect(renderedText(view.renderer.root)).toContain(
-        i18n.t('agentChat.session.backToSessions')
-      );
+      expect(cardBackAction(view.renderer).props.onPress).toBeDefined();
 
       // The reopen reaches its fresh transcript request while the card still
       // holds the action.
@@ -3287,7 +3273,7 @@ describe('session detail terminal load failure retry', () => {
       });
       expect(errorCard(view).isRetrying).toBe(false);
       expect(errorCard(view).message).toBe(i18n.t('agentChat.session.failedToLoadDetails'));
-      expect(errorCard(view).onRetry).toBeDefined();
+      expect(cardRetryAction(view.renderer)).toBeDefined();
     } finally {
       vi.useRealTimers();
     }
@@ -3298,7 +3284,7 @@ describe('session detail terminal load failure retry', () => {
     showTransportFailure(view);
 
     act(() => {
-      (errorCard(view).onRetry as () => void)();
+      (cardRetryAction(view.renderer).props.onPress as () => void)();
     });
     expect(errorCard(view).isRetrying).toBe(true);
 
@@ -3323,8 +3309,12 @@ describe('session detail terminal load failure retry', () => {
     const card = errorCard(view);
     expect(card.variant).toBe('permission');
     expect(card.title).toBe(i18n.t('common.accessDenied'));
-    expect(card.onRetry).toBeUndefined();
     expect(card.isRetrying).toBe(false);
+    // A permanent refusal offers the way back alone.
+    expect(() => cardRetryAction(view.renderer)).toThrow();
+    expect(cardBackAction(view.renderer).props.label).toBe(
+      i18n.t('agentChat.session.backToSessions')
+    );
   });
 
   it('holds the busy state through the anti-flicker beat after a fast re-failure', async () => {
@@ -3337,7 +3327,7 @@ describe('session detail terminal load failure retry', () => {
       const view = await mountDetails(null);
       showTransportFailure(view);
       act(() => {
-        (errorCard(view).onRetry as () => void)();
+        (cardRetryAction(view.renderer).props.onPress as () => void)();
       });
       expect(errorCard(view).isRetrying).toBe(true);
 
@@ -3355,7 +3345,7 @@ describe('session detail terminal load failure retry', () => {
         await Promise.resolve();
       });
       expect(errorCard(view).isRetrying).toBe(false);
-      expect(errorCard(view).onRetry).toBeDefined();
+      expect(cardRetryAction(view.renderer)).toBeDefined();
     } finally {
       vi.useRealTimers();
     }
@@ -3370,7 +3360,7 @@ describe('session detail terminal load failure retry', () => {
       const view = await mountDetails(null);
       showTransportFailure(view);
       act(() => {
-        (errorCard(view).onRetry as () => void)();
+        (cardRetryAction(view.renderer).props.onPress as () => void)();
       });
       expect(errorCard(view).isRetrying).toBe(true);
 
@@ -3901,20 +3891,18 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
       const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
         typeof QueryError
       >;
-      expect(
-        view.renderer.root.findAll(node => Object.is(node.type, 'CenteredState'))
-      ).toHaveLength(1);
-      expect(error.placement).toBe('top');
       expect(error.variant).toBe(code === 'UNAUTHORIZED' ? 'permission' : 'server');
-      expect(Boolean(error.onRetry)).toBe(code !== 'UNAUTHORIZED');
-      expect(renderedText(view.renderer.root)).toContain('Back to sessions');
+      // The card's actions are its state action slot: Retry when the failure is
+      // retryable, and the way back in every case.
+      if (code === 'UNAUTHORIZED') {
+        expect(() => cardRetryAction(view.renderer)).toThrow();
+      } else {
+        expect(cardRetryAction(view.renderer).props.onPress).toBeDefined();
+      }
+      const backToSessions = cardBackAction(view.renderer);
+      expect(backToSessions.props.label).toBe(i18n.t('agentChat.session.backToSessions'));
       // The card's Back returns to the sessions list through the same POP_TO
       // the session route's not-found card uses, so the two cards cannot drift.
-      const backToSessions = view.renderer.root.find(
-        node =>
-          Object.is(node.type, 'Button') &&
-          renderedText(node).includes(i18n.t('agentChat.session.backToSessions'))
-      );
       const routesBeforeCardBack = [...navigationRoutes];
       const plantedRoutes: string[] = ['(app)', '/(app)/(tabs)/(2_agents)/', 'agent-chat/x'];
       navigationRoutes.splice(0, navigationRoutes.length, ...plantedRoutes);
@@ -4140,8 +4128,9 @@ describe('child transcript requests', () => {
     expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
 
     act(() => {
-      errorProps.onRetry?.();
-      errorProps.onRetry?.();
+      const retry = cardRetryAction(view.renderer).props.onPress as () => void;
+      retry();
+      retry();
     });
     expect(sheetProps(view.renderer).hydrationState.status).toBe('loading');
     expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID, SELECTED_ID]);
@@ -4924,7 +4913,7 @@ describe('session detail composer after a failed turn', () => {
       typeof QueryError
     >;
     expect(error.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
-    expect(error.onRetry).toBeDefined();
+    expect(cardRetryAction(view.renderer).props.onPress).toBeDefined();
 
     // The composer stays mounted and editable; only sending waits on the
     // session being able to accept a message again.
@@ -4999,10 +4988,7 @@ describe('session detail composer after a failed turn', () => {
 
     // The non-retryable class keeps no Retry: the reader continues in the
     // session instead, so the composer must stay fully usable.
-    const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
-      typeof QueryError
-    >;
-    expect(error.onRetry).toBeUndefined();
+    expect(() => cardRetryAction(view.renderer)).toThrow();
     const node = view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer'));
     expect(node.props.disabled).toBe(false);
     expect(node.props.sendDisabled).toBe(false);

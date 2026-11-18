@@ -35,10 +35,14 @@ describe('low balance alert screen states', () => {
     unmount();
   });
 
-  it('keeps a refused role on the permission state', async () => {
+  it('keeps a refused role on the permission state under the screen header', async () => {
     boundary.role = 'member';
     const { renderer, unmount } = await mountScreen();
-    expect(renderer.root.findAll(node => String(node.type) === 'PermissionDenied')).toHaveLength(1);
+    const header = renderer.root.find(node => String(node.type) === 'ScreenHeader');
+    expect(header.props.title).toBe(i18n.t('organization.lowBalanceAlert.title'));
+    const [denied] = renderer.root.findAll(node => String(node.type) === 'PermissionDenied');
+    // The header owns the way out, so the state must not repeat a Back action.
+    expect(denied?.props.showBack).toBe(false);
     unmount();
   });
 });

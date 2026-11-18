@@ -547,72 +547,78 @@ export function ScreenHeader({
     );
   }
 
+  const eyebrowSlot =
+    eyebrow || reserveEyebrow ? (
+      <View className={cn('mb-0.5', centerTitle && 'items-center')}>
+        {eyebrow === undefined && eyebrowPlaceholder ? (
+          // The reserved text below still holds the line's height, so the
+          // placeholder is painted over it rather than sizing the slot.
+          <View
+            className={cn(
+              'absolute inset-0 justify-center',
+              centerTitle ? 'items-center' : 'items-start'
+            )}
+            pointerEvents="none"
+          >
+            {eyebrowPlaceholder}
+          </View>
+        ) : null}
+        <Eyebrow
+          className={cn(centerTitle && 'text-center', !eyebrow && 'opacity-0')}
+          // A status line is one line: a narrow window truncates it rather than
+          // stacking it into a column beside the title. A caller that raises
+          // `eyebrowNumberOfLines` opts into the extra lines and the middle
+          // ellipsis that keeps a path's distinguishing tail.
+          numberOfLines={eyebrowNumberOfLines ?? 1}
+          ellipsizeMode={eyebrowNumberOfLines === undefined ? 'tail' : 'middle'}
+          accessible={Boolean(eyebrow)}
+          accessibilityElementsHidden={!eyebrow}
+          importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}
+        >
+          {eyebrow ?? '\u00A0'}
+        </Eyebrow>
+      </View>
+    ) : null;
+
+  const subtitleSlot =
+    subtitle || reserveSubtitle || subtitlePlaceholder ? (
+      <View className={cn('mt-0.5', centerTitle && 'items-center')}>
+        {subtitle === undefined && subtitlePlaceholder ? (
+          // The reserved text below still holds the line's height, so the
+          // placeholder is painted over it rather than sizing the slot.
+          <View
+            className={cn(
+              'absolute inset-0 justify-center',
+              centerTitle ? 'items-center' : 'items-start'
+            )}
+            pointerEvents="none"
+          >
+            {subtitlePlaceholder}
+          </View>
+        ) : null}
+        <Text
+          variant="muted"
+          className={cn(centerTitle && 'text-center', !subtitle && 'opacity-0')}
+          // One line: the subtitle is context for the title, so it truncates at
+          // its tail instead of taking a second line and moving the body. The
+          // reserved copy is a no-break space in the same style, so the height
+          // it holds is the height the name will take.
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          accessible={Boolean(subtitle)}
+          accessibilityElementsHidden={!subtitle}
+          importantForAccessibility={subtitle ? 'auto' : 'no-hide-descendants'}
+        >
+          {subtitle ?? '\u00A0'}
+        </Text>
+      </View>
+    ) : null;
+
   const heading = (
     <View className="min-w-0 flex-1">
-      {eyebrow || reserveEyebrow ? (
-        <View className={cn('mb-0.5', centerTitle && 'items-center')}>
-          {eyebrow === undefined && eyebrowPlaceholder ? (
-            // The reserved text below still holds the line's height, so the
-            // placeholder is painted over it rather than sizing the slot.
-            <View
-              className={cn(
-                'absolute inset-0 justify-center',
-                centerTitle ? 'items-center' : 'items-start'
-              )}
-              pointerEvents="none"
-            >
-              {eyebrowPlaceholder}
-            </View>
-          ) : null}
-          <Eyebrow
-            className={cn(centerTitle && 'text-center', !eyebrow && 'opacity-0')}
-            // A status line is one line: a narrow window truncates it rather than
-            // stacking it into a column beside the title. A caller that raises
-            // `eyebrowNumberOfLines` opts into the extra lines and the middle
-            // ellipsis that keeps a path's distinguishing tail.
-            numberOfLines={eyebrowNumberOfLines ?? 1}
-            ellipsizeMode={eyebrowNumberOfLines === undefined ? 'tail' : 'middle'}
-            accessible={Boolean(eyebrow)}
-            accessibilityElementsHidden={!eyebrow}
-            importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}
-          >
-            {eyebrow ?? '\u00A0'}
-          </Eyebrow>
-        </View>
-      ) : null}
+      {eyebrowSlot}
       {titleNode}
-      {subtitle || reserveSubtitle || subtitlePlaceholder ? (
-        <View className={cn('mt-0.5', centerTitle && 'items-center')}>
-          {subtitle === undefined && subtitlePlaceholder ? (
-            // The reserved text below still holds the line's height, so the
-            // placeholder is painted over it rather than sizing the slot.
-            <View
-              className={cn(
-                'absolute inset-0 justify-center',
-                centerTitle ? 'items-center' : 'items-start'
-              )}
-              pointerEvents="none"
-            >
-              {subtitlePlaceholder}
-            </View>
-          ) : null}
-          <Text
-            variant="muted"
-            className={cn(centerTitle && 'text-center', !subtitle && 'opacity-0')}
-            // One line: the subtitle is context for the title, so it truncates at
-            // its tail instead of taking a second line and moving the body. The
-            // reserved copy is a no-break space in the same style, so the height
-            // it holds is the height the name will take.
-            numberOfLines={1}
-            ellipsizeMode="tail"
-            accessible={Boolean(subtitle)}
-            accessibilityElementsHidden={!subtitle}
-            importantForAccessibility={subtitle ? 'auto' : 'no-hide-descendants'}
-          >
-            {subtitle ?? '\u00A0'}
-          </Text>
-        </View>
-      ) : null}
+      {subtitleSlot}
     </View>
   );
   // A centered title shares its row with the leading and trailing controls.
@@ -679,6 +685,38 @@ export function ScreenHeader({
       </Pressable>
     </View>
   ) : null;
+  // A two-line header keeps the back control centred on the title's own line:
+  // the eyebrow above and the subtitle below each carry the control's column as
+  // a spacer, so the chevron never floats over the block between them. With no
+  // second line the same row is the plain title row.
+  const backControlSpacer = canGoBack ? (
+    <View className={cn('h-0 w-[48px] shrink-0', '-ms-4')} />
+  ) : null;
+  const titleRow = (
+    <View className="flex-row items-center gap-1">
+      {/* The control's box takes no layout height: the row stays the title's
+          own line, and the 48pt target paints centred on it. */}
+      <View className="h-0 justify-center">{backControl}</View>
+      <View className="min-w-0 flex-1">{titleNode}</View>
+    </View>
+  );
+  const titledHeading = (
+    <View className="min-h-[48px] min-w-0 flex-1 justify-center">
+      {eyebrowSlot ? (
+        <View className="flex-row items-center gap-1">
+          {backControlSpacer}
+          <View className="min-w-0 grow">{eyebrowSlot}</View>
+        </View>
+      ) : null}
+      {titleRow}
+      {subtitleSlot ? (
+        <View className="flex-row items-center gap-1">
+          {backControlSpacer}
+          <View className="min-w-0 grow">{subtitleSlot}</View>
+        </View>
+      ) : null}
+    </View>
+  );
   // A fixed-width trailing cluster sizes to its content and never shrinks
   // (`shrink-0`). A `max-w-[50%] shrink` cap clamped the cluster's box on
   // narrow screens while its fixed-width children kept painting at their full
@@ -758,10 +796,7 @@ export function ScreenHeader({
         ) : (
           <>
             <View className="flex-row items-center">
-              <View className="min-w-0 flex-1 flex-row items-center gap-1">
-                {backControl}
-                {heading}
-              </View>
+              {titledHeading}
               {reservedTitleBand}
               {headerRight && !stackActions ? (
                 <View className={headerRightSlotClassName}>{headerRight}</View>

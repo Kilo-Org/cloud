@@ -841,7 +841,11 @@ describe('ScreenHeader mounted', () => {
       className: 'pt-3',
     });
     const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.parent?.parent).toBe(findBackFrame(renderer.root).parent);
+    // The control and the title share one row, so the chevron centres on the
+    // title's own line while the eyebrow keeps its line above both.
+    const titleRow = title.parent?.parent;
+    expect(titleRow?.props.className).toContain('flex-row items-center');
+    expect(findBackFrame(renderer.root).parent?.parent).toBe(titleRow);
     expect(renderer.root.props.style).toBeUndefined();
     expect(renderer.root.props.className).toContain('pt-3');
   });
@@ -976,7 +980,11 @@ describe('ScreenHeader mounted', () => {
       subtitle: 'Shared Agency Review Profile',
     });
 
-    const heading = renderer.root.findByProps({ className: 'min-w-0 flex-1' });
+    // The two-line heading is the block that carries the title row and the
+    // subtitle row the back control stays centred on.
+    const heading = renderer.root.findByProps({
+      className: 'min-h-[48px] min-w-0 flex-1 justify-center',
+    });
     const texts = heading.findAllByType('Text');
     expect(texts[0]?.children).toEqual(['Profile agents']);
     const subtitle = texts[1];

@@ -168,7 +168,12 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
   }
 
   if (!query.data.canManage) {
-    return <PermissionDenied description={t('spendAlerts.permissionDenied')} />;
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title={t('notifications.channel.spend')} backFallback={PROFILE_TAB_HREF} />
+        <PermissionDenied description={t('spendAlerts.permissionDenied')} showBack={false} />
+      </View>
+    );
   }
 
   return (

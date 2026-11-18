@@ -75,8 +75,9 @@ export function CreateOrganizationScreen() {
   // so the status line's announcement key (its `key` prop) changes with every
   // new failure even when the words are identical.
   const attemptRef = useRef(0);
-  const report = useCallback((text: string, tone: CreateMessage['tone']) => {
-    setMessage({ text, tone, attempt: attemptRef.current++ });
+  const report = useCallback((line: string, tone: CreateMessage['tone']) => {
+    setMessage({ text: line, tone, attempt: attemptRef.current });
+    attemptRef.current += 1;
   }, []);
   const focusedRef = useRef(routeFocused);
   const selectOrganizationRef = useRef(setOrganizationId);
@@ -143,7 +144,7 @@ export function CreateOrganizationScreen() {
         setSettling(false);
       }
     },
-    [navigation, queryClient, router, stackSafeRouter, t, trpc]
+    [navigation, queryClient, report, router, stackSafeRouter, t, trpc]
   );
 
   const createOrganization = useMutation({

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the offline settle, the announcement and the double-submit cases share the screen's mounted harness. */
 // Create-organization screen contract: an empty name is refused before any
 // request, a valid one creates with `autoAddCreator`, the new organization
 // becomes the selection and the stack lands on its hub — popped over the hub
@@ -214,7 +215,7 @@ beforeEach(() => {
 
 describe('CreateOrganizationScreen', () => {
   it('keeps the create attempting while the connectivity manager reports offline', async () => {
-    const { renderer, unmount } = await mount();
+    const { unmount } = await mount();
     // The screen spreads the production `mutationOptions`, so the contract its
     // rendering depends on is the deployed one, not the test's copy.
     expect(mocks.createOptions).toHaveBeenCalledWith(

@@ -102,6 +102,17 @@ describe('RepoBindingRow', () => {
   it('even the row insets with the compact remove box and its slop', async () => {
     const { renderer, unmount } = await mountRows();
 
+    const row = renderer.root
+      .findAll(node => String(node.type) === 'View')
+      .find(node => String(node.props.className ?? '').includes('min-h-14'));
+    if (!row) {
+      throw new Error('The binding row did not render');
+    }
+    // The row pads 16 dp on both sides: the same inset the leading icon and
+    // the trash glyph end at.
+    expect(String(row.props.className)).toContain('px-[16px]');
+    expect(String(row.props.className)).not.toContain('px-3 ');
+
     const remove = renderer.root
       .findAll(node => String(node.type) === 'Pressable')
       .find(node => node.props.accessibilityRole === 'button');

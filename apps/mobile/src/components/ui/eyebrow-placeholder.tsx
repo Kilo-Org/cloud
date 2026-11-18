@@ -16,18 +16,18 @@ import { Skeleton } from '@/components/ui/skeleton';
  * only arrive through a retry. `ready` and `none` reserve no line at all.
  */
 export function eyebrowHeaderProps(eyebrow: HeaderEyebrow) {
-  switch (eyebrow.kind) {
-    case 'ready':
-      return { eyebrow: eyebrow.text, reserveEyebrow: false, eyebrowPlaceholder: undefined };
-    case 'loading':
-      return {
-        eyebrow: undefined,
-        reserveEyebrow: true,
-        eyebrowPlaceholder: <Skeleton className="h-2.5 w-20 rounded-full" />,
-      };
-    case 'held':
-      return { eyebrow: undefined, reserveEyebrow: true, eyebrowPlaceholder: undefined };
-    case 'none':
-      return { eyebrow: undefined, reserveEyebrow: false, eyebrowPlaceholder: undefined };
+  if (eyebrow.kind === 'ready') {
+    return { eyebrow: eyebrow.text, reserveEyebrow: false, eyebrowPlaceholder: undefined };
   }
+  if (eyebrow.kind === 'loading') {
+    return {
+      eyebrow: undefined,
+      reserveEyebrow: true,
+      eyebrowPlaceholder: <Skeleton className="h-2.5 w-20 rounded-full" />,
+    };
+  }
+  if (eyebrow.kind === 'held') {
+    return { eyebrow: undefined, reserveEyebrow: true, eyebrowPlaceholder: undefined };
+  }
+  return { eyebrow: undefined, reserveEyebrow: false, eyebrowPlaceholder: undefined };
 }

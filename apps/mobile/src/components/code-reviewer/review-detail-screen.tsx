@@ -411,7 +411,7 @@ export function ReviewDetailScreen({
           {/* The transcript is a secondary way to read the same review, so it
               sits beside the primary action and never above the title. */}
           <Button
-            variant="secondary"
+            variant="outline"
             accessibilityLabel={t('agentChat.session.transcriptAccessibility')}
             onPress={() => {
               setTranscriptReviewId(reviewId);

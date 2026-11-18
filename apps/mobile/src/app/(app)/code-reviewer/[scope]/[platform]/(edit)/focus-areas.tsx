@@ -84,9 +84,7 @@ function FocusAreasScreen({
         />
       ) : (
         <TabScreenScrollView className="flex-1" contentContainerClassName={SCREEN_BODY_CLASS}>
-          <Text variant="muted" className="text-xs">
-            {t('codeReviewer.focusAreas.hint')}
-          </Text>
+          <Text variant="muted">{t('codeReviewer.focusAreas.hint')}</Text>
           <RowGroup>
             {REVIEW_FOCUS_AREAS.map(area => (
               <ChoiceRow

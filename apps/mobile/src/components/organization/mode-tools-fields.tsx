@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
 
 import {
   MODE_TOOL_GROUPS,
@@ -7,9 +6,9 @@ import {
 } from '@/components/organization/org-mode-form-model';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
-import { FormFieldLabel } from '@/components/ui/form-field-label';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 
 const TOOL_LABEL_KEYS = {
@@ -51,8 +50,7 @@ export function ModeToolsFields({
   const { t } = useTranslation();
   return (
     <>
-      <View className="gap-2">
-        <FormFieldLabel label={t('profiles.agents.tools')} />
+      <Section label={t('profiles.agents.tools')}>
         <RowGroup>
           {MODE_TOOL_GROUPS.map(group => (
             <PreferenceRow
@@ -67,7 +65,7 @@ export function ModeToolsFields({
             />
           ))}
         </RowGroup>
-      </View>
+      </Section>
 
       {groups.includes('edit') ? (
         <Card>

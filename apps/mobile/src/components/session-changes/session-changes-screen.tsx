@@ -144,8 +144,6 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
     <View className="flex-1 bg-background" testID="session-changes-screen">
       <ScreenHeader
         title={openFile === null ? t('common.changes') : openFile.path}
-        eyebrow={asOf}
-        reserveEyebrow
         titleNumberOfLines={1}
         onBack={
           openFile === null
@@ -168,6 +166,11 @@ export function SessionChangesScreen({ sessionId }: Readonly<{ sessionId: string
           )
         }
       />
+      {openFile === null && asOf !== undefined ? (
+        <Text variant="muted" className="px-4 pt-2" testID="session-changes-as-of">
+          {asOf}
+        </Text>
+      ) : null}
       {failure === null ? null : (
         <Pressable
           onPress={refresh}

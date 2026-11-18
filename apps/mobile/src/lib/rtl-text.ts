@@ -134,9 +134,19 @@ export function ltrValueTextStyle(): TextStyle {
  * value (`ltrValueTextStyle`), which sits on the label's start edge, a command
  * reads from the left and must not follow a right-aligned label in a
  * right-to-left interface.
+ *
+ * The family's default ligatures are switched off as well: JetBrains Mono draws
+ * the `--` of a flag as one long dash, so `pnpm install --frozen-lockfile` reads
+ * as prose dashes instead of the two hyphens the shell needs. These are the
+ * feature names the platform's text stack recognises; a face without them
+ * ignores the request.
  */
 export function codeFieldTextStyle(): TextStyle {
-  return { ...LTR_TEXT_DIRECTION, textAlign: 'left' };
+  return {
+    ...LTR_TEXT_DIRECTION,
+    textAlign: 'left',
+    fontVariant: ['no-common-ligatures', 'no-discretionary-ligatures', 'no-contextual'],
+  };
 }
 
 /**

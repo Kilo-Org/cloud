@@ -17,6 +17,7 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { Section } from '@/components/ui/section';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { Text } from '@/components/ui/text';
 import {
   setThemePreference,
   type ThemePreference,
@@ -43,31 +44,35 @@ export function PreferencesScreen() {
         contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <RowGroup leadingTile>
-          <ConfigureRow
-            icon={SlidersHorizontal}
-            title={t('preferences.general')}
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/general' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={Mic}
-            title={t('preferences.voiceInput')}
-            subtitle={t('preferences.gatewayTranscriptionSubtitle')}
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/voice-input' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={WandSparkles}
-            title={t('preferences.toolSummaryTranslation')}
-            subtitle={t('preferences.toolSummaryTranslationSubtitle')}
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/tool-summary-translation' as Href);
-            }}
-          />
-        </RowGroup>
+        <Section>
+          <RowGroup leadingTile>
+            <ConfigureRow
+              icon={SlidersHorizontal}
+              title={t('preferences.general')}
+              onPress={() => {
+                router.push('/(app)/(tabs)/(3_profile)/general' as Href);
+              }}
+            />
+            <ConfigureRow
+              icon={Mic}
+              title={t('preferences.voiceInput')}
+              onPress={() => {
+                router.push('/(app)/(tabs)/(3_profile)/voice-input' as Href);
+              }}
+            />
+            <ConfigureRow
+              icon={WandSparkles}
+              title={t('preferences.toolSummaryTranslation')}
+              subtitle={t('preferences.toolSummaryTranslationSubtitle')}
+              onPress={() => {
+                router.push('/(app)/(tabs)/(3_profile)/tool-summary-translation' as Href);
+              }}
+            />
+          </RowGroup>
+          {/* The explanation is the caption the card answers to, so the Voice
+              input row keeps its two-line subtitle budget whatever the width. */}
+          <Text variant="caption">{t('preferences.gatewayTranscriptionSubtitle')}</Text>
+        </Section>
 
         <Section label={t('preferences.appearance')}>
           <SegmentedControl<ThemePreference>

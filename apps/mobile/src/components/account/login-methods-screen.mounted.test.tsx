@@ -1,4 +1,4 @@
-import { createElement, type ElementType } from 'react';
+import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -76,7 +76,6 @@ vi.mock('@/lib/trpc', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Plus: 'Plus' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -88,7 +87,6 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 
-const BUTTON = 'Button' as ElementType;
 const LAST_METHOD = "You can't unlink your only sign-in method. Link another method first.";
 
 let renderer: ReactTestRenderer | undefined = undefined;
@@ -121,7 +119,13 @@ function rerender() {
 }
 
 function unlinkButtons(root: ReactTestRenderer['root']) {
-  return root.findAll(node => Object.is(node.type, BUTTON) && node.props.accessibilityLabel);
+  return root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      node.props.accessibilityRole === 'button' &&
+      typeof node.props.accessibilityLabel === 'string' &&
+      node.props.accessibilityLabel.startsWith('Unlink')
+  );
 }
 
 /** The row note that states the last-method rule under a blocked row. */

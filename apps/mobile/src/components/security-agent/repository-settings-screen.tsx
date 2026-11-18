@@ -22,7 +22,7 @@ import { QueryError } from '@/components/query-error';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
-import { RowGroup } from '@/components/ui/row-group';
+import { RowGroup, RowGroupItem } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
@@ -50,6 +50,17 @@ type RepositoryRow = NonNullable<ReturnType<typeof useSecurityAgentRepositories>
 // the rows and the header, whose row primitives draw their own `px-4`.
 const listStyle = { flex: 1 } satisfies ViewStyle;
 
+/** Where a grouped cell sits in its section, for its rounded ends. */
+function rowPosition(index: number, count: number): 'only' | 'first' | 'middle' | 'last' {
+  if (count <= 1) {
+    return 'only';
+  }
+  if (index === 0) {
+    return 'first';
+  }
+  return index === count - 1 ? 'last' : 'middle';
+}
+
 function RepositorySettingsSkeleton() {
   const { t } = useTranslation();
   return (
@@ -60,13 +71,11 @@ function RepositorySettingsSkeleton() {
           <RowSkeleton />
           <RowSkeleton />
         </RowGroup>
-        {/* The picker's own rows are full-bleed one-line rows, not a grouped
-            card: their placeholders carry the same hairline the loaded rows
-            draw under themselves. */}
-        <View>
-          <RowSkeleton className="border-b-[0.5px] border-hair-soft" />
+        {/* The picker's rows are one grouped card, so the reserve is one. */}
+        <RowGroup>
           <RowSkeleton />
-        </View>
+          <RowSkeleton />
+        </RowGroup>
       </View>
     </View>
   );
@@ -151,21 +160,29 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     [insets.left, insets.right, paddingBottom]
   );
 
+  // The rendered count decides each cell's rounded end, so it is read once and
+  // carried into the renderer rather than re-derived per cell.
+  const repositoryCount = repositories.data?.length ?? 0;
+
   // Hoisted so the FlashList keeps one renderer identity across toggles and
   // re-renders only the rows whose `selected` actually changed.
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<RepositoryRow>) => (
-      <RepoToggleRow
-        repo={item}
-        selected={selectedIdSet.has(item.id)}
-        disabled={!canManage}
-        className="border-b-[0.5px] border-hair-soft"
-        onPress={() => {
-          toggleRepo(item.id);
-        }}
-      />
+    ({ item, index }: ListRenderItemInfo<RepositoryRow>) => (
+      // The picker is one grouped card inside the full-bleed list, so each
+      // virtualized cell draws its own rounded end, surface and separator and
+      // the page gutter lives here rather than on the list.
+      <RowGroupItem position={rowPosition(index, repositoryCount)} className="mx-4">
+        <RepoToggleRow
+          repo={item}
+          selected={selectedIdSet.has(item.id)}
+          disabled={!canManage}
+          onPress={() => {
+            toggleRepo(item.id);
+          }}
+        />
+      </RowGroupItem>
     ),
-    [selectedIdSet, canManage, toggleRepo]
+    [selectedIdSet, canManage, repositoryCount, toggleRepo]
   );
 
   if (config.isError && !config.data) {
@@ -183,13 +200,13 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   }
 
   const showRepositoryStates = mode === 'selected';
-  const hasRepositories = (repositories.data?.length ?? 0) > 0;
+  const hasRepositories = repositoryCount > 0;
   // A loading, failed, or not-yet-fetched repository query must not read as
   // zero repositories. Only a delivered read may claim the list is empty: a
   // read paused by lost connectivity delivered nothing and names the
   // connection with Retry instead.
   const repositoriesBody = classifyListBody({
-    rowCount: repositories.data?.length ?? 0,
+    rowCount: repositoryCount,
     hasDeliveredData: repositories.data !== undefined,
     isError: repositories.isError,
     isFetching: repositories.isFetching,
@@ -260,10 +277,10 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         // section label above it only repeats the screen title.
         <Section label={repositoriesBody.status === 'empty' ? undefined : t('common.repositories')}>
           {repositoriesBody.status === 'loading' && (
-            <View>
-              <RowSkeleton className="border-b-[0.5px] border-hair-soft" />
+            <RowGroup>
               <RowSkeleton />
-            </View>
+              <RowSkeleton />
+            </RowGroup>
           )}
           {repositoriesFailed && (
             <QueryError

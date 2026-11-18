@@ -1,6 +1,7 @@
 // Security Agent repository picker: the repositories mount through FlashList
 // (one virtualized scroller instead of every RepoToggleRow inside the screen's
-// ScrollView), selection is a Set lookup, the loading / error / empty /
+// ScrollView), each cell draws the grouped card's own rounded end and
+// separator, selection is a Set lookup, the loading / error / empty /
 // validation branches keep rendering where they did before, and the empty
 // branch's Manage access launch is one shared fixture.
 /* eslint-disable max-lines -- one native fixture for the picker's states; splitting it would duplicate the mocks */
@@ -9,6 +10,7 @@ import { createElement, Fragment, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { RowGroupItem } from '@/components/ui/row-group';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -62,7 +64,7 @@ vi.mock('expo-router', () => ({
 vi.mock('@shopify/flash-list', () => ({
   FlashList: (props: {
     data?: readonly unknown[];
-    renderItem: (info: { item: unknown }) => ReactNode;
+    renderItem: (info: { item: unknown; index: number }) => ReactNode;
     keyExtractor?: (item: never) => string;
     getItemType?: (item: unknown) => string;
     style?: unknown;
@@ -82,7 +84,7 @@ vi.mock('@shopify/flash-list', () => ({
       },
       props.ListHeaderComponent,
       data.map((item, index) =>
-        createElement(Fragment, { key: index }, props.renderItem({ item }))
+        createElement(Fragment, { key: index }, props.renderItem({ item, index }))
       ),
       props.ListFooterComponent
     );
@@ -183,6 +185,14 @@ function repoRow(renderer: TestRenderer.ReactTestRenderer, index: number) {
 // loaded list would show, at the same one-line frame.
 function placeholderRows(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root.findAll(node => String(node.type) === 'RowSkeleton');
+}
+
+// The picker's cells are one grouped card drawn by the list, so each carries
+// its own rounded end: `first`/`middle`/`last` for a multi-row section.
+function cellPositions(renderer: TestRenderer.ReactTestRenderer): unknown[] {
+  return renderer.root
+    .findAllByType(RowGroupItem)
+    .map(node => (node.props as { position?: unknown }).position);
 }
 
 function textContents(renderer: TestRenderer.ReactTestRenderer): unknown[] {
@@ -293,6 +303,8 @@ describe('RepositorySettingsScreen repository picker', () => {
       },
     });
     expect((list.props as { style: unknown }).style).toEqual({ flex: 1 });
+    // One grouped card: the first cell rounds the top, the last the bottom.
+    expect(cellPositions(renderer)).toEqual(['first', 'middle', 'last']);
   });
 
   it('keeps the picker rows inside the landscape side insets', async () => {
@@ -330,8 +342,9 @@ describe('RepositorySettingsScreen repository picker', () => {
     repositories.data = undefined;
     const { renderer } = await mount();
 
-    // The picker's rows are flat one-line rows, so the reserve is two rows of
-    // one bar each — not a second line the loaded row never draws.
+    // The picker's rows are one-line rows inside one grouped card, so the
+    // reserve is two rows of one bar each — not a second line the loaded row
+    // never draws.
     const placeholders = placeholderRows(renderer);
     expect(placeholders).toHaveLength(2);
     expect(placeholders.every(row => row.props.subtitle !== true)).toBe(true);

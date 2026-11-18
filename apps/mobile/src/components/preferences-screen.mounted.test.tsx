@@ -71,11 +71,14 @@ describe('PreferencesScreen hub', () => {
 
     expect(hubRows(renderer)).toHaveLength(7);
     expect(row(renderer, 'General').props).toMatchObject({ icon: 'SlidersHorizontal' });
-    expect(row(renderer, 'Voice input').props).toMatchObject({
-      icon: 'Mic',
-      subtitle:
-        "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway.",
-    });
+    // The voice-input explanation is the card's caption, not a third subtitle
+    // line on the row it names.
+    expect(row(renderer, 'Voice input').props).toMatchObject({ icon: 'Mic' });
+    expect(
+      renderer.root
+        .findAll(node => node.type === 'Text')
+        .map(node => node.props.children)
+    ).toContain(i18n.t('preferences.gatewayTranscriptionSubtitle'));
     expect(row(renderer, 'Translate tool summaries').props).toMatchObject({
       icon: 'WandSparkles',
       subtitle:

@@ -3133,7 +3133,6 @@
     "completingPurchase": "Alış tamamlanır",
     "subscriptionLoading": "Kilo Pass abunəliyi yüklənir",
     "retryHint": "Kilo Pass-ın vəziyyətini yenidən yoxlayır.",
-    "cardAccessibility": "{{title}}: {{description}}. {{actionLabel}}",
     "endedOn": "{{date}} tarixində bitdi",
     "notAvailableInApp": "Kilo Pass tətbiqdə əlçatan deyil.",
     "statusActive": "Aktiv",

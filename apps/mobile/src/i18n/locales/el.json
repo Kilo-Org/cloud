@@ -3133,7 +3133,6 @@
     "completingPurchase": "Ολοκλήρωση αγοράς…",
     "subscriptionLoading": "Φόρτωση συνδρομής Kilo Pass",
     "retryHint": "Επαναλαμβάνει τη φόρτωση της κατάστασης του Kilo Pass.",
-    "cardAccessibility": "{{title}} — {{description}}. {{actionLabel}}",
     "endedOn": "Έληξε {{date}}",
     "notAvailableInApp": "Το Kilo Pass δεν είναι διαθέσιμο στην εφαρμογή.",
     "statusActive": "Ενεργό",

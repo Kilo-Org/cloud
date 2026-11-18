@@ -2624,7 +2624,6 @@
     "completingPurchase": "הרכישה מתבצעת",
     "subscriptionLoading": "פרטי המינוי ל-Kilo Pass בטעינה",
     "retryHint": "טעינת המצב של Kilo Pass שוב.",
-    "cardAccessibility": "{{title}}. {{description}}. פעולה: {{actionLabel}}",
     "endedOn": "הסתיים ב-{{date}}",
     "notAvailableInApp": "Kilo Pass אינו זמין באפליקציה.",
     "statusActive": "פעיל",

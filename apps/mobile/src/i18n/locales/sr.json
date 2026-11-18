@@ -3190,7 +3190,6 @@
     "completingPurchase": "Završavanje kupovine",
     "subscriptionLoading": "Učitavanje pretplate na Kilo Pass",
     "retryHint": "Ponovo učitava stanje pretplate na Kilo Pass.",
-    "cardAccessibility": "{{title}} — {{description}}. {{actionLabel}}",
     "endedOn": "Završeno {{date}}",
     "notAvailableInApp": "Kilo Pass nije dostupan u aplikaciji.",
     "statusActive": "Aktivan",

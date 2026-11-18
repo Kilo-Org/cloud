@@ -3247,7 +3247,6 @@
     "completingPurchase": "Dokončuje sa nákup",
     "subscriptionLoading": "Načítava sa predplatné Kilo Pass",
     "retryHint": "Znova načíta stav Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Skončené {{date}}",
     "notAvailableInApp": "Kilo Pass nie je dostupný v aplikácii.",
     "statusActive": "Aktívne",

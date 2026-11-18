@@ -3133,7 +3133,6 @@
     "completingPurchase": "Bittaa xumuraa jira",
     "subscriptionLoading": "Maamilummaa Kilo Pass fe'aa jira",
     "retryHint": "Haala Kilo Pass fe'uu irra deebi'ee yaala.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "{{date}} xumurameera",
     "notAvailableInApp": "Kilo Pass appii keessatti hin argamu.",
     "statusActive": "Socho'aa",

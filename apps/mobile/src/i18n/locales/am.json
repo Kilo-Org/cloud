@@ -3133,7 +3133,6 @@
     "completingPurchase": "ግዢን በማጠናቀቅ ላይ",
     "subscriptionLoading": "የKilo Pass ምዝገባ መረጃ በመጫን ላይ",
     "retryHint": "የKilo Pass ሁኔታን ለማግኘት እንደገና ይሞክራል።",
-    "cardAccessibility": "{{title}}። {{description}}። {{actionLabel}}",
     "endedOn": "በ{{date}} ተጠናቋል",
     "notAvailableInApp": "Kilo Pass በመተግበሪያው ውስጥ አይገኝም።",
     "statusActive": "ንቁ",

@@ -3133,7 +3133,6 @@
     "completingPurchase": "در حال تکمیل خرید",
     "subscriptionLoading": "در حال بارگذاری اشتراک Kilo Pass",
     "retryHint": "وضعیت Kilo Pass را دوباره بررسی می‌کند.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "پایان‌یافته {{date}}",
     "notAvailableInApp": "Kilo Pass در برنامه در دسترس نیست.",
     "statusActive": "فعال",

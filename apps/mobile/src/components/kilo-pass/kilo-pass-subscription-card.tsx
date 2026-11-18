@@ -120,11 +120,7 @@ export function KiloPassSubscriptionCard({
       {contentState.kind === 'error' ? (
         <Pressable
           accessibilityHint={t('kiloPass.retryHint')}
-          accessibilityLabel={t('kiloPass.cardAccessibility', {
-            title: contentState.title,
-            description: contentState.description,
-            actionLabel: contentState.actionLabel,
-          })}
+          accessibilityLabel={contentState.accessibilityLabel}
           accessibilityRole="button"
           className="rounded-lg border border-border bg-card p-3 active:opacity-80"
           onPress={handleRetryPress}

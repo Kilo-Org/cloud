@@ -3133,7 +3133,6 @@
     "completingPurchase": "کڕینەکە تەواو دەکرێت",
     "subscriptionLoading": "بارکردنی بەشداربوونی Kilo Pass",
     "retryHint": "دووبارە هەوڵی وەرگرتنی دۆخی Kilo Pass دەدات.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "لە {{date}} کۆتایی هاتووە",
     "notAvailableInApp": "Kilo Pass لە ئەپدا بەردەست نییە.",
     "statusActive": "چالاک",

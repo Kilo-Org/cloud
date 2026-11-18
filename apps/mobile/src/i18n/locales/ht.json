@@ -3133,7 +3133,6 @@
     "completingPurchase": "Ap finalize acha a",
     "subscriptionLoading": "Abònman Kilo Pass ap chaje",
     "retryHint": "Eseye chaje eta Kilo Pass la ankò.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Fini {{date}}",
     "notAvailableInApp": "Kilo Pass pa disponib nan aplikasyon an.",
     "statusActive": "Aktif",

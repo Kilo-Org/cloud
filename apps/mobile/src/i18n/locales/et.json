@@ -3133,7 +3133,6 @@
     "completingPurchase": "Ostu lõpetamine",
     "subscriptionLoading": "Kilo Passi tellimuse laadimine",
     "retryHint": "Proovib Kilo Passi olekut uuesti laadida.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Lõppenud {{date}}",
     "notAvailableInApp": "Kilo Pass ei ole rakenduses saadaval.",
     "statusActive": "Aktiivne",

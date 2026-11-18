@@ -3133,7 +3133,6 @@
     "completingPurchase": "Kuqedwa ukuthenga",
     "subscriptionLoading": "Ukubhalisa kwe-Kilo Pass kuyalayishwa",
     "retryHint": "Iphinda izame ukulayisha isimo se-Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Iphelile ngomhla ka-{{date}}",
     "notAvailableInApp": "I-Kilo Pass ayitholakali kuhlelo lokusebenza.",
     "statusActive": "Iyasebenza",

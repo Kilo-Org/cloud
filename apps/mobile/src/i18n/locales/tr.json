@@ -2590,7 +2590,6 @@
     "completingPurchase": "Satın alma tamamlanıyor",
     "subscriptionLoading": "Kilo Pass aboneliği yükleniyor",
     "retryHint": "Kilo Pass durumunu almayı tekrar dener.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "{{date}} tarihinde sona erdi",
     "notAvailableInApp": "Kilo Pass uygulamada kullanılamıyor.",
     "statusActive": "Aktif",

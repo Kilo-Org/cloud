@@ -3133,7 +3133,6 @@
     "completingPurchase": "ဝယ်ယူမှုကို အပြီးသတ်နေသည်",
     "subscriptionLoading": "Kilo Pass စာရင်းသွင်းမှုအချက်အလက်ကို ရယူနေသည်",
     "retryHint": "Kilo Pass အခြေအနေကို ပြန်ရယူသည်။",
-    "cardAccessibility": "{{title}}။ {{description}}။ {{actionLabel}}",
     "endedOn": "{{date}} တွင် အဆုံးသတ်ပြီးပါပြီ",
     "notAvailableInApp": "Kilo Pass ကို အက်ပ်တွင် မရရှိနိုင်ပါ။",
     "statusActive": "သက်ဝင်",

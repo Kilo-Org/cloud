@@ -3133,7 +3133,6 @@
     "completingPurchase": "Kei te whakaoti i te hokonga",
     "subscriptionLoading": "Kei te uta i te ohaurunga Kilo Pass",
     "retryHint": "Ka whakamātau anō ki te tiki i te tūnga Kilo Pass.",
-    "cardAccessibility": "{{title}}. {{description}}. {{actionLabel}}",
     "endedOn": "Kua mutu i te {{date}}",
     "notAvailableInApp": "Kāore a Kilo Pass e wātea ana i te taupānga.",
     "statusActive": "Hohe",

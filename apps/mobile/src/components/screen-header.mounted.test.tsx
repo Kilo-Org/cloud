@@ -876,6 +876,36 @@ describe('ScreenHeader mounted', () => {
     expect(title.parent?.parent?.children).toHaveLength(2);
   });
 
+  it('keeps the back control inside the header when the title row is its first line', () => {
+    safeArea.top = 48;
+
+    const paddingTopOf = (props: ScreenHeaderProps): number => {
+      const style = findOuterContainer(renderHeader(props).root).props.style as {
+        paddingTop: number;
+      };
+      return style.paddingTop;
+    };
+    // The profile sections' header: a title with the profile's name under it and
+    // no eyebrow above, so the title row is the header's first line.
+    const twoLine = { title: 'Instructions', subtitle: 'Shared Agency Review Profile' };
+
+    // The control still centres on the title's own line, so half of its 48dp
+    // target hangs above that line. With no eyebrow to reach into, the header's
+    // top padding carries the overhang: the surface inset plus 11.75dp, not the
+    // standard 8dp gap that left the target 3.4dp inside the status bar.
+    expect(findBackFrame(renderHeader(twoLine).root).props.className).toContain('-my-3.5');
+    expect(paddingTopOf(twoLine)).toBe(48 + (48 - 24.5) / 2);
+
+    // An eyebrow above is the line that overhang reaches into, so a header that
+    // paints one keeps the standard gap — as a one-line header (whose row is
+    // the control itself) and a title line taller than the target (a 2x font
+    // scale, the accessibility setting) already do.
+    expect(paddingTopOf({ ...twoLine, eyebrow: 'KILO-ORG/CLOUD' })).toBe(48 + 8);
+    expect(paddingTopOf({ title: 'Instructions' })).toBe(48 + 8);
+    layout.fontScale = 2;
+    expect(paddingTopOf(twoLine)).toBe(48 + 8);
+  });
+
   it('aligns the eyebrow and subtitle with the title line the control centres on', () => {
     const renderer = renderHeader({
       title: 'Profile agents',

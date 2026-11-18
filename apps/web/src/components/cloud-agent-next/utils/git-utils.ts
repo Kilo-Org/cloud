@@ -26,13 +26,11 @@
 export function extractRepoFromGitUrl(gitUrl: string | null | undefined): string | undefined {
   if (!gitUrl) return undefined;
 
-  // SSH format: git@github.com:owner/repo.git or git@gitlab.com:group/subgroup/project.git
   const sshMatch = gitUrl.match(/^git@[^:]+:(.+?)(?:\.git)?$/);
   if (sshMatch) {
     return sshMatch[1];
   }
 
-  // HTTPS format: https://github.com/owner/repo.git or https://gitlab.com/group/subgroup/project.git
   try {
     const url = new URL(gitUrl);
     const pathParts = url.pathname.split('/').filter(Boolean);
@@ -51,7 +49,6 @@ export function extractRepoFromGitUrl(gitUrl: string | null | undefined): string
       if (url.hostname === 'gitlab.com') {
         return fullPath;
       }
-      // GitHub and Bitbucket repository paths use the first two segments.
       return `${pathParts[0]}/${pathParts[1]}`;
     }
   } catch {
@@ -66,13 +63,11 @@ export type GitPlatform = 'github' | 'gitlab' | 'bitbucket';
 export function buildRepoBrowseUrl(gitUrl: string | null | undefined): string | undefined {
   if (!gitUrl) return undefined;
 
-  // SSH format: git@host:path.git
   const sshMatch = gitUrl.match(/^git@([^:]+):(.+?)(?:\.git)?$/);
   if (sshMatch) {
     return `https://${sshMatch[1]}/${sshMatch[2]}`;
   }
 
-  // Standard URL format (https://, ssh://, etc.)
   try {
     const url = new URL(gitUrl);
     const pathname = url.pathname.replace(/\.git$/, '');

@@ -1,9 +1,3 @@
-/**
- * Hook for fetching and filtering organization models
- *
- * Handles fetching organization configuration and available models.
- */
-
 import { useMemo } from 'react';
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
@@ -13,7 +7,6 @@ import { CLOUD_AGENT_METADATA_STALE_TIME } from '@/lib/cloud-agent/constants';
 type UseOrganizationModelsReturn = {
   /** Models formatted for the ModelCombobox component */
   modelOptions: ModelOption[];
-  /** Whether models are still loading */
   isLoadingModels: boolean;
   hasLoadedModels: boolean;
   /** Context windows keyed by exact catalog model ID */
@@ -32,7 +25,6 @@ export function useOrganizationModels(
   organizationId?: string,
   enabled = true
 ): UseOrganizationModelsReturn {
-  // Fetch models for the model selector
   const { data: openRouterModels, isLoading: isLoadingOpenRouter } = useModelSelectorList(
     organizationId,
     enabled,
@@ -40,7 +32,6 @@ export function useOrganizationModels(
     { staleTime: CLOUD_AGENT_METADATA_STALE_TIME, gcTime: CLOUD_AGENT_METADATA_STALE_TIME }
   );
 
-  // Format models for the combobox
   const modelOptions = useMemo<ModelOption[]>(() => {
     return (
       openRouterModels?.data.map(model => ({

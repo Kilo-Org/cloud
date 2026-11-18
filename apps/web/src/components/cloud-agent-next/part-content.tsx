@@ -213,9 +213,6 @@ function hasRequiredInput(part: Extract<Part, { type: 'tool' }>): boolean {
   }
 }
 
-/**
- * Renders a placeholder while tool input is still streaming.
- */
 function StreamingToolPlaceholder({ toolName }: { toolName: string }) {
   return (
     <div className="text-muted-foreground flex min-h-6 items-center gap-2 px-2 py-1 text-xs">
@@ -416,9 +413,6 @@ export function ReasoningPartRenderer({
   );
 }
 
-/**
- * Renders a SubtaskPart - placeholder for child session indicator
- */
 export function SubtaskPartRenderer({ part }: { part: Extract<Part, { type: 'subtask' }> }) {
   return (
     <div className="bg-muted/30 border-muted my-2 rounded-md border px-3 py-2">

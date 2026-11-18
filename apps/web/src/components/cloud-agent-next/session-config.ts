@@ -1,9 +1,3 @@
-/**
- * Session Config Utilities
- *
- * Centralized logic for building, validating, and deriving SessionConfig.
- */
-
 import type { SessionConfig as CloudAgentSessionConfig } from '@kilocode/cloud-agent-sdk';
 import type { SessionConfig, ResumeConfig, AgentMode } from './types';
 
@@ -17,17 +11,11 @@ type ResumeConfigInput = {
   setupCommands?: string[];
 };
 
-/**
- * Partial session info from DB (last_mode/last_model)
- */
 export type DbSessionInfo = {
   last_mode: string | null;
   last_model: string | null;
 };
 
-/**
- * Options for building a session config
- */
 export type BuildSessionConfigOptions = {
   /** Session ID (cloud agent or kilo session) */
   sessionId: string;
@@ -41,10 +29,8 @@ export type BuildSessionConfigOptions = {
   /** Session info from database (second priority) */
   dbSession?: DbSessionInfo | null;
 
-  /** Default mode to use if not found elsewhere */
   defaultMode?: AgentMode;
 
-  /** Default model to use if not found elsewhere */
   defaultModel?: string;
 };
 
@@ -85,7 +71,6 @@ export function buildSessionConfig(options: BuildSessionConfigOptions): SessionC
     defaultModel = '',
   } = options;
 
-  // Precedence: resumeConfig > dbSession > defaults
   const mode = resumeConfig?.mode || dbSession?.last_mode || defaultMode;
   const model = resumeConfig?.model || dbSession?.last_model || defaultModel;
 

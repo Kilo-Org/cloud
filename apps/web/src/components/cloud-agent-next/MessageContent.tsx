@@ -1,10 +1,3 @@
-/**
- * Message Content Renderer
- *
- * Handles different message subtypes from the cloud agent stream.
- * Based on CLI's message routing patterns from cli-message-use.md
- */
-
 'use client';
 
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
@@ -65,10 +58,6 @@ export function MessageContent({
   return <TextMessage content={content} isStreaming={isStreaming} />;
 }
 
-/**
- * API Request Message
- * Shows progress/completion of API requests
- */
 function ApiRequestMessage({
   metadata,
   partial,
@@ -137,10 +126,6 @@ function ApiRequestMessage({
   );
 }
 
-/**
- * Completion Result Message
- * Shows the final result from the agent
- */
 function CompletionResultMessage({
   content,
   isStreaming,
@@ -166,10 +151,6 @@ function CompletionResultMessage({
   );
 }
 
-/**
- * Regular Text Message
- * Default message renderer
- */
 function TextMessage({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
   return (
     <div
@@ -189,10 +170,6 @@ function TextMessage({ content, isStreaming }: { content: string; isStreaming?: 
   );
 }
 
-/**
- * Tool Message
- * Shows tool execution inline with Running/Complete status
- */
 export function ToolMessage({
   metadata,
   partial,
@@ -270,10 +247,6 @@ export function ToolMessage({
   return <ToolExecutionCard execution={execution} />;
 }
 
-/**
- * Command Output Message
- * Shows command execution output
- */
 function CommandOutputMessage({ content }: { content: string }) {
   return (
     <div className="my-2">

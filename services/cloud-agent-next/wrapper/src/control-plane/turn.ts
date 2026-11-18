@@ -546,7 +546,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         warn: message => emitWarning(route.sessionId, message),
         log,
         outcome: (status, reason) => sendOutcome(turn, status, reason),
-        nativeFailure: error => onKiloError(turn, { error }),
+        nativeFailure: error => onKiloError(turn, { error }, 'publication_failure'),
       });
     turns.set(route.sessionId, turn);
     if (memoryHeldRuntimes.has(route.runtimeKey)) emitWarning(route.sessionId, MEMORY_HOLD_WARNING);
@@ -885,7 +885,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     if (hasUndispatchedPrompt(turn)) return;
     const publicationFailure = turn.publication?.failure();
     if (publicationFailure !== undefined) {
-      onKiloError(turn, { error: publicationFailure });
+      onKiloError(turn, { error: publicationFailure }, 'publication_failure');
       return;
     }
     if (turn.publication?.recover()) return;
@@ -1094,8 +1094,42 @@ export function createTurnManager(deps: TurnManagerDeps) {
     return matched;
   }
 
-  function onKiloError(turn: Turn, properties: Record<string, unknown>): void {
+  function onKiloError(
+    turn: Turn,
+    properties: Record<string, unknown>,
+    failureSource: 'publication_failure' | 'turn_close_error' | 'session_error' | 'missing_agent'
+  ): void {
     const failure = classifyAssistantFailure(properties.error ?? properties);
+    const error = isRecord(properties.error) ? properties.error : undefined;
+    const errorData = error !== undefined && isRecord(error.data) ? error.data : undefined;
+    const errorType =
+      typeof error?.type === 'string'
+        ? error.type
+        : typeof error?.name === 'string'
+          ? error.name
+          : undefined;
+    const errorStatus =
+      typeof error?.status === 'number'
+        ? error.status
+        : typeof errorData?.statusCode === 'number'
+          ? errorData.statusCode
+          : undefined;
+    deps.onDiagnostic?.('wrapper.lifecycle', {
+      phase: 'assistant_failure',
+      status: 'failed',
+      failureSource,
+      sessionId: turn.route.sessionId,
+      messageId:
+        (failureSource === 'publication_failure'
+          ? turn.publication?.failureMessageId()
+          : undefined) ??
+        turn.assistantMessageId ??
+        lastReceivedMessageId(turn),
+      ...(errorType === undefined ? {} : { errorType }),
+      ...(errorStatus === undefined ? {} : { errorStatus }),
+      assistantReason: failure.reason,
+      providerOwnership: failure.providerOwnership,
+    });
     sendOutcome(turn, 'failed', failure.safeMessage, {
       assistantReason: failure.reason,
       providerOwnership: failure.providerOwnership,
@@ -1125,12 +1159,12 @@ export function createTurnManager(deps: TurnManagerDeps) {
         return;
       }
       if (properties.reason === 'error') {
-        onKiloError(turn, properties);
+        onKiloError(turn, properties, 'turn_close_error');
         return;
       }
       if (properties.reason === 'completed') turn.completion?.request(event.nativeRuntimeId);
     }
-    if (type === 'session.error') onKiloError(turn, properties);
+    if (type === 'session.error') onKiloError(turn, properties, 'session_error');
   }
 
   /**
@@ -1216,7 +1250,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         missingAgent !== undefined &&
         turn.prompts.some(entry => entry.dispatched && entry.payload.agent.mode === missingAgent)
       ) {
-        onKiloError(turn, event.properties);
+        onKiloError(turn, event.properties, 'missing_agent');
       }
       return;
     }

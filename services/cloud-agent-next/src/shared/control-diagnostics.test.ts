@@ -74,6 +74,60 @@ describe('control diagnostic schema compatibility', () => {
     expect(JSON.stringify(records)).not.toContain('secret');
   });
 
+  it('retains bounded assistant-failure attribution without error text', () => {
+    const record = createControlDiagnosticRecord(
+      'wrapper.lifecycle',
+      {
+        phase: 'assistant_failure',
+        status: 'failed',
+        failureSource: 'publication_failure',
+        sessionId: 'workspace_test',
+        messageId: 'msg_failed',
+        errorType: 'provider.unknown',
+        errorStatus: 200,
+        assistantReason: 'provider_unavailable',
+        providerOwnership: 'managed',
+        errorMessage: 'raw provider text must not survive',
+      },
+      30
+    );
+    const fractional = createControlDiagnosticRecord(
+      'wrapper.lifecycle',
+      {
+        phase: 'assistant_failure',
+        status: 'failed',
+        failureSource: 'turn_close_error',
+        sessionId: 'workspace_test',
+        messageId: 'm1',
+        errorType: 'APIError',
+        errorStatus: 402.5,
+        assistantReason: 'insufficient_credits',
+        providerOwnership: 'byok',
+      },
+      31
+    );
+    const records = controlLogBatchSchema.parse({
+      version: 1,
+      sequence: 1,
+      droppedRecords: 0,
+      records: [record, fractional],
+    }).records;
+    expect(records[0]?.fields).toEqual({
+      phase: 'assistant_failure',
+      status: 'failed',
+      failureSource: 'publication_failure',
+      sessionId: 'workspace_test',
+      messageId: 'msg_failed',
+      errorType: 'provider.unknown',
+      errorStatus: 200,
+      assistantReason: 'provider_unavailable',
+      providerOwnership: 'managed',
+    });
+    expect(records[1]?.fields).toMatchObject({ errorStatus: 402.5, providerOwnership: 'byok' });
+    expect(JSON.stringify(records)).not.toContain('raw provider text');
+    expect(isProjectableControlDiagnostic('wrapper.lifecycle', record?.fields ?? {})).toBe(true);
+  });
+
   it('keeps memory protection and hold records whole and projects them to native logs', () => {
     const records = [
       createControlDiagnosticRecord(

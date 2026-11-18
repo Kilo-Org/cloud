@@ -266,9 +266,12 @@ describe('auto-dismiss eligibility', () => {
         })
       ),
       finding(user.id, 'bulk-page-ineligible', {
-        // The SQL candidate condition keeps this row (suggestedAction is
-        // 'dismiss'); the configured confidence threshold rejects it inside
-        // the page. Its per-page re-reads make a dropped id cursor observable.
+        // Deterministic uuid that sorts first among generated v4 ids, so this
+        // row is always read in page 1. The SQL candidate condition keeps it
+        // (suggestedAction is 'dismiss'); the configured confidence threshold
+        // rejects it inside the page. Its per-page re-reads make a dropped id
+        // cursor observable.
+        id: '00000000-0000-4000-8000-000000000000',
         analysis: triageAnalysis({ confidence: 'medium' }),
       }),
     ]);

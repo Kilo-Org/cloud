@@ -4292,8 +4292,7 @@
       "repoValue": "Koodivarasto: {{name}}",
       "profileValue": "Profiili: {{name}}",
       "profileUnavailable": "Tämä profiili ei ole enää käytettävissä. Valitse toinen.",
-      "pickerEmptyDescriptionOrganization": "Luo organisaatioprofiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Organisaation omistaja tai ylläpitäjä voi luoda organisaatioprofiilin."
+      "pickerEmptyDescriptionOrganization": "Luo organisaatioprofiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana."
     },
     "variablesDeleteFailed": "Muuttujaa ei voitu poistaa",
     "deleteVariable": "Poista muuttuja {{key}}",
@@ -4651,6 +4650,8 @@
       "created": "Liipaisin luotu",
       "saved": "Liipaisin tallennettu",
       "statusArrived": "Saapunut",
+      "defaultPromptWebhook": "Kuvaile tämän verkkokoukkupyynnön runko:\n\n{{body}}",
+      "defaultPromptScheduled": "Suorita ajastettu tehtävä. Käynnistetty klo {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Anna nimi.",
         "nameTooShort": "Käytä vähintään 8 merkkiä.",

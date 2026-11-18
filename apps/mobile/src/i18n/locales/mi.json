@@ -4292,8 +4292,7 @@
       "repoValue": "Rokiroki: {{name}}",
       "profileValue": "Kōtaha: {{name}}",
       "profileUnavailable": "Kua kore tēnei kōtaha e wātea. Kōwhiria tētahi atu.",
-      "pickerEmptyDescriptionOrganization": "Waihangatia he kōtaha umanga hei whakamahi anō i ngā taurangi taiao, ngā whakahau tatūnga, me ngā pūkenga puta noa i ngā wātū.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Ka taea e te rangatira o te umanga, te kaiwhakahaere rānei, te waihanga i tētahi kōtaha umanga."
+      "pickerEmptyDescriptionOrganization": "Waihangatia he kōtaha umanga hei whakamahi anō i ngā taurangi taiao, ngā whakahau tatūnga, me ngā pūkenga puta noa i ngā wātū."
     },
     "variablesDeleteFailed": "Kāore i taea te muku taurangi",
     "deleteVariable": "Mukua te taurangi {{key}}",
@@ -4651,6 +4650,8 @@
       "created": "Kua waihangatia te kaiwhakaara",
       "saved": "Kua tiakina te kaiwhakaara",
       "statusArrived": "Kua tae",
+      "defaultPromptWebhook": "Whakaahuatia te tinana o tēnei tono hononga tukutuku:\n\n{{body}}",
+      "defaultPromptScheduled": "Rere te mahi kua hōtakahia. I tīmata i {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Whakaurua he ingoa.",
         "nameTooShort": "Whakamahia kia 8 ngā pūāhua neke atu.",

@@ -4292,8 +4292,7 @@
       "repoValue": "Ebe nchekwa: {{name}}",
       "profileValue": "Profaịlụ: {{name}}",
       "profileUnavailable": "Enweghịzi profaịlụ a. Họrọ nke ọzọ.",
-      "pickerEmptyDescriptionOrganization": "Mepụta profaịlụ otumobi iji megharịa mgbanwe gburugburu ebe obibi, iwu ntọlite na nka n'ofe nnọkọ.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Onye nwe otumobi ma ọ bụ onye nchịkwa nwere ike mepụta profaịlụ otumobi."
+      "pickerEmptyDescriptionOrganization": "Mepụta profaịlụ otumobi iji megharịa mgbanwe gburugburu ebe obibi, iwu ntọlite na nka n'ofe nnọkọ."
     },
     "variablesDeleteFailed": "Enweghị ike ihichapụ mgbanwe",
     "deleteVariable": "Hichapụ mgbanwe {{key}}",
@@ -4651,6 +4650,8 @@
       "created": "Emepụtara ihe mkpalite",
       "saved": "Echekwara ihe mkpalite",
       "statusArrived": "Rutere",
+      "defaultPromptWebhook": "Kọwaa ahụ arịrịọ webhook a:\n\n{{body}}",
+      "defaultPromptScheduled": "Gbaa ọrụ a haziri. Ọsọ malitere na {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Tinye aha.",
         "nameTooShort": "Jiri opekata mpe mkpụrụedemede 8.",

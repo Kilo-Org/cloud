@@ -19,6 +19,17 @@ const BulkUserCreditsInputSchema = z.object({
       },
       { message: 'Invalid date' }
     )
+    .refine(
+      dateStr => {
+        const time = new Date(dateStr).getTime();
+        // An unparseable value is already reported as an invalid date above.
+        if (isNaN(time)) return true;
+        // A YYYY-MM-DD date is interpreted as midnight UTC, so a same-day
+        // expiry is still an instant in the past and must be refused.
+        return time > Date.now();
+      },
+      { message: 'Expiration date must be in the future' }
+    )
     .optional(),
   description: z.string().optional(),
 });

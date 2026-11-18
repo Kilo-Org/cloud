@@ -4292,8 +4292,7 @@
       "repoValue": "Tahiry: {{name}}",
       "profileValue": "Mombamomba: {{name}}",
       "profileUnavailable": "Tsy misy intsony ity mombamomba ity. Misafidiana iray hafa.",
-      "pickerEmptyDescriptionOrganization": "Mamorona mombamomba momba ny fikambanana hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Ny tompon'ny fikambanana na ny mpandrindra dia afaka mamorona mombamomba momba ny fikambanana."
+      "pickerEmptyDescriptionOrganization": "Mamorona mombamomba momba ny fikambanana hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana."
     },
     "variablesDeleteFailed": "Tsy afaka namafa ny ova",
     "deleteVariable": "Fafao miovaova {{key}}",
@@ -4651,6 +4650,8 @@
       "created": "Voaforona ny fanentanana",
       "saved": "Voatahiry ny fanentanana",
       "statusArrived": "Tonga",
+      "defaultPromptWebhook": "Lazao ny votoatin'ny fangatahana avy amin'ity fiantsoana ity:\n\n{{body}}",
+      "defaultPromptScheduled": "Hazakazaho ny asa voalahatra. Natomboka tamin'ny {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ampidiro ny anarana.",
         "nameTooShort": "Mampiasà farafahakeliny 8 tarehintsoratra.",

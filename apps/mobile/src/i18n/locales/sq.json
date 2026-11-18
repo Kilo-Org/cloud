@@ -4292,8 +4292,7 @@
       "repoValue": "Depoja: {{name}}",
       "profileValue": "Profili: {{name}}",
       "profileUnavailable": "Ky profil nuk është më i disponueshëm. Zgjidh një tjetër.",
-      "pickerEmptyDescriptionOrganization": "Krijo një profil organizate për të ripërdorur variablat e mjedisit, komandat e konfigurimit dhe aftësitë nëpër sesione.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Pronari i organizatës ose një administrator mund të krijojë një profil organizate."
+      "pickerEmptyDescriptionOrganization": "Krijo një profil organizate për të ripërdorur variablat e mjedisit, komandat e konfigurimit dhe aftësitë nëpër sesione."
     },
     "variablesDeleteFailed": "Variabla nuk mund të fshihej",
     "deleteVariable": "Fshi variablin {{key}}",
@@ -4651,6 +4650,8 @@
       "created": "Shkaktari u krijua",
       "saved": "Shkaktari u ruajt",
       "statusArrived": "Mbërriti",
+      "defaultPromptWebhook": "Përshkruaj trupin e kërkesës së kësaj thirrjeje webhook:\n\n{{body}}",
+      "defaultPromptScheduled": "Ekzekuto detyrën e planifikuar. Nisur në {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Vendos një emër.",
         "nameTooShort": "Përdor të paktën 8 karaktere.",

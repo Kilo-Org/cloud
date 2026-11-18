@@ -4292,8 +4292,7 @@
       "repoValue": "ਰਿਪੋਜ਼ਟਰੀ: {{name}}",
       "profileValue": "ਪ੍ਰੋਫਾਈਲ: {{name}}",
       "profileUnavailable": "ਇਹ ਪ੍ਰੋਫਾਈਲ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਕੋਈ ਹੋਰ ਚੁਣੋ।",
-      "pickerEmptyDescriptionOrganization": "ਸਾਰੇ ਸੈਸ਼ਨਾਂ ਵਿੱਚ ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਅਤੇ ਹੁਨਰਾਂ ਦੀ ਮੁੜ ਵਰਤੋਂ ਕਰਨ ਲਈ ਇੱਕ ਸੰਗਠਨ ਪ੍ਰੋਫਾਈਲ ਬਣਾਓ।",
-      "pickerEmptyDescriptionOrganizationReadOnly": "ਸੰਗਠਨ ਦਾ ਮਾਲਕ ਜਾਂ ਪ੍ਰਬੰਧਕ ਇੱਕ ਸੰਗਠਨ ਪ੍ਰੋਫਾਈਲ ਬਣਾ ਸਕਦਾ ਹੈ।"
+      "pickerEmptyDescriptionOrganization": "ਸਾਰੇ ਸੈਸ਼ਨਾਂ ਵਿੱਚ ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਅਤੇ ਹੁਨਰਾਂ ਦੀ ਮੁੜ ਵਰਤੋਂ ਕਰਨ ਲਈ ਇੱਕ ਸੰਗਠਨ ਪ੍ਰੋਫਾਈਲ ਬਣਾਓ।"
     },
     "variablesDeleteFailed": "ਵੇਰੀਏਬਲ ਨੂੰ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
     "deleteVariable": "ਵੇਰੀਏਬਲ {{key}} ਮਿਟਾਓ",
@@ -4651,6 +4650,8 @@
       "created": "ਟ੍ਰਿਗਰ ਬਣਾਇਆ ਗਿਆ",
       "saved": "ਟ੍ਰਿਗਰ ਸੰਭਾਲਿਆ ਗਿਆ",
       "statusArrived": "ਪਹੁੰਚਿਆ",
+      "defaultPromptWebhook": "ਇਸ ਵੈਬਹੁੱਕ ਬੇਨਤੀ ਦੀ ਬਾਡੀ ਦਾ ਵਰਣਨ ਕਰੋ:\n\n{{body}}",
+      "defaultPromptScheduled": "ਸਮਾਂ-ਸੂਚੀ ਵਾਲਾ ਕੰਮ ਚਲਾਓ। {{scheduledTime}} ਵਜੇ ਟ੍ਰਿਗਰ ਹੋਇਆ।",
       "problems": {
         "nameRequired": "ਨਾਮ ਦਰਜ ਕਰੋ।",
         "nameTooShort": "ਘੱਟੋ-ਘੱਟ 8 ਅੱਖਰ ਵਰਤੋ।",

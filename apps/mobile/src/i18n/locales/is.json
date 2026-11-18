@@ -4292,8 +4292,7 @@
       "repoValue": "Geymsla: {{name}}",
       "profileValue": "Prófíl: {{name}}",
       "profileUnavailable": "Þessi prófíll er ekki lengur tiltækur. Veldu annan.",
-      "pickerEmptyDescriptionOrganization": "Búðu til stofnunarprófíl til að endurnýta umhverfisbreytur, uppsetningarskipanir og færni yfir lotur.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Eigandi stofnunar eða stjórnandi getur búið til stofnunarprófíl."
+      "pickerEmptyDescriptionOrganization": "Búðu til stofnunarprófíl til að endurnýta umhverfisbreytur, uppsetningarskipanir og færni yfir lotur."
     },
     "variablesDeleteFailed": "Ekki tókst að eyða breytunni",
     "deleteVariable": "Eyða breytu {{key}}",
@@ -4651,6 +4650,8 @@
       "created": "Kveikja búin til",
       "saved": "Kveikja vistuð",
       "statusArrived": "Borist",
+      "defaultPromptWebhook": "Lýstu meginmáli þessarar vefkrókabeiðni:\n\n{{body}}",
+      "defaultPromptScheduled": "Keyrðu tímasettu verkefnið. Kveikt á {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Sláðu inn heiti.",
         "nameTooShort": "Notaðu að minnsta kosti 8 stafi.",

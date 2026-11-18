@@ -69,7 +69,11 @@ async function expectPassesUpstreamUrlPolicy(url: string) {
     },
   });
 
-  expect(violation).toBeNull();
+  expect(violation).toEqual({
+    allowed: true,
+    hostname: new URL(url).hostname,
+    addresses: ['104.18.2.115'],
+  });
   expect(resolvedHosts).toHaveLength(1);
 }
 

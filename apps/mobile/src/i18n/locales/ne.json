@@ -4292,8 +4292,7 @@
       "repoValue": "भण्डार: {{name}}",
       "profileValue": "प्रोफाइल: {{name}}",
       "profileUnavailable": "यो प्रोफाइल अब उपलब्ध छैन। अर्को छान्नुहोस्।",
-      "pickerEmptyDescriptionOrganization": "वातावरण चरहरू, सेटअप आदेशहरू, र सत्रहरूमा सीपहरू पुन: प्रयोग गर्न संगठन प्रोफाइल सिर्जना गर्नुहोस्।",
-      "pickerEmptyDescriptionOrganizationReadOnly": "संगठनको मालिक वा प्रशासकले संगठन प्रोफाइल सिर्जना गर्न सक्छ।"
+      "pickerEmptyDescriptionOrganization": "वातावरण चरहरू, सेटअप आदेशहरू, र सत्रहरूमा सीपहरू पुन: प्रयोग गर्न संगठन प्रोफाइल सिर्जना गर्नुहोस्।"
     },
     "variablesDeleteFailed": "चर मेटाउन सकिएन",
     "deleteVariable": "चर {{key}} मेट्नुहोस्",
@@ -4651,6 +4650,8 @@
       "created": "ट्रिगर सिर्जना गरियो",
       "saved": "ट्रिगर सुरक्षित गरियो",
       "statusArrived": "आइपुग्यो",
+      "defaultPromptWebhook": "यो वेबहुक अनुरोधको बडीको वर्णन गर्नुहोस्:\n\n{{body}}",
+      "defaultPromptScheduled": "अनुसूचित कार्य चलाउनुहोस्। {{scheduledTime}} मा ट्रिगर भयो।",
       "problems": {
         "nameRequired": "नाम प्रविष्ट गर्नुहोस्।",
         "nameTooShort": "कम्तीमा 8 वर्ण प्रयोग गर्नुहोस्।",

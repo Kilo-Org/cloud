@@ -4364,8 +4364,7 @@
       "repoValue": "Repositório: {{name}}",
       "profileValue": "Perfil: {{name}}",
       "profileUnavailable": "Este perfil já não está disponível. Escolha outro.",
-      "pickerEmptyDescriptionOrganization": "Crie um perfil de organização para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Um proprietário ou administrador da organização pode criar um perfil de organização."
+      "pickerEmptyDescriptionOrganization": "Crie um perfil de organização para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões."
     },
     "variablesDeleteFailed": "Não foi possível eliminar a variável",
     "deleteVariable": "Eliminar a variável {{key}}",
@@ -4727,6 +4726,8 @@
       "created": "Acionador criado",
       "saved": "Acionador guardado",
       "statusArrived": "Recebido",
+      "defaultPromptWebhook": "Descreve o corpo do pedido desta chamada de webhook:\n\n{{body}}",
+      "defaultPromptScheduled": "Executa a tarefa agendada. Acionada às {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Introduza um nome.",
         "nameTooShort": "Utilize pelo menos 8 caracteres.",

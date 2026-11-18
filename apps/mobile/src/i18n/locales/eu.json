@@ -4292,8 +4292,7 @@
       "repoValue": "Biltegia: {{name}}",
       "profileValue": "Profila: {{name}}",
       "profileUnavailable": "Profil hau jada ez dago erabilgarri. Aukeratu beste bat.",
-      "pickerEmptyDescriptionOrganization": "Sortu erakunde-profil bat ingurune-aldagaiak, konfigurazio komandoak eta trebetasunak saioetan berrerabiltzeko.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Erakundearen jabe batek edo administratzaile batek sor dezake erakunde-profil bat."
+      "pickerEmptyDescriptionOrganization": "Sortu erakunde-profil bat ingurune-aldagaiak, konfigurazio komandoak eta trebetasunak saioetan berrerabiltzeko."
     },
     "variablesDeleteFailed": "Ezin izan da aldagaia ezabatu",
     "deleteVariable": "Ezabatu aldagaia {{key}}",
@@ -4651,6 +4650,8 @@
       "created": "Abiarazlea sortu da",
       "saved": "Abiarazlea gorde da",
       "statusArrived": "Iritsi da",
+      "defaultPromptWebhook": "Deskribatu webhook eskaera honen gorputza:\n\n{{body}}",
+      "defaultPromptScheduled": "Exekutatu programatutako zeregina. Abiarazita: {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Sartu izen bat.",
         "nameTooShort": "Erabili gutxienez 8 karaktere.",

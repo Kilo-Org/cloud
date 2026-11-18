@@ -4292,8 +4292,7 @@
       "repoValue": "Depo: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Bu profil artık kullanılamıyor. Başka bir profil seçin.",
-      "pickerEmptyDescriptionOrganization": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir kuruluş profili oluşturun.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Kuruluş sahibi veya yöneticisi bir kuruluş profili oluşturabilir."
+      "pickerEmptyDescriptionOrganization": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir kuruluş profili oluşturun."
     },
     "variablesDeleteFailed": "Değişken silinemedi",
     "deleteVariable": "{{key}} değişkenini sil",
@@ -4651,6 +4650,8 @@
       "created": "Tetikleyici oluşturuldu",
       "saved": "Tetikleyici kaydedildi",
       "statusArrived": "Ulaştı",
+      "defaultPromptWebhook": "Bu web kancası isteğinin gövdesini açıklayın:\n\n{{body}}",
+      "defaultPromptScheduled": "Zamanlanmış görevi çalıştırın. {{scheduledTime}} zamanında tetiklendi.",
       "problems": {
         "nameRequired": "Bir ad girin.",
         "nameTooShort": "En az 8 karakter kullanın.",

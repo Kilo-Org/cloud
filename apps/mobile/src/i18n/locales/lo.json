@@ -4292,8 +4292,7 @@
       "repoValue": "ບ່ອນເກັບມ້ຽນ: {{name}}",
       "profileValue": "ໂປຣໄຟລ໌: {{name}}",
       "profileUnavailable": "ໂປຣໄຟລ໌ນີ້ບໍ່ມີໃຫ້ໃຊ້ອີກແລ້ວ. ເລືອກໂປຣໄຟລ໌ອື່ນ.",
-      "pickerEmptyDescriptionOrganization": "ສ້າງໂປຣໄຟລ໌ຂອງອົງກອນເພື່ອນຳໃຊ້ຕົວແປສະພາບແວດລ້ອມຄືນໃໝ່, ຕັ້ງຄ່າຄຳສັ່ງ ແລະທັກສະຕ່າງໆໃນທົ່ວເຊດຊັນ.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "ເຈົ້າຂອງອົງກອນ ຫຼືຜູ້ບໍລິຫານສາມາດສ້າງໂປຣໄຟລ໌ຂອງອົງກອນໄດ້."
+      "pickerEmptyDescriptionOrganization": "ສ້າງໂປຣໄຟລ໌ຂອງອົງກອນເພື່ອນຳໃຊ້ຕົວແປສະພາບແວດລ້ອມຄືນໃໝ່, ຕັ້ງຄ່າຄຳສັ່ງ ແລະທັກສະຕ່າງໆໃນທົ່ວເຊດຊັນ."
     },
     "variablesDeleteFailed": "ບໍ່ສາມາດລຶບຕົວແປໄດ້",
     "deleteVariable": "ລຶບຕົວແປ {{key}}",
@@ -4651,6 +4650,8 @@
       "created": "ສ້າງຕົວກະຕຸ້ນແລ້ວ",
       "saved": "ບັນທຶກຕົວກະຕຸ້ນແລ້ວ",
       "statusArrived": "ມາຮອດແລ້ວ",
+      "defaultPromptWebhook": "ອະທິບາຍເນື້ອຄວາມຂອງຄຳຮ້ອງເວັບຮຸກນີ້:\n\n{{body}}",
+      "defaultPromptScheduled": "ຣັນວຽກທີ່ກຳນົດເວລາໄວ້. ເລີ່ມດຳເນີນງານເມື່ອ {{scheduledTime}}.",
       "problems": {
         "nameRequired": "ປ້ອນຊື່.",
         "nameTooShort": "ໃຊ້ຢ່າງໜ້ອຍ 8 ຕົວອັກສອນ.",

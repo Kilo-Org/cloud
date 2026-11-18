@@ -4292,8 +4292,7 @@
       "repoValue": "Depot: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Denne profilen er ikke lenger tilgjengelig. Velg en annen.",
-      "pickerEmptyDescriptionOrganization": "Opprett en organisasjonsprofil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "En organisasjonseier eller administrator kan opprette en organisasjonsprofil."
+      "pickerEmptyDescriptionOrganization": "Opprett en organisasjonsprofil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter."
     },
     "variablesDeleteFailed": "Kunne ikke slette variabelen",
     "deleteVariable": "Slett variabel {{key}}",
@@ -4651,6 +4650,8 @@
       "created": "Trigger opprettet",
       "saved": "Trigger lagret",
       "statusArrived": "Ankommet",
+      "defaultPromptWebhook": "Beskriv innholdet i webhook-forespørselen:\n\n{{body}}",
+      "defaultPromptScheduled": "Kjør den planlagte oppgaven. Utløst ved {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Skriv inn et navn.",
         "nameTooShort": "Bruk minst 8 tegn.",

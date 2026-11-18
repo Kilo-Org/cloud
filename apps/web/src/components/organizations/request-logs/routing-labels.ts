@@ -42,6 +42,7 @@ const BYOK_SKIP_REASON_LABELS: Record<string, string> = {
 
 const ENDPOINT_SKIP_REASON_LABELS: Record<string, string> = {
   disabled: 'Endpoint disabled',
+  'not-catalog-mode': 'Endpoint uses its own model IDs',
 };
 
 const BYOK_OUTCOME_LABELS: Record<string, string> = {
@@ -77,8 +78,7 @@ const REJECTED_RESULT_LABELS: Record<string, string> = {
   'claude-billing-reconnect': 'Rejected: the Claude organization must be linked again',
   'custom-llm-unavailable': 'Rejected: the promotional model is unavailable',
   'byok-endpoint-unavailable': 'Rejected: the endpoint is unavailable',
-  'byok-endpoint-catalog-only': 'Rejected: the endpoint only serves Kilo catalog model IDs',
-  'direct-byok-catalog-only': 'Rejected: the key only serves Kilo catalog model IDs',
+  'direct-byok-catalog-only': 'Rejected: the key or endpoint only serves Kilo catalog model IDs',
 };
 
 const NOT_SENT_LABELS: Record<RequestLogNotSentReason, string> = {
@@ -115,8 +115,8 @@ function listOf(names: string[]): string {
   return names.join(', ');
 }
 
-export function byokSkipReasonLabel(reason: string, route?: string): string {
-  if (route === 'endpoint-byok' && Object.hasOwn(ENDPOINT_SKIP_REASON_LABELS, reason)) {
+export function byokSkipReasonLabel(reason: string, providerId: string): string {
+  if (isByokEndpointProviderId(providerId) && Object.hasOwn(ENDPOINT_SKIP_REASON_LABELS, reason)) {
     return ENDPOINT_SKIP_REASON_LABELS[reason];
   }
   return lookup(BYOK_SKIP_REASON_LABELS, reason);
@@ -150,10 +150,11 @@ function paidByLabel(result: RequestLogRoutingResult): string | null {
 function selectedProviderName(result: RequestLogRoutingResult): string | null {
   const providerType = result.provider_type;
   if (!providerType) return null;
-  if (providerType === 'direct-byok' || providerType === 'byok-endpoint') {
+  if (providerType === 'direct-byok') {
     const providerIds = result.byok_provider_ids ?? [];
-    if (providerIds.length > 0) return listOf(providerIds.map(getByokProviderDisplayName));
-    return providerType === 'byok-endpoint' ? 'the endpoint' : 'the BYOK provider';
+    return providerIds.length > 0
+      ? listOf(providerIds.map(getByokProviderDisplayName))
+      : 'the BYOK provider';
   }
   return lookup(SENT_TO_LABELS, providerType);
 }
@@ -198,18 +199,7 @@ function describePromotionalModel(step: RequestLogRoutingStep): string {
   return 'The requested model is not a promotional model.';
 }
 
-function describeProviderModelId(step: RequestLogRoutingStep): string {
-  const key = step.provider_id ? keyLabel([step.provider_id]) : 'BYOK key';
-  if (step.outcome === 'selected') return `Served with the ${key}.`;
-  if (step.outcome === 'rejected') {
-    return step.catalog_model_id
-      ? `The ${key} only serves Kilo catalog model IDs; request ${step.catalog_model_id} instead.`
-      : `The ${key} only serves Kilo catalog model IDs.`;
-  }
-  if (step.reason === 'no-key') return `No ${key} is configured.`;
-  return "The requested model is not a BYOK provider's own model ID.";
-}
-
+/** Why an organization endpoint could not serve its own model id, which no other route serves. */
 const ENDPOINT_REJECTION_LABELS: Record<string, (endpoint: string) => string> = {
   'no-organization': () => 'Endpoints are only available to organizations.',
   'no-key': endpoint => `This organization has no ${endpoint}.`,
@@ -218,18 +208,23 @@ const ENDPOINT_REJECTION_LABELS: Record<string, (endpoint: string) => string> = 
   'invalid-credentials': endpoint => `The ${endpoint}'s credentials could not be used.`,
 };
 
-function describeEndpointModelId(step: RequestLogRoutingStep): string {
-  const endpoint = step.provider_id ? keyLabel([step.provider_id]) : 'endpoint';
-  if (step.outcome === 'selected') return `Served with the ${endpoint}.`;
-  if (step.reason === 'catalog-only') {
+function isEndpointStep(step: RequestLogRoutingStep): boolean {
+  return step.provider_id !== undefined && isByokEndpointProviderId(step.provider_id);
+}
+
+function describeProviderModelId(step: RequestLogRoutingStep): string {
+  const key = step.provider_id ? keyLabel([step.provider_id]) : 'BYOK key';
+  if (step.outcome === 'selected') return `Served with the ${key}.`;
+  if (step.outcome === 'rejected') {
+    if (step.reason && Object.hasOwn(ENDPOINT_REJECTION_LABELS, step.reason)) {
+      return ENDPOINT_REJECTION_LABELS[step.reason](key);
+    }
     return step.catalog_model_id
-      ? `The ${endpoint} only serves Kilo catalog model IDs; request ${step.catalog_model_id} instead.`
-      : `The ${endpoint} only serves Kilo catalog model IDs.`;
+      ? `The ${key} only serves Kilo catalog model IDs; request ${step.catalog_model_id} instead.`
+      : `The ${key} only serves Kilo catalog model IDs.`;
   }
-  if (step.reason && Object.hasOwn(ENDPOINT_REJECTION_LABELS, step.reason)) {
-    return ENDPOINT_REJECTION_LABELS[step.reason](endpoint);
-  }
-  return `The ${endpoint} cannot serve the requested model.`;
+  if (step.reason === 'no-key') return `No ${key} is configured.`;
+  return "The requested model is not a BYOK provider's own model ID.";
 }
 
 function describeChatGpt(step: RequestLogRoutingStep): string {
@@ -279,9 +274,11 @@ export function describeStep(
     case 'custom-llm':
       return { title: 'Promotional model', detail: describePromotionalModel(step), tone };
     case 'direct-byok-model':
-      return { title: 'Provider model ID', detail: describeProviderModelId(step), tone };
-    case 'byok-endpoint-model':
-      return { title: 'Endpoint model ID', detail: describeEndpointModelId(step), tone };
+      return {
+        title: isEndpointStep(step) ? 'Endpoint model ID' : 'Provider model ID',
+        detail: describeProviderModelId(step),
+        tone,
+      };
     case 'organization-policy': {
       const excluded = step.excluded_provider_ids ?? [];
       return {

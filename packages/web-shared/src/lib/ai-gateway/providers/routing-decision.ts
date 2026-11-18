@@ -15,12 +15,7 @@ import {
 import { getByokKeyDefaultRank } from '@kilocode/web-shared/lib/ai-gateway/byok/route-order';
 import type { KeyPlanStep } from '@kilocode/web-shared/lib/ai-gateway/providers/route-plan';
 
-const ByokCandidateRouteSchema = z.enum([
-  'endpoint-byok',
-  'direct-byok',
-  'vercel-byok',
-  'gateway-byok',
-]);
+const ByokCandidateRouteSchema = z.enum(['direct-byok', 'vercel-byok', 'gateway-byok']);
 
 const ByokCandidateSkipReasonSchema = z.enum([
   'unsupported-api-kind',
@@ -111,31 +106,6 @@ const RoutingDecisionStepSchema = z.union([
       'invalid-credentials',
     ]),
   }),
-  /** Listed only for an endpoint model id, which no other route serves. */
-  z.object({
-    step: z.literal('byok-endpoint-model'),
-    outcome: z.literal('selected'),
-    provider_id: z.string(),
-  }),
-  z.object({
-    step: z.literal('byok-endpoint-model'),
-    outcome: z.literal('rejected'),
-    provider_id: z.string(),
-    reason: z.enum([
-      'no-organization',
-      'no-key',
-      'disabled',
-      'unknown-model',
-      'invalid-credentials',
-    ]),
-  }),
-  z.object({
-    step: z.literal('byok-endpoint-model'),
-    outcome: z.literal('rejected'),
-    provider_id: z.string(),
-    reason: z.literal('catalog-only'),
-    catalog_model_id: z.string().nullable(),
-  }),
   z.object({ step: z.literal('organization-policy'), excluded_provider_ids: z.array(z.string()) }),
   z.object({ step: z.literal('chatgpt'), outcome: z.literal('selected') }),
   z.object({
@@ -196,7 +166,6 @@ export type RoutingDecisionStep = z.infer<typeof RoutingDecisionStepSchema>;
 const SelectedRouteSchema = z.enum([
   'local-fake-llm',
   'custom-llm',
-  'byok-endpoint-model',
   'direct-byok-model',
   'chatgpt',
   'claude-billing',
@@ -235,7 +204,6 @@ const RoutingDecisionResultSchema = z.discriminatedUnion('kind', [
       'claude-billing-reconnect',
       'custom-llm-unavailable',
       'byok-endpoint-unavailable',
-      'byok-endpoint-catalog-only',
       'direct-byok-catalog-only',
     ]),
   }),
@@ -329,8 +297,6 @@ function payerOf(route: SelectedRoute): Payer {
       return 'customer-claude-organization';
     case 'kilo':
       return 'kilo';
-    case 'byok-endpoint-model':
-    case 'endpoint-byok':
     case 'direct-byok-model':
     case 'direct-byok':
     case 'vercel-byok':

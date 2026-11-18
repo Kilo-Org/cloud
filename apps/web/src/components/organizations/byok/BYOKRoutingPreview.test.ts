@@ -7,6 +7,7 @@ const NAMES: Record<string, string> = {
   bedrock: 'AWS Bedrock',
   openrouter: 'OpenRouter',
   openai: 'OpenAI API key',
+  'endpoint-a1b2c3d4e5': 'Acme',
 };
 
 function getProviderName(providerId: string) {
@@ -31,6 +32,29 @@ describe('describeRouteStep', () => {
       title: 'Z.ai Coding Plan key',
       detail: 'Skipped: the provider serves this model over Chat Completions only.',
     });
+  });
+
+  it.each([
+    ['unsupported-api-kind', 'Skipped: the endpoint serves this model over Chat Completions only.'],
+    ['disabled', 'Skipped: the endpoint is disabled.'],
+    [
+      'not-catalog-mode',
+      'Skipped: the endpoint uses its own model IDs. Turn on Kilo catalog model IDs to use it for this model.',
+    ],
+  ] as const)('names an organization endpoint skipped as %s', (reason, detail) => {
+    expect(
+      describeRouteStep(
+        {
+          route: 'direct-byok',
+          outcome: 'skipped',
+          providerId: 'endpoint-a1b2c3d4e5',
+          reason,
+          supportedApiKinds: ['chat_completions'],
+        },
+        getProviderName,
+        true
+      )
+    ).toEqual({ title: 'Acme endpoint', detail });
   });
 
   it('names the key Vercel AI Gateway receives', () => {

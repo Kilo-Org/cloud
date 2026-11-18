@@ -178,12 +178,12 @@ describe('RoutingSections endpoints', () => {
     return {
       ...routing(attempts),
       requested_model: `${endpointId}/my-model`,
-      steps: [{ step: 'byok-endpoint-model', outcome: 'selected', provider_id: endpointId }],
+      steps: [{ step: 'direct-byok-model', outcome: 'selected', provider_id: endpointId }],
       byok_candidates: [],
       result: {
         kind: 'provider',
-        route: 'byok-endpoint-model',
-        provider_type: 'byok-endpoint',
+        route: 'direct-byok-model',
+        provider_type: 'direct-byok',
         byok_provider_ids: [endpointId],
         payer: 'owner-byok-key',
         is_free: false,
@@ -208,7 +208,7 @@ describe('RoutingSections endpoints', () => {
         endpointRouting({
           steps: [
             {
-              step: 'byok-endpoint-model',
+              step: 'direct-byok-model',
               outcome: 'rejected',
               provider_id: endpointId,
               reason: 'disabled',
@@ -230,7 +230,7 @@ describe('RoutingSections endpoints', () => {
         ],
         byok_candidates: [
           {
-            route: 'endpoint-byok',
+            route: 'direct-byok',
             provider_id: endpointId,
             route_order: 0,
             outcome: 'skipped',
@@ -260,7 +260,7 @@ describe('RoutingSections endpoints', () => {
     const document = render(
       endpointRouting({}, [
         {
-          provider_type: 'byok-endpoint',
+          provider_type: 'direct-byok',
           byok_provider_ids: [endpointId],
           status: 502,
           duration_ms: 300,

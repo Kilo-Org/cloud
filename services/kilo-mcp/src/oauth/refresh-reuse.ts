@@ -20,8 +20,10 @@ export type IssuedRefreshToken = RefreshTokenParts & { current: boolean; previou
 
 /** Request-scoped facts the guard hands to the provider handler it forwards to. */
 export type TokenRequestContext = {
-  /** The account id in the presented refresh token's prefix; unauthenticated. */
+  /** The account a stored hash of the presented token belongs to. */
   tokenUserId: string | null;
+  /** The account named in the presented token's prefix when no stored hash matched. */
+  unverifiedTokenUserId: string | null;
 };
 
 /** Strongly consistent DO SQLite state, not eventually consistent Workers KV. */
@@ -119,18 +121,31 @@ export function parseRefreshToken(token: string): RefreshTokenParts | null {
   return { userId, grantId };
 }
 
-/** Bound on the account id telemetry may carry; a real id is far shorter. */
-const TOKEN_USER_ID_MAX_LENGTH = 128;
-const tokenUserIdSchema = z.string().min(1).max(TOKEN_USER_ID_MAX_LENGTH);
+/**
+ * Characters an account id may carry. The prefix is caller-controlled input, so
+ * a value outside this set is dropped rather than reported.
+ */
+const unverifiedTokenUserIdSchema = z.string().regex(/^[A-Za-z0-9_./-]{1,128}$/);
 
 /**
- * The account id in a presented token's prefix, for attributing a failed
- * refresh. The prefix is unauthenticated input: it is never proof of anything,
- * and a missing, malformed, or over-long id yields null rather than a value.
+ * The account id in a presented token's prefix, for a request no stored hash
+ * matched. The prefix proves nothing, so this is reported as unverified
+ * attribution and a malformed value yields null.
  */
-export function parseTokenUserId(token: string): string | null {
-  const parsed = tokenUserIdSchema.safeParse(parseRefreshToken(token)?.userId);
+export function parseUnverifiedTokenUserId(token: string): string | null {
+  const parsed = unverifiedTokenUserIdSchema.safeParse(parseRefreshToken(token)?.userId);
   return parsed.success ? parsed.data : null;
+}
+
+/**
+ * The stored row for a presented hash, read once per request: the reuse
+ * decision and the attribution both need it.
+ */
+export async function lookupRefreshToken(
+  refreshToken: string,
+  deps: Pick<RefreshReuseDeps, 'store'>
+): Promise<IssuedRefreshToken | null> {
+  return deps.store.getRefreshToken(await hashRefreshToken(refreshToken), new Date().toISOString());
 }
 
 export function isTokenRequest(request: Request): boolean {
@@ -182,9 +197,9 @@ export function bodyTooLargeResponse(request: Request): Response {
 }
 
 /**
- * Decides from the form the client sent. A repeated parameter other than
- * `resource` is left to the library, which owns the duplicate-parameter
- * rejection.
+ * Decides from the form the client sent, using the row `lookupRefreshToken`
+ * already read for this request. A repeated parameter other than `resource` is
+ * left to the library, which owns the duplicate-parameter rejection.
  *
  * The library accepts the current and the immediately previous refresh token:
  * two clients can race a rotation, and a rotation response can be lost, so the
@@ -194,18 +209,14 @@ export function bodyTooLargeResponse(request: Request): Response {
 export async function detectRefreshTokenReuse(
   request: Request,
   params: URLSearchParams,
-  deps: RefreshReuseDeps
+  deps: RefreshReuseDeps,
+  issued: IssuedRefreshToken | null
 ): Promise<Response | null> {
   if ([...params.keys()].some(key => key !== 'resource' && params.getAll(key).length > 1)) {
     return null;
   }
   if (params.get('grant_type') !== 'refresh_token') return null;
-  const refreshToken = params.get('refresh_token');
-  if (!refreshToken) return null;
-  const issued = await deps.store.getRefreshToken(
-    await hashRefreshToken(refreshToken),
-    new Date().toISOString()
-  );
+  if (!params.get('refresh_token')) return null;
   // A mismatch with the latest token is NOT proof of replay. Only a full hash
   // of a previously issued token authenticates the stored grant identity, and
   // the provider still accepts the one it rotated away from last.
@@ -262,16 +273,18 @@ export async function rememberIssuedRefreshToken(
  * external awaits. An isolate-local queue in the Worker would not be sufficient.
  * Only token requests queue; MCP responses are never cloned or parsed here.
  *
- * `forward` receives the request-scoped context the provider hook needs to
- * attribute a failed refresh; nothing about it is persisted.
+ * `forward` receives the request-scoped attribution the provider hook needs for
+ * a failed refresh; nothing about it is persisted. A stored hash of the
+ * presented token is the only proof of its account.
  */
 export function createRefreshReuseHandler(deps: RefreshReuseDeps) {
   let pending: Promise<unknown> = Promise.resolve();
+  const noAttribution: TokenRequestContext = { tokenUserId: null, unverifiedTokenUserId: null };
   return async (
     request: Request,
     forward: (request: Request, context: TokenRequestContext) => Promise<Response>
   ): Promise<Response> => {
-    if (!isTokenRequest(request)) return forward(request, { tokenUserId: null });
+    if (!isTokenRequest(request)) return forward(request, noAttribution);
     const body = await readTokenBody(request);
     if (body.kind === 'too_large') return bodyTooLargeResponse(request);
     const forwarded = forwardable(request, body.body);
@@ -279,20 +292,36 @@ export function createRefreshReuseHandler(deps: RefreshReuseDeps) {
       body.kind === 'form' && body.params.get('grant_type') === 'refresh_token'
         ? (body.params.get('refresh_token') ?? null)
         : null;
-    const context: TokenRequestContext = {
-      tokenUserId: presentedToken ? parseTokenUserId(presentedToken) : null,
-    };
     const response = pending.then(async () => {
+      const issued =
+        presentedToken === null ? null : await lookupRefreshToken(presentedToken, deps);
       if (body.kind === 'form') {
-        const rejected = await detectRefreshTokenReuse(request, body.params, deps);
+        const rejected = await detectRefreshTokenReuse(request, body.params, deps, issued);
         if (rejected) return rejected;
       }
-      const result = await forward(forwarded, context);
+      const result = await forward(forwarded, tokenRequestContext(presentedToken, issued));
       await rememberIssuedRefreshToken(result, deps, presentedToken);
       return result;
     });
     // A failed request must not poison the queue for subsequent retries.
     pending = response.catch(() => {});
     return response;
+  };
+}
+
+/**
+ * The attribution a forwarded request carries. A stored hash decides the
+ * account; without one the prefix is reported as unverified, because it is
+ * caller-controlled. Both fields are never set together.
+ */
+function tokenRequestContext(
+  presentedToken: string | null,
+  issued: IssuedRefreshToken | null
+): TokenRequestContext {
+  if (issued) return { tokenUserId: issued.userId, unverifiedTokenUserId: null };
+  return {
+    tokenUserId: null,
+    unverifiedTokenUserId:
+      presentedToken === null ? null : parseUnverifiedTokenUserId(presentedToken),
   };
 }

@@ -33,11 +33,15 @@ export type ProviderHookDeps = {
   /** Best-effort sign-in analytics; never awaited and never allowed to throw. */
   analytics?: McpAnalytics;
   /**
-   * The account id in the presented refresh token's prefix, when the request is
-   * a refresh exchange. Unauthenticated input: it is emitted as a property for
-   * attribution only, never as the event identity.
+   * The account a stored hash of the presented refresh token belongs to. Only a
+   * hash match produces it, so it is verified attribution without an identity.
    */
   tokenUserId?: string | null;
+  /**
+   * The account named in the presented token's prefix when no stored hash
+   * matched. Caller-controlled, so it is reported as unverified attribution.
+   */
+  unverifiedTokenUserId?: string | null;
 };
 
 /**
@@ -112,8 +116,9 @@ const OAUTH_ERROR_DETAILS: Record<string, OAuthFailureDetail> = {
  * Emit `oauthSignIn failed` for a provider error response. The `reason` is the
  * OAuth error code and `detail` narrows it to a cause; no identity is known at
  * the error boundary, so it is always anonymous. A refresh exchange carries the
- * account id parsed from the presented token's prefix as a separate property:
- * the prefix is unauthenticated, so it must never bind a PostHog person.
+ * account a stored hash of the token belongs to as `tokenUserId`, or — when no
+ * hash matched — the caller-controlled prefix as `unverifiedTokenUserId`. Both
+ * are properties only: neither may bind a PostHog person.
  *
  * The own-property check keeps the vocabulary closed: a description of
  * `constructor` or `__proto__` must report `other`, not resolve through
@@ -129,5 +134,6 @@ export function onError(error: OAuthProviderError, deps: ProviderHookDeps = {}):
     reason: error.code,
     detail,
     ...(deps.tokenUserId ? { tokenUserId: deps.tokenUserId } : {}),
+    ...(deps.unverifiedTokenUserId ? { unverifiedTokenUserId: deps.unverifiedTokenUserId } : {}),
   });
 }

@@ -36,6 +36,7 @@ import {
   forwardable,
   isTokenRequest,
   readTokenBody,
+  type TokenRequestContext,
 } from './oauth/refresh-reuse';
 import {
   CLIENT_REGISTRATION_TTL_SECONDS,
@@ -1127,12 +1128,12 @@ function fetchWithProvider(
   request: Request,
   env: Env,
   ctx: ExecutionContext,
-  tokenUserId: string | null = null
+  attribution: TokenRequestContext = { tokenUserId: null, unverifiedTokenUserId: null }
 ): Promise<Response> {
   const analytics = createMcpAnalytics({ env, ctx });
   const provider = new OAuthProvider<Env>({
     ...providerOptions,
-    onError: error => onError(error, { analytics, tokenUserId }),
+    onError: error => onError(error, { analytics, ...attribution }),
   });
   return provider.fetch(request, env, ctx);
 }
@@ -1157,7 +1158,7 @@ export class KiloMcpOAuthStore extends OAuthStore {
     // our analytics waitUntil. The DO state supplies that request lifetime.
     const tokenContext: Pick<ExecutionContext, 'waitUntil' | 'props'> = this.ctx;
     return this.forwardToken(request, (req, context) =>
-      fetchWithProvider(req, this.env, tokenContext as ExecutionContext, context.tokenUserId)
+      fetchWithProvider(req, this.env, tokenContext as ExecutionContext, context)
     );
   }
 }

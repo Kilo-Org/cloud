@@ -136,7 +136,7 @@ describe('onError', () => {
     }
   });
 
-  it('attributes a failed refresh to the account in the token prefix', () => {
+  it('attributes a failed refresh to the account its stored hash belongs to', () => {
     const { analytics, calls } = fakeAnalytics();
     onError(
       { code: 'invalid_grant', description: 'Grant not found', status: 400, headers: {} },
@@ -153,7 +153,24 @@ describe('onError', () => {
     ]);
   });
 
-  it('emits no tokenUserId for an authorization-code failure', () => {
+  it('reports a prefix without a stored hash as unverified attribution only', () => {
+    const { analytics, calls } = fakeAnalytics();
+    onError(
+      { code: 'invalid_grant', description: 'Grant not found', status: 400, headers: {} },
+      { analytics, unverifiedTokenUserId: 'user-9' }
+    );
+    expect(calls).toEqual([
+      {
+        phase: 'failed',
+        identity: null,
+        reason: 'invalid_grant',
+        detail: 'grant_not_found',
+        unverifiedTokenUserId: 'user-9',
+      },
+    ]);
+  });
+
+  it('emits no attribution for an authorization-code failure', () => {
     const { analytics, calls } = fakeAnalytics();
     onError(
       {

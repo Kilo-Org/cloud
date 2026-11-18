@@ -5,13 +5,15 @@ import {
   createRefreshReuseHandler,
   detectRefreshTokenReuse,
   hashRefreshToken,
+  lookupRefreshToken,
   parseRefreshToken,
-  parseTokenUserId,
+  parseUnverifiedTokenUserId,
   readTokenBody,
   rememberIssuedRefreshToken,
   type IssuedRefreshToken,
   type RefreshReuseDeps,
   type RefreshReuseStore,
+  type TokenRequestContext,
 } from './refresh-reuse';
 
 function makeDeps() {
@@ -113,10 +115,14 @@ function codeRequest(): Request {
   });
 }
 
-/** The handler's steps in order: read the body, then decide. */
+/** The handler's steps in order: read the body, look the token up, then decide. */
 async function guard(request: Request, deps: RefreshReuseDeps): Promise<Response | null> {
   const body = await readTokenBody(request);
-  return body.kind === 'form' ? detectRefreshTokenReuse(request, body.params, deps) : null;
+  if (body.kind !== 'form') return null;
+  const refreshToken =
+    body.params.get('grant_type') === 'refresh_token' ? body.params.get('refresh_token') : null;
+  const issued = refreshToken === null ? null : await lookupRefreshToken(refreshToken, deps);
+  return detectRefreshTokenReuse(request, body.params, deps, issued);
 }
 
 describe('parseRefreshToken', () => {
@@ -133,16 +139,27 @@ describe('parseRefreshToken', () => {
   );
 });
 
-describe('parseTokenUserId', () => {
-  it('returns the account id in a well-formed token prefix', () => {
-    expect(parseTokenUserId('user-1:grant-1:secret')).toBe('user-1');
+describe('parseUnverifiedTokenUserId', () => {
+  it('returns a well-formed account id from the token prefix', () => {
+    expect(parseUnverifiedTokenUserId('user-1:grant-1:secret')).toBe('user-1');
+    expect(parseUnverifiedTokenUserId('user.name_1/x-y:grant-1:secret')).toBe('user.name_1/x-y');
   });
 
-  it('caps the id and rejects anything malformed', () => {
-    expect(parseTokenUserId(`u${'x'.repeat(128)}:grant:secret`)).toBeNull();
-    expect(parseTokenUserId(`u${'x'.repeat(127)}:grant:secret`)).toBe(`u${'x'.repeat(127)}`);
-    for (const token of ['nope', 'a:b', ':grant:secret', 'user:grant:']) {
-      expect(parseTokenUserId(token)).toBeNull();
+  it('caps the id and rejects disallowed characters or a malformed token', () => {
+    expect(parseUnverifiedTokenUserId(`u${'x'.repeat(128)}:grant:secret`)).toBeNull();
+    expect(parseUnverifiedTokenUserId(`u${'x'.repeat(127)}:grant:secret`)).toBe(
+      `u${'x'.repeat(127)}`
+    );
+    for (const token of [
+      'nope',
+      'a:b',
+      ':grant:secret',
+      'user:grant:',
+      'bad id:grant:secret',
+      'user%20id:grant:secret',
+      'user@example.com:grant:secret',
+    ]) {
+      expect(parseUnverifiedTokenUserId(token)).toBeNull();
     }
   });
 });
@@ -434,18 +451,43 @@ describe('createRefreshReuseHandler (one per named DO)', () => {
     expect(deps.tokens.get(await hashRefreshToken('u:g:current'))?.previous).toBe(true);
   });
 
-  it('hands the forwarded handler the account in the presented refresh token', async () => {
+  it('attributes only a stored hash to an account and marks the rest unverified', async () => {
     const deps = makeDeps();
     const handle = createRefreshReuseHandler(deps);
-    const seen: Array<{ tokenUserId: string | null }> = [];
-    const forward = vi.fn(async (_request: Request, context: { tokenUserId: string | null }) => {
+    // A stored row proves the account: the token's own prefix claims another.
+    deps.tokens.set(await hashRefreshToken('claimed:g:secret'), {
+      userId: 'stored-user',
+      grantId: 'g',
+      current: true,
+      previous: false,
+    });
+    const seen: TokenRequestContext[] = [];
+    const forward = vi.fn(async (_request: Request, context: TokenRequestContext) => {
       seen.push(context);
       return Response.json({ refresh_token: 'u:g:next' });
     });
     await handle(codeRequest(), forward);
+    await handle(refreshRequest('claimed:g:secret'), forward);
     await handle(refreshRequest('u-7:g:secret'), forward);
+    await handle(refreshRequest('bad id:g:secret'), forward);
     await handle(refreshRequest('nope'), forward);
-    expect(seen).toEqual([{ tokenUserId: null }, { tokenUserId: 'u-7' }, { tokenUserId: null }]);
+    expect(seen).toEqual([
+      { tokenUserId: null, unverifiedTokenUserId: null },
+      { tokenUserId: 'stored-user', unverifiedTokenUserId: null },
+      { tokenUserId: null, unverifiedTokenUserId: 'u-7' },
+      { tokenUserId: null, unverifiedTokenUserId: null },
+      { tokenUserId: null, unverifiedTokenUserId: null },
+    ]);
+  });
+
+  it('reads the presented hash once for both the reuse decision and the attribution', async () => {
+    const deps = makeDeps();
+    const getRefreshToken = vi.spyOn(deps.store, 'getRefreshToken');
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:current' }), deps);
+    const handle = createRefreshReuseHandler(deps);
+    const forward = vi.fn(async () => new Response('nope', { status: 400 }));
+    await handle(refreshRequest('u:g:current'), forward);
+    expect(getRefreshToken).toHaveBeenCalledTimes(1);
   });
 
   it.each(['/mcp', '/register', '/authorize', '/.well-known/oauth-authorization-server', '/token'])(

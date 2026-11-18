@@ -120,6 +120,28 @@ function findMenuItemMarkup(html: string, text: string): string {
   return item ?? '';
 }
 
+it('keeps the active overflow chat visible without changing saved tab order', () => {
+  const chatSessions = Array.from({ length: 53 }, (_, index) =>
+    makeSession(`ses_${index + 1}`, `Chat ${index + 1}`)
+  );
+  const html = renderWorkspaceTabs(
+    {
+      chatSessions,
+      currentSessionId: 'ses_52',
+      openChatSessionIds: chatSessions.map(chat => chat.sessionId),
+    },
+    true
+  );
+  const tabs = html.match(/<button\b[^>]*role="tab"[^>]*>[\s\S]*?<\/button>/g) ?? [];
+  expect(tabs).toHaveLength(50);
+  expect(tabs[48]).toContain('Chat 49');
+  expect(tabs[49]).toContain('Chat 52');
+  expect(tabs[49]).toContain('aria-selected="true"');
+  const overflow = jest.mocked(DropdownMenuItem).mock.calls.map(([props]) => props.textValue);
+  expect(overflow.filter(Boolean)).toEqual(['Chat 50', 'Chat 51', 'Chat 53']);
+  expect(html).toContain('More tabs');
+});
+
 function getButtonProps(label: string): ComponentProps<typeof Button> {
   const props = jest
     .mocked(Button)

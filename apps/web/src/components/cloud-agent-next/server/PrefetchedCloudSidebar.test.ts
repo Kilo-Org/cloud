@@ -49,8 +49,8 @@ beforeEach(() => {
     workspaces: [
       {
         worktreeId: 'worktree_synthetic',
-        openChats: [],
-        closedChats: [{ sessionId: 'ses_closed' }],
+        openChatCount: 0,
+        closedChatCount: 1,
       },
     ],
     workspaceOrder: 'manual',
@@ -61,13 +61,13 @@ beforeEach(() => {
 });
 afterEach(() => jest.useRealTimers());
 
-it('hydrates workspace tab summaries and standalone sessions without details or a separate order request', async () => {
+it('hydrates workspace counts and standalone sessions without details or a separate order request', async () => {
   const page = await PrefetchedCloudSidebar(scope);
   const client = new QueryClient();
   hydrate(client, page.props.state);
   expect(mockList).toHaveBeenCalledWith(expect.objectContaining({ standaloneOnly: true }));
   expect(client.getQueryData(['workspaces'])).toMatchObject({
-    pages: [{ workspaces: [{ closedChats: [{ sessionId: 'ses_closed' }] }] }],
+    pages: [{ workspaces: [{ openChatCount: 0, closedChatCount: 1 }] }],
   });
   expect(client.getQueryData(['list'])).toEqual({ cliSessions: [] });
   expect(mockDetails).not.toHaveBeenCalled();

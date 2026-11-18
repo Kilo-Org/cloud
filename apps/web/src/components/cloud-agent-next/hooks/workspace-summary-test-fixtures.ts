@@ -1,4 +1,5 @@
 import type { WorkspaceSummary } from './useWorkspaceSummaries';
+import type { WorkspaceChatSummary } from '@/lib/cloud-agent/workspace-read-model';
 
 export const WORKSPACE_FIXTURE_TIME = '2026-11-10T12:00:00.000Z';
 export const WORKSPACE_FIXTURE_ID = 'worktree_11111111-1111-4111-8111-111111111111';
@@ -38,20 +39,25 @@ export function workspaceSummaryFixture(
     stackRootId: worktreeId,
     stackDepth: 0,
     chatCount: 1,
+    openChatCount: 1,
+    closedChatCount: 0,
     hasOpenRun: false,
-    openChats: [
-      {
-        sessionId: 'ses_root',
-        title: 'Chat',
-        createdAt: WORKSPACE_FIXTURE_TIME,
-        updatedAt: WORKSPACE_FIXTURE_TIME,
-        lastActivityAt: null,
-        cloudAgentSessionId: null,
-        sessionStatus: null,
-        sessionStatusUpdatedAt: null,
-      },
-    ],
-    closedChats: [],
+    ...overrides,
+  };
+}
+
+export function workspaceChatFixture(
+  overrides: Partial<WorkspaceChatSummary> = {}
+): WorkspaceChatSummary {
+  return {
+    sessionId: 'ses_root',
+    title: 'Chat',
+    createdAt: WORKSPACE_FIXTURE_TIME,
+    updatedAt: WORKSPACE_FIXTURE_TIME,
+    lastActivityAt: null,
+    cloudAgentSessionId: null,
+    sessionStatus: null,
+    sessionStatusUpdatedAt: null,
     ...overrides,
   };
 }

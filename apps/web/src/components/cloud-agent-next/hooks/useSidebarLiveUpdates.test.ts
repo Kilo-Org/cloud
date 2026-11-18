@@ -115,8 +115,12 @@ function workspace(
   worktreeId = WORKTREE_A,
   overrides: Partial<WorkspaceSummary> = {}
 ): WorkspaceSummary {
-  const summary = workspaceSummaryFixture({ worktreeId, lastActivityAt: TIME, ...overrides });
-  return { ...summary, openChats: summary.openChats.map(chat => ({ ...chat, updatedAt: TIME })) };
+  return workspaceSummaryFixture({
+    worktreeId,
+    lastActivityAt: TIME,
+    status: { ...workspaceSummaryFixture().status, statusUpdatedAt: TIME },
+    ...overrides,
+  });
 }
 
 function session(overrides: Partial<SessionRow> = {}): SessionRow {
@@ -532,7 +536,7 @@ describe('useSidebarLiveUpdates', () => {
       { organizationId: ORGANIZATION, worktreeIds: [WORKTREE_A], includeAncestors: true },
       { workspaces: [first] }
     );
-    const refreshed = { ...first, openChats: [], closedChats: first.openChats };
+    const refreshed = { ...first, openChatCount: 0, closedChatCount: 1, latestOpenSessionId: null };
     mockNetwork.workspaceSummaries.mockImplementation(input =>
       Promise.resolve({ workspaces: input.search ? [] : [refreshed] })
     );

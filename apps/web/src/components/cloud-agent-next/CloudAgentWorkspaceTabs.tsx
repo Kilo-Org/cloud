@@ -34,6 +34,7 @@ import { CHAT_TAB_ID, fileTabId, terminalTabId } from './workspace-tabs';
 import type { FileWorkspaceTab, TerminalWorkspaceTab, WorkspaceTabId } from './workspace-tabs';
 import type { StoredSession } from './types';
 import type { TerminalStatus } from './useCloudAgentTerminal';
+import { OPEN_CHAT_TAB_PAGE_SIZE, type ChatTabPages } from './hooks/useWorkspaceChats';
 
 type TerminalStatusSummary = {
   status: TerminalStatus;
@@ -72,6 +73,9 @@ export function CloudAgentWorkspaceTabs({
   worktreeId,
   openChatSessionIds,
   closedChatSessionIds,
+  openChatPages,
+  closedChatPages,
+  requestClosedHistory,
   onSelectChat,
   onCloseChat,
   onCreateChat,
@@ -101,6 +105,9 @@ export function CloudAgentWorkspaceTabs({
   worktreeId?: string | null;
   openChatSessionIds?: readonly string[];
   closedChatSessionIds?: readonly string[];
+  openChatPages?: ChatTabPages;
+  closedChatPages?: ChatTabPages;
+  requestClosedHistory?: () => void;
   onSelectChat: (sessionId: string) => void;
   onCloseChat?: (sessionId: string) => void;
   onCreateChat?: () => void;
@@ -141,13 +148,22 @@ export function CloudAgentWorkspaceTabs({
   const groupedSessionsById = new Map(
     groupedChatSessions.map(session => [session.sessionId, session])
   );
-  const visibleChatSessions =
+  const openChatSessions =
     openChatSessionIds === undefined
       ? groupedChatSessions
       : openChatSessionIds
           .map(sessionId => groupedSessionsById.get(sessionId))
           .filter(session => session !== undefined);
-  const openSessionIds = new Set(visibleChatSessions.map(session => session.sessionId));
+  const visibleChatSessions = openChatSessions.slice(0, OPEN_CHAT_TAB_PAGE_SIZE);
+  const activeChat = openChatSessions.find(session => session.sessionId === currentSessionId);
+  if (activeChat && !visibleChatSessions.includes(activeChat)) {
+    visibleChatSessions[OPEN_CHAT_TAB_PAGE_SIZE - 1] = activeChat;
+  }
+  const visibleChatIds = new Set(visibleChatSessions.map(session => session.sessionId));
+  const moreChatSessions = openChatSessions.filter(
+    session => !visibleChatIds.has(session.sessionId)
+  );
+  const openSessionIds = new Set(openChatSessions.map(session => session.sessionId));
   const closedChatSessions = (
     closedChatSessionIds ?? groupedChatSessions.map(session => session.sessionId)
   ).flatMap(sessionId => {
@@ -585,6 +601,46 @@ export function CloudAgentWorkspaceTabs({
       </TabsList>
 
       <div className="flex shrink-0 items-center gap-1 py-1 pr-1">
+        {selectedWorktreeId &&
+          (moreChatSessions.length > 0 || openChatPages?.hasMore || openChatPages?.error) && (
+            <DropdownMenu
+              onOpenChange={open => {
+                if (open && moreChatSessions.length === 0 && openChatPages?.hasMore)
+                  openChatPages.loadMore();
+              }}
+            >
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 [@media(any-pointer:coarse)]:h-12">
+                  More tabs <ChevronDown className="size-3.5" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-72 max-w-[calc(100vw-2rem)]"
+                aria-label="More tabs"
+              >
+                {moreChatSessions.map(session => (
+                  <DropdownMenuItem
+                    key={session.sessionId}
+                    textValue={session.prompt}
+                    disabled={deletingSessionIds.includes(session.sessionId)}
+                    onSelect={() => {
+                      if (activeTabId !== CHAT_TAB_ID) onSelectTab(CHAT_TAB_ID);
+                      onSelectChat(session.sessionId);
+                    }}
+                  >
+                    <MessageSquare className="size-4" aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate">{session.prompt}</span>
+                    <SessionStatusIndicator
+                      status={session.sessionStatus ?? null}
+                      statusUpdatedAt={session.sessionStatusUpdatedAt ?? null}
+                    />
+                  </DropdownMenuItem>
+                ))}
+                <ChatTabPageAction pages={openChatPages} />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         {selectedWorktreeId ? (
           <div className="border-border flex h-8 shrink-0 items-center rounded-md border [@media(any-pointer:coarse)]:h-12">
             {onCreateChat && (
@@ -601,7 +657,11 @@ export function CloudAgentWorkspaceTabs({
                 <Plus className="h-4 w-4" aria-hidden="true" />
               </Button>
             )}
-            <DropdownMenu>
+            <DropdownMenu
+              onOpenChange={open => {
+                if (open) requestClosedHistory?.();
+              }}
+            >
               <DropdownMenuTrigger asChild>
                 <Button
                   ref={tabOptionsTriggerRef}
@@ -644,7 +704,9 @@ export function CloudAgentWorkspaceTabs({
                 )}
                 {(onCreateChat || canCreateTerminal) && <DropdownMenuSeparator />}
                 <DropdownMenuLabel>Sessions</DropdownMenuLabel>
-                {closedChatSessions.length === 0 ? (
+                {closedChatSessions.length === 0 &&
+                !closedChatPages?.loading &&
+                !closedChatPages?.error ? (
                   <DropdownMenuItem disabled>No closed sessions</DropdownMenuItem>
                 ) : (
                   closedChatSessions.map(session => {
@@ -686,6 +748,7 @@ export function CloudAgentWorkspaceTabs({
                     );
                   })
                 )}
+                <ChatTabPageAction pages={closedChatPages} />
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -704,5 +767,20 @@ export function CloudAgentWorkspaceTabs({
         ) : null}
       </div>
     </div>
+  );
+}
+
+function ChatTabPageAction({ pages }: { pages?: ChatTabPages }) {
+  if (pages?.loading) return <DropdownMenuItem disabled>Loading tabs…</DropdownMenuItem>;
+  if (!pages?.hasMore && !pages?.error) return null;
+  return (
+    <DropdownMenuItem
+      onSelect={event => {
+        event.preventDefault();
+        pages.loadMore();
+      }}
+    >
+      {pages.error ? 'Retry loading tabs' : 'Load more'}
+    </DropdownMenuItem>
   );
 }

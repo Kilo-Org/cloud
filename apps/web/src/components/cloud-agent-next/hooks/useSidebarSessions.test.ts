@@ -6,18 +6,18 @@ import {
   groupSidebarSessionsByDate,
   SIDEBAR_RUNNING_BUMP_INTERVAL_MS,
 } from './sidebar-session-model';
-import {
-  groupSidebarWorkspaces,
-  latestOpenWorkspaceChat,
-  workspaceSummaryChats,
-} from './sidebar-workspace-model';
+import { groupSidebarWorkspaces, workspaceChatToStoredSession } from './sidebar-workspace-model';
 import {
   getMissingWorkspaceAncestorIds,
   getWorkspaceSummaryRefetchInterval,
 } from './useWorkspaceSummaries';
 import { mergeWorkspaceChats } from './useWorkspaceChats';
 import { sidebarListInput } from './sidebar-queries';
-import { workspaceSummaryFixture, WORKSPACE_FIXTURE_TIME } from './workspace-summary-test-fixtures';
+import {
+  workspaceChatFixture,
+  workspaceSummaryFixture,
+  WORKSPACE_FIXTURE_TIME,
+} from './workspace-summary-test-fixtures';
 
 const now = Date.parse(WORKSPACE_FIXTURE_TIME);
 
@@ -33,12 +33,14 @@ describe('workspace sidebar summaries', () => {
 
   it('does not reconstruct workspace rows from server search or recent-chat results', () => {
     const summary = workspaceSummaryFixture();
-    expect(groupSidebarWorkspaces(workspaceSummaryChats(summary))).toEqual([]);
+    expect(
+      groupSidebarWorkspaces([workspaceChatToStoredSession(summary, workspaceChatFixture())])
+    ).toEqual([]);
   });
 
   it('keeps pending local chats separate, and yields to server chat summaries', () => {
     const summary = workspaceSummaryFixture();
-    const [server] = workspaceSummaryChats(summary);
+    const server = workspaceChatToStoredSession(summary, workspaceChatFixture());
     const pending = { ...server, sessionId: 'ses_pending', localSync: 'syncing' as const };
     const staleLocal = { ...server, prompt: 'Local title', localSync: 'syncing' as const };
     expect(mergeWorkspaceChats(summary.worktreeId, [server], [pending, staleLocal])).toEqual([
@@ -46,7 +48,7 @@ describe('workspace sidebar summaries', () => {
       pending,
     ]);
     const [group] = groupSidebarWorkspaces([pending], {}, [summary]);
-    expect(group.sessions.map(chat => chat.sessionId)).toEqual(['ses_root', 'ses_pending']);
+    expect(group.sessions.map(chat => chat.sessionId)).toEqual(['ses_pending']);
     expect(group.summary).toBe(summary);
   });
 
@@ -89,32 +91,14 @@ describe('workspace sidebar summaries', () => {
     ).toEqual({ status: null, statusUpdatedAt: null, isLive: false });
   });
 
-  it('uses summary open-chat order immediately, followed by recently closed chats', () => {
-    const initial = workspaceSummaryFixture();
-    const chat = initial.openChats[0];
+  it('uses the latest open chat as the workspace navigation target without chat details', () => {
     const summary = workspaceSummaryFixture({
-      openChats: [{ ...chat, sessionId: 'ses_second' }, chat],
-      closedChats: [{ ...chat, sessionId: 'ses_closed' }],
+      latestSessionId: 'ses_closed',
       latestOpenSessionId: 'ses_root',
     });
-    expect(workspaceSummaryChats(summary).map(chat => chat.sessionId)).toEqual([
-      'ses_second',
-      'ses_root',
-      'ses_closed',
-    ]);
-    expect(groupSidebarWorkspaces([], {}, [summary])[0].latestSession.sessionId).toBe('ses_root');
-  });
-
-  it('selects the next open summary chat while a legacy import or local close is pending', () => {
-    const summary = workspaceSummaryFixture();
-    const second = {
-      ...summary.openChats[0],
-      sessionId: 'ses_second',
-      lastActivityAt: '2026-11-09T00:00:00Z',
-    };
-    const workspace = { ...summary, openChats: [...summary.openChats, second] };
-    expect(latestOpenWorkspaceChat(workspace, ['ses_root'])).toBe('ses_second');
-    expect(latestOpenWorkspaceChat(workspace, ['ses_root', 'ses_second'])).toBeNull();
+    const [group] = groupSidebarWorkspaces([], {}, [summary]);
+    expect(group.latestSession.sessionId).toBe('ses_root');
+    expect(group.sessions).toEqual([]);
   });
 });
 
@@ -150,13 +134,11 @@ describe('workspace polling', () => {
       const stale = {
         ...summary,
         hasOpenRun: true,
-        openChats: [
-          {
-            ...summary.openChats[0],
-            sessionStatus,
-            updatedAt: new Date(now - 3 * 60 * 60_000).toISOString(),
-          },
-        ],
+        sessionStatus,
+        status: {
+          ...summary.status,
+          statusUpdatedAt: new Date(now - 3 * 60 * 60_000).toISOString(),
+        },
       };
       expect(getWorkspaceSummaryRefetchInterval(stale, now)).toBe(false);
       expect(getWorkspaceSummaryRefetchInterval(stale, now - 1)).toBe(30_000);
@@ -214,7 +196,7 @@ describe('standalone sidebar sessions', () => {
   });
 
   it('preserves the 60-second running sort step', () => {
-    const [session] = workspaceSummaryChats(workspaceSummaryFixture());
+    const session = workspaceChatToStoredSession(workspaceSummaryFixture(), workspaceChatFixture());
     const moving = { ...session, lastActivityAt: new Date(now + 59_999).toISOString() };
     expect(getRunningSessionSortTime(moving, true)).toBe(now);
     expect(
@@ -226,7 +208,7 @@ describe('standalone sidebar sessions', () => {
   });
 
   it('groups standalone sessions by activity without workspace dates', () => {
-    const [session] = workspaceSummaryChats(workspaceSummaryFixture());
+    const session = workspaceChatToStoredSession(workspaceSummaryFixture(), workspaceChatFixture());
     const standalone: StoredSession = { ...session, worktreeId: null };
     expect(groupSidebarSessionsByDate([standalone], new Date(now))[0]).toMatchObject({
       label: 'Today',

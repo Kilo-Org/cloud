@@ -592,7 +592,15 @@ const WorkspaceSummariesInputSchema = WorktreeDetailsInputSchema.extend({
 
 const WorkspaceChatsInputSchema = WorktreeInputSchema.extend({
   limit: z.number().int().min(1).max(200).default(50),
-  cursor: z.object({ createdAt: z.iso.datetime(), sessionId: z.string().min(1) }).optional(),
+  cursor: z
+    .object({
+      createdAt: z.iso.datetime(),
+      sessionId: z.string().min(1),
+      position: z.number().int().min(1).max(2147483647).optional(),
+    })
+    .optional(),
+  tabState: z.enum(['open', 'closed']).optional(),
+  sessionId: z.string().min(1).max(200).optional(),
 });
 const ListSessionsInputSchema = z.object({
   cursor: z.iso.datetime().optional(),

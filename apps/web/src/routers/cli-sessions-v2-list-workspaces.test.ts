@@ -280,6 +280,8 @@ describe('cliSessionsV2 workspace read model', () => {
       latestOpenSessionId: unordered.session_id,
       cloudAgentSessionId: unordered.cloud_agent_session_id,
       chatCount: 4,
+      openChatCount: 2,
+      closedChatCount: 2,
       baseBranch: 'main',
       baseSha: 'base-sha',
       gitUrl: GIT_URL,
@@ -290,15 +292,15 @@ describe('cliSessionsV2 workspace read model', () => {
       status: { kind: 'running', sessionId: active.session_id, sessionStatus: 'busy' },
       hasOpenRun: false,
     });
-    expect(result.workspaces[0]?.openChats.map(chat => chat.sessionId)).toEqual([
-      'ses_active',
-      'ses_unordered',
-    ]);
-    expect(result.workspaces[0]?.closedChats.map(chat => chat.sessionId)).toEqual([
-      'ses_latest',
-      'ses_first',
-    ]);
-    expect(result.workspaces[0]?.openChats[0]).toMatchObject({
+    expect(result.workspaces[0]).not.toHaveProperty('openChats');
+    expect(result.workspaces[0]).not.toHaveProperty('closedChats');
+    const caller = sessionCaller();
+    const input = { organizationId: null, worktreeId: worktree };
+    const open = await caller.workspaceChats({ ...input, tabState: 'open' });
+    const closed = await caller.workspaceChats({ ...input, tabState: 'closed' });
+    expect(open.chats.map(chat => chat.sessionId)).toEqual(['ses_active', 'ses_unordered']);
+    expect(closed.chats.map(chat => chat.sessionId)).toEqual(['ses_latest', 'ses_first']);
+    expect(open.chats[0]).toMatchObject({
       title: 'Active chat',
       cloudAgentSessionId: active.cloud_agent_session_id,
       sessionStatusUpdatedAt: now,
@@ -957,10 +959,66 @@ describe('cliSessionsV2 workspace read model', () => {
     await insertWorkspace([session]);
     const result = await sessionCaller().listWorkspaces({ organizationId: null });
     expect(result.workspaces[0]?.status.kind).toBe('idle');
-    expect(result.workspaces[0]?.openChats[0]?.createdAt).toBe('2026-04-29T01:16:12.945Z');
-    expect(result.workspaces[0]?.openChats[0]?.sessionStatusUpdatedAt).toBe(
-      '2026-04-29T01:16:12.945Z'
+    const tabs = await sessionCaller().workspaceChats({
+      organizationId: null,
+      worktreeId: cloudAgentWorktreeIdSchema.parse(session.cloud_agent_worktree_id),
+      tabState: 'open',
+    });
+    expect(tabs.chats[0]?.createdAt).toBe('2026-04-29T01:16:12.945Z');
+    expect(tabs.chats[0]?.sessionStatusUpdatedAt).toBe('2026-04-29T01:16:12.945Z');
+  });
+
+  it('pages all open and closed tabs independently without changing persisted tab state', async () => {
+    const worktree = worktreeId();
+    const openIds = Array.from(
+      { length: 53 },
+      (_, index) => `ses_open_${String(index).padStart(2, '0')}`
     );
+    const closedIds = Array.from(
+      { length: 23 },
+      (_, index) => `ses_closed_${String(index).padStart(2, '0')}`
+    ).reverse();
+    const tabOrder = openIds.toReversed().slice(0, 52);
+    await insertWorkspace(
+      [...openIds, ...closedIds].map(id => makeSession(id, worktree)),
+      {
+        tab_order: tabOrder,
+        closed_session_ids: [closedIds[0], 'ses_missing', ...closedIds.slice(1)],
+      }
+    );
+    const caller = sessionCaller();
+    const scope = { organizationId: null, worktreeId: worktree };
+    const open = await caller.workspaceChats({ ...scope, tabState: 'open', limit: 50 });
+    const more = await caller.workspaceChats({
+      ...scope,
+      tabState: 'open',
+      limit: 50,
+      cursor: open.nextCursor ?? undefined,
+    });
+    expect(open.chats.map(chat => chat.sessionId)).toEqual(tabOrder.slice(0, 50));
+    expect(more.chats.map(chat => chat.sessionId)).toEqual([...tabOrder.slice(50), openIds[0]]);
+    expect(more.nextCursor).toBeNull();
+    const closed = await caller.workspaceChats({ ...scope, tabState: 'closed', limit: 20 });
+    const older = await caller.workspaceChats({
+      ...scope,
+      tabState: 'closed',
+      limit: 20,
+      cursor: closed.nextCursor ?? undefined,
+    });
+    expect(closed.chats.map(chat => chat.sessionId)).toEqual(closedIds.slice(0, 20));
+    expect(older.chats.map(chat => chat.sessionId)).toEqual(closedIds.slice(20));
+    expect(older.nextCursor).toBeNull();
+    const active = await caller.workspaceChats({ ...scope, sessionId: openIds[0], limit: 1 });
+    expect(active.chats).toMatchObject([{ sessionId: openIds[0], tabClosed: false }]);
+    const summary = await caller.workspaceSummaries({
+      organizationId: null,
+      worktreeIds: [worktree],
+    });
+    expect(summary.workspaces).toMatchObject([
+      { chatCount: 76, openChatCount: 53, closedChatCount: 23 },
+    ]);
+    expect(summary.workspaces[0]).not.toHaveProperty('openChats');
+    expect(summary.workspaces[0]).not.toHaveProperty('closedChats');
   });
 
   it('pages root chats by creation and ID with no age cutoff and preserves microseconds in cursors', async () => {

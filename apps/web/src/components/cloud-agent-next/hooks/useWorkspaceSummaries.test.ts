@@ -4,13 +4,13 @@ import { QueryClient, QueryClientProvider, skipToken } from '@tanstack/react-que
 import { parseHTML } from 'linkedom';
 import { useWorkspaceSummaryLookup, type WorkspaceSummary } from './useWorkspaceSummaries';
 import { useWorkspaceChats } from './useWorkspaceChats';
-import { workspaceSummaryFixture } from './workspace-summary-test-fixtures';
+import { workspaceChatFixture, workspaceSummaryFixture } from './workspace-summary-test-fixtures';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 
 const mockSummaries = jest.fn<Promise<{ workspaces: WorkspaceSummary[] }>, [unknown]>();
 const mockChats = jest.fn<
   Promise<{
-    chats: WorkspaceSummary['openChats'];
+    chats: (ReturnType<typeof workspaceChatFixture> & { tabClosed: boolean })[];
     nextCursor: { createdAt: string; sessionId: string } | null;
   }>,
   [unknown]
@@ -203,34 +203,47 @@ it('keeps a fetched stack lookup active for reconnect invalidation', async () =>
   }
 });
 
-it('renders selected workspace tabs from the summary and requests chat pages only on demand', async () => {
+it('loads open tabs immediately and only requests 20 closed tabs at a time after opening history', async () => {
   const client = new QueryClient({
     defaultOptions: { queries: { gcTime: Infinity, retry: false } },
   });
   const summary = workspaceSummaryFixture();
-  const cursor = { createdAt: summary.openChats[0].createdAt, sessionId: 'ses_page_end' };
-  mockChats.mockResolvedValue({ chats: [], nextCursor: cursor });
+  const chat = workspaceChatFixture();
+  const cursor = { createdAt: chat.createdAt, sessionId: 'ses_page_end' };
+  mockChats.mockImplementation(async input => {
+    if (typeof input === 'object' && input && 'tabState' in input && input.tabState === 'closed')
+      return { chats: [], nextCursor: 'cursor' in input && input.cursor ? null : cursor };
+    return { chats: [{ ...chat, tabClosed: false }], nextCursor: null };
+  });
   let result: ReturnType<typeof useWorkspaceChats> | undefined;
   const cleanup = await mount(client, function Probe() {
     result = useWorkspaceChats({
       organizationId: null,
       worktreeId: cloudAgentWorktreeIdSchema.parse(summary.worktreeId),
       workspace: summary,
-      pendingChats: [],
+      currentSessionId: null,
     });
     return null;
   });
   try {
-    expect(result?.chats.map(chat => chat.sessionId)).toEqual(['ses_root']);
-    expect(mockChats).not.toHaveBeenCalled();
-    await act(async () => result?.loadMore());
     expect(mockChats).toHaveBeenCalledTimes(1);
-    mockChats.mockResolvedValue({ chats: [], nextCursor: null });
-    await act(async () => result?.loadMore());
+    expect(mockChats).toHaveBeenLastCalledWith(
+      expect.objectContaining({ tabState: 'open', limit: 50 })
+    );
+    await act(async () => {
+      result?.requestClosedHistory();
+    });
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(result?.serverChats.map(chat => chat.sessionId)).toEqual(['ses_root']);
+    expect(mockChats).toHaveBeenCalledTimes(2);
+    await act(async () => result?.closedPages.loadMore());
     expect(mockChats).toHaveBeenLastCalledWith({
       organizationId: null,
       worktreeId: summary.worktreeId,
-      limit: 50,
+      tabState: 'closed',
+      limit: 20,
       cursor,
     });
   } finally {

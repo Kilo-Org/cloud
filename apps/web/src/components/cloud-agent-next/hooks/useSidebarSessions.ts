@@ -9,7 +9,7 @@ import {
 import { useWorkspaceSummaries } from './useWorkspaceSummaries';
 import { useStandaloneSessions, type SidebarSearchInput } from './useStandaloneSessions';
 import { useSidebarLiveUpdates } from './useSidebarLiveUpdates';
-import { workspaceSummaryChats, workspaceRowToSidebarDetails } from './sidebar-workspace-model';
+import { workspaceRowToSidebarDetails } from './sidebar-workspace-model';
 
 export * from './sidebar-session-model';
 export { groupSidebarWorkspaces, workspaceRowToSidebarDetails } from './sidebar-workspace-model';
@@ -54,6 +54,7 @@ export function useSidebarSessions(options: UseSidebarSessionsOptions = {}) {
       trpc.cliSessionsV2.listWorkspaces.infiniteQueryFilter(workspaceListInput)
     );
     void queryClient.invalidateQueries(trpc.cliSessionsV2.workspaceSummaries.pathFilter());
+    void queryClient.invalidateQueries(trpc.cliSessionsV2.workspaceChats.pathFilter());
   }, [listInput, queryClient, searchInput, trpc, workspaceListInput]);
   const workspaces = useWorkspaceSummaries(workspaceListInput);
   const standalone = useStandaloneSessions({
@@ -77,16 +78,9 @@ export function useSidebarSessions(options: UseSidebarSessionsOptions = {}) {
       ),
     [workspaces.workspaces]
   );
-  const cachedSessions = useMemo(
-    () => [
-      ...standalone.standaloneSessions,
-      ...workspaces.workspaces.flatMap(workspaceSummaryChats),
-    ],
-    [standalone.standaloneSessions, workspaces.workspaces]
-  );
   return {
     sessions: standalone.sessions,
-    cachedSessions,
+    cachedSessions: standalone.standaloneSessions,
     worktreeDetails,
     workspaceRows: workspaces.workspaces,
     workspaceOrder: workspaces.workspaceOrder,

@@ -19,14 +19,13 @@ import {
 } from './workspace-activity';
 import { DEFAULT_WORKSPACE_ORDER, type WorkspaceOrder } from './workspace-folders';
 import {
-  hydrateWorkspaceChats,
+  hydrateWorkspaceSummaries,
   readWorkspaceDirectory,
   readWorkspaceStackDirectory,
   readWorkspaceChatPage,
   type WorkspaceDirectoryRow,
   type WorkspaceStackDirectoryRow,
   type WorkspaceReadScope,
-  type WorkspaceChatSummary,
 } from './workspace-read-model-queries';
 
 export type { WorkspaceChatSummary } from './workspace-read-model-queries';
@@ -216,17 +215,10 @@ function workspaceComparator(order: WorkspaceOrder) {
   };
 }
 
-function activityComparator(a: WorkspaceChatSummary, b: WorkspaceChatSummary) {
-  return (
-    Date.parse(b.lastActivityAt ?? b.createdAt) - Date.parse(a.lastActivityAt ?? a.createdAt) ||
-    b.sessionId.localeCompare(a.sessionId)
-  );
-}
-
 async function hydrateWorkspaces(scope: WorkspaceReadScope, rows: ClassifiedWorkspace[]) {
   const hydration = new Map(
     (
-      await hydrateWorkspaceChats(
+      await hydrateWorkspaceSummaries(
         scope,
         rows.map(row => row.worktreeId)
       )
@@ -235,25 +227,7 @@ async function hydrateWorkspaces(scope: WorkspaceReadScope, rows: ClassifiedWork
   const workspaces = rows.flatMap(row => {
     const hydrated = hydration.get(row.worktreeId);
     if (!hydrated) return [];
-    const chats = hydrated.chats;
-    const root = chats[0];
-    if (!root) return [];
-    const closedIds = new Set(row.closedSessionIds);
-    const tabPositions = new Map(row.tabOrder.map((id, index) => [id, index]));
-    const openChats = chats
-      .filter(chat => !closedIds.has(chat.sessionId))
-      .sort((a, b) => {
-        const position =
-          (tabPositions.get(a.sessionId) ?? Infinity) - (tabPositions.get(b.sessionId) ?? Infinity);
-        return Number.isNaN(position) ? 0 : position;
-      });
-    const chatsById = new Map(chats.map(chat => [chat.sessionId, chat]));
-    const closedChats = [...new Set(row.closedSessionIds)].flatMap(id => {
-      const chat = chatsById.get(id);
-      return chat ? [chat] : [];
-    });
-    const latest = [...chats].sort(activityComparator)[0] ?? root;
-    const latestOpen = [...openChats].sort(activityComparator)[0];
+    const { rootTitle, latestOpenSessionId } = hydrated;
     const pr = row.pr
       ? formatAssociatedPr(
           {
@@ -271,7 +245,7 @@ async function hydrateWorkspaces(scope: WorkspaceReadScope, rows: ClassifiedWork
       {
         worktreeId: row.worktreeId,
         name: row.name,
-        defaultTitle: root.title?.trim() && !isDefaultSessionTitle(root.title) ? root.title : null,
+        defaultTitle: rootTitle?.trim() && !isDefaultSessionTitle(rootTitle) ? rootTitle : null,
         branch: row.branch,
         createdAt: row.createdAt,
         lastActivityAt: row.lastActivityAt,
@@ -280,10 +254,12 @@ async function hydrateWorkspaces(scope: WorkspaceReadScope, rows: ClassifiedWork
         parentWorktreeId: row.parentWorktreeId,
         baseBranch: row.baseBranch,
         baseSha: row.baseSha,
-        rootSessionId: root.sessionId,
-        latestSessionId: latest.sessionId,
-        latestOpenSessionId: latestOpen?.sessionId ?? null,
-        cloudAgentSessionId: latestOpen?.cloudAgentSessionId ?? latest.cloudAgentSessionId,
+        rootSessionId: hydrated.rootSessionId,
+        latestSessionId: row.latest.sessionId,
+        latestOpenSessionId,
+        cloudAgentSessionId: latestOpenSessionId
+          ? hydrated.latestOpenCloudAgentSessionId
+          : row.latest.cloudAgentSessionId,
         gitUrl: row.gitUrl,
         pr,
         status: row.status,
@@ -291,10 +267,10 @@ async function hydrateWorkspaces(scope: WorkspaceReadScope, rows: ClassifiedWork
         destination: row.destination,
         stackRootId: row.stackRootId,
         stackDepth: row.stackDepth,
-        chatCount: chats.length,
+        chatCount: hydrated.chatCount,
+        openChatCount: hydrated.chatCount - hydrated.closedChatCount,
+        closedChatCount: hydrated.closedChatCount,
         hasOpenRun: hydrated.hasOpenRun,
-        openChats,
-        closedChats,
       },
     ];
   });

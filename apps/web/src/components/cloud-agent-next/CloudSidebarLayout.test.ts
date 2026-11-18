@@ -191,6 +191,16 @@ jest.mock('./hooks/useWorkspaceSummaries', () => ({
   useWorkspaceSummaryLookup: () => ({ workspaces: [] }),
 }));
 
+jest.mock('./hooks/useWorkspaceChats', () => ({
+  ...jest.requireActual('./hooks/useWorkspaceChats'),
+  useWorkspaceChats: () => ({
+    serverChats: [],
+    openChats: [],
+    closedChats: [],
+    closedHistoryIds: new Set(),
+  }),
+}));
+
 jest.mock('./hooks/useSidebarPreferences', () => ({
   useSidebarPreferences: () => ({
     platformFilter: [],

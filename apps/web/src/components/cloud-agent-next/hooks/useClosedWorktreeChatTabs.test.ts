@@ -7,13 +7,16 @@ import {
   useQuery,
   type InfiniteData,
 } from '@tanstack/react-query';
-import type { WorkspaceSummary } from '@/lib/cloud-agent/workspace-read-model';
+import type { WorkspaceChatTabSummary } from '../worktree-chat-tabs';
+import { workspaceSummaryFixture } from './workspace-summary-test-fixtures';
 import { useClosedWorktreeChatTabs } from './useClosedWorktreeChatTabs';
 
 const WORKTREE = 'worktree_11111111-1111-4111-8111-111111111111';
 const STORAGE_KEY = 'cloud-agent:closed-worktree-chat-tabs:user:synthetic:personal';
 const LIST_KEY = ['listWorkspaces'];
+const SELECTED_TABS_KEY = ['selectedTabs'];
 const SUMMARY_KEY = ['workspaceSummaries'];
+const TAB_KEY = ['workspaceChats', { input: { worktreeId: WORKTREE, organizationId: null } }];
 const mockClose = jest.fn();
 const mockReopen = jest.fn();
 const mockReorder = jest.fn();
@@ -22,8 +25,8 @@ const mockImport = jest.fn();
 const mockError = jest.fn();
 const mockSummaries = jest.fn();
 type WorkspaceCache =
-  | { workspaces: WorkspaceSummary[] }
-  | InfiniteData<{ workspaces: WorkspaceSummary[] }>;
+  | { workspaces: WorkspaceChatTabSummary[] }
+  | InfiniteData<{ workspaces: WorkspaceChatTabSummary[] }>;
 const mockTrpc = {
   cliSessionsV2: {
     closeWorkspaceTab: {
@@ -42,6 +45,7 @@ const mockTrpc = {
       mutationOptions: () => ({ mutationFn: (input: unknown) => mockImport(input) }),
     },
     listWorkspaces: { pathFilter: () => ({ queryKey: LIST_KEY }) },
+    workspaceChats: { pathFilter: () => ({ queryKey: ['workspaceChats'] }) },
     workspaceSummaries: {
       pathFilter: () => ({ queryKey: SUMMARY_KEY }),
       queryOptions: (input: unknown) => ({
@@ -55,7 +59,7 @@ const mockTrpc = {
 jest.mock('@/lib/trpc/utils', () => ({ useTRPC: () => mockTrpc }));
 jest.mock('sonner', () => ({ toast: { error: (...args: unknown[]) => mockError(...args) } }));
 
-function summary(openIds: string[], closedIds: string[] = []): WorkspaceSummary {
+function summary(openIds: string[], closedIds: string[] = []): WorkspaceChatTabSummary {
   const chat = (sessionId: string) => ({
     sessionId,
     title: sessionId,
@@ -71,7 +75,7 @@ function summary(openIds: string[], closedIds: string[] = []): WorkspaceSummary 
     openChats: openIds.map(chat),
     closedChats: closedIds.map(chat),
     latestOpenSessionId: openIds[0] ?? null,
-  } as WorkspaceSummary;
+  };
 }
 
 function installDom() {
@@ -127,7 +131,7 @@ describe('server-backed workspace chat tabs', () => {
     organizationId?: string | null;
   }) {
     const { data } = useQuery<WorkspaceCache>({
-      queryKey: LIST_KEY,
+      queryKey: SELECTED_TABS_KEY,
       queryFn: async () => ({ workspaces: [] }),
       enabled: false,
     });
@@ -171,7 +175,7 @@ describe('server-backed workspace chat tabs', () => {
     queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
-    queryClient.setQueryData(LIST_KEY, { workspaces: [summary(['a', 'b'], ['closed'])] });
+    queryClient.setQueryData(SELECTED_TABS_KEY, { workspaces: [summary(['a', 'b'], ['closed'])] });
     root = createRoot(dom.container);
   });
   afterEach(async () => {
@@ -186,7 +190,7 @@ describe('server-backed workspace chat tabs', () => {
     expect(mockImport).not.toHaveBeenCalled();
   });
 
-  it('patches React Query optimistically without writing browser storage', async () => {
+  it('updates the selected tabs optimistically without writing browser storage', async () => {
     let finish: (value: { worktreeIds: string[] }) => void = () => undefined;
     mockClose.mockReturnValue(
       new Promise(resolve => {
@@ -224,40 +228,40 @@ describe('server-backed workspace chat tabs', () => {
         finish = resolve;
       })
     );
-    mockSummaries.mockResolvedValue({ workspaces: [summary(['a'], ['b', 'closed'])] });
     await render();
     await act(async () => probe?.closeChatTab('b'));
     await act(async () => {
-      queryClient.setQueryData(LIST_KEY, { workspaces: [summary(['a', 'b'], ['closed'])] });
+      queryClient.setQueryData(SELECTED_TABS_KEY, {
+        workspaces: [summary(['a', 'b'], ['closed'])],
+      });
     });
     await flush();
     expect(probe?.closedSessionIds).toContain('b');
+    queryClient.setQueryData(SELECTED_TABS_KEY, { workspaces: [summary(['a'], ['b', 'closed'])] });
     await act(async () => finish({ worktreeIds: [WORKTREE] }));
     await flush();
     expect(probe?.closedSessionIds).toEqual(['closed', 'b']);
   });
 
-  it('patches infinite workspace pages and direct summaries without losing response metadata', async () => {
-    queryClient.setQueryData(LIST_KEY, {
-      pages: [{ workspaces: [summary(['a', 'b'])], totalCount: 12 }],
-      pageParams: [null],
+  it('invalidates the selected workspace tab query and refreshes summary counts after a mutation', async () => {
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    const refreshed = workspaceSummaryFixture({
+      chatCount: 2,
+      openChatCount: 1,
+      closedChatCount: 1,
     });
-    queryClient.setQueryData(SUMMARY_KEY, { workspaces: [summary(['a', 'b'])] });
+    mockSummaries.mockResolvedValue({ workspaces: [refreshed] });
+    queryClient.setQueryData(TAB_KEY, { chats: [] });
+    queryClient.setQueryData(SUMMARY_KEY, { workspaces: [workspaceSummaryFixture()] });
     await render();
     await act(async () => probe?.closeChatTab('b'));
     await flush();
-    expect(probe?.closedSessionIds).toEqual(['b']);
-    expect(queryClient.getQueryData(LIST_KEY)).toMatchObject({
-      pages: [
-        {
-          totalCount: 12,
-          workspaces: [{ openChats: [{ sessionId: 'a' }], closedChats: [{ sessionId: 'b' }] }],
-        },
-      ],
-      pageParams: [null],
-    });
+    expect(invalidate).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['workspaceChats'] })
+    );
+    expect(queryClient.getQueryState(TAB_KEY)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryData(SUMMARY_KEY)).toMatchObject({
-      workspaces: [{ closedChats: [{ sessionId: 'b' }] }],
+      workspaces: [refreshed],
     });
   });
 
@@ -267,7 +271,7 @@ describe('server-backed workspace chat tabs', () => {
     expect(probe?.closedSessionIds).toContain('pending');
     expect(mockClose).not.toHaveBeenCalled();
     await act(async () => {
-      queryClient.setQueryData(LIST_KEY, {
+      queryClient.setQueryData(SELECTED_TABS_KEY, {
         workspaces: [summary(['a', 'b', 'pending'], ['closed'])],
       });
     });
@@ -277,7 +281,6 @@ describe('server-backed workspace chat tabs', () => {
       worktreeId: WORKTREE,
       sessionId: 'pending',
     });
-    expect(probe?.closedSessionIds).toContain('pending');
   });
 
   it('defers replacement until both chats have confirmed membership', async () => {
@@ -287,7 +290,7 @@ describe('server-backed workspace chat tabs', () => {
     expect(probe?.sessionOrderByWorktree[WORKTREE]).toEqual(['a', 'pending']);
     expect(mockReplace).not.toHaveBeenCalled();
     await act(async () => {
-      queryClient.setQueryData(LIST_KEY, {
+      queryClient.setQueryData(SELECTED_TABS_KEY, {
         workspaces: [summary(['a', 'b', 'pending'], ['closed'])],
       });
     });
@@ -298,10 +301,15 @@ describe('server-backed workspace chat tabs', () => {
       oldSessionId: 'b',
       newSessionId: 'pending',
     });
-    expect(probe?.sessionOrderByWorktree[WORKTREE]).toEqual(['a', 'pending']);
   });
 
   it('sends relative reorder operations', async () => {
+    mockReorder.mockImplementation(async () => {
+      queryClient.setQueryData(SELECTED_TABS_KEY, {
+        workspaces: [summary(['b', 'a'], ['closed'])],
+      });
+      return { worktreeIds: [WORKTREE] };
+    });
     await render();
     await act(async () => probe?.reorderChatTab(WORKTREE, 'b', 'a'));
     await flush();
@@ -325,7 +333,7 @@ describe('server-backed workspace chat tabs', () => {
       probe?.openChatTab('retried-local');
     });
     await act(async () => {
-      queryClient.setQueryData(LIST_KEY, {
+      queryClient.setQueryData(SELECTED_TABS_KEY, {
         workspaces: [summary(['a', 'b', 'retried-local'], ['closed'])],
       });
     });
@@ -337,8 +345,6 @@ describe('server-backed workspace chat tabs', () => {
       oldSessionId: 'b',
       newSessionId: 'retried-local',
     });
-    expect(probe?.closedSessionIds).toContain('b');
-    expect(probe?.sessionOrderByWorktree[WORKTREE]).toEqual(['a', 'retried-local']);
     expect(JSON.stringify(mockReopen.mock.calls)).not.toContain('failed-local');
   });
 
@@ -368,7 +374,7 @@ describe('server-backed workspace chat tabs', () => {
   });
 
   it('keeps an explicit reopen when it cancels a stale close reconciliation', async () => {
-    let finishRefresh: (value: { workspaces: WorkspaceSummary[] }) => void = () => undefined;
+    let finishRefresh: (value: { workspaces: WorkspaceChatTabSummary[] }) => void = () => undefined;
     mockSummaries
       .mockReturnValueOnce(
         new Promise(resolve => {

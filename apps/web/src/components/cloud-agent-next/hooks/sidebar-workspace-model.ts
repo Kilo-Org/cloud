@@ -4,7 +4,7 @@ import { getChatDisplayTitle } from '../utils/session-title';
 import type { WorkspaceSummary } from './useWorkspaceSummaries';
 import type { SidebarWorktreeDetails, SidebarWorktreeGroup } from './sidebar-session-model';
 
-export type WorkspaceChatSummary = WorkspaceSummary['openChats'][number];
+import type { WorkspaceChatSummary } from '@/lib/cloud-agent/workspace-read-model';
 
 export function workspaceChatToStoredSession(
   workspace: WorkspaceSummary,
@@ -31,49 +31,29 @@ export function workspaceChatToStoredSession(
   };
 }
 
-export function workspaceSummaryChats(workspace: WorkspaceSummary): StoredSession[] {
-  return [...workspace.openChats, ...workspace.closedChats].map(chat =>
-    workspaceChatToStoredSession(workspace, chat)
-  );
-}
-
-export function latestOpenWorkspaceChat(
-  workspace: WorkspaceSummary,
-  closedSessionIds: readonly string[]
-): string | null {
-  const closed = new Set(closedSessionIds);
-  if (workspace.latestOpenSessionId && !closed.has(workspace.latestOpenSessionId))
-    return workspace.latestOpenSessionId;
+export function workspaceHasNavigationSession(row: WorkspaceSummary, sessionId: string) {
   return (
-    [...workspace.openChats]
-      .sort(
-        (a, b) =>
-          Date.parse(b.lastActivityAt ?? b.createdAt) -
-            Date.parse(a.lastActivityAt ?? a.createdAt) || b.sessionId.localeCompare(a.sessionId)
-      )
-      .find(chat => !closed.has(chat.sessionId))?.sessionId ?? null
+    row.latestSessionId === sessionId ||
+    row.latestOpenSessionId === sessionId ||
+    row.rootSessionId === sessionId ||
+    row.status.sessionId === sessionId
   );
 }
 
 export function workspaceRowRepresentativeSession(row: WorkspaceSummary): StoredSession {
   const sessionId = row.latestOpenSessionId ?? row.latestSessionId ?? row.rootSessionId ?? '';
-  const chat = [...row.openChats, ...row.closedChats].find(chat => chat.sessionId === sessionId);
   return {
-    ...(chat
-      ? workspaceChatToStoredSession(row, chat)
-      : {
-          sessionId,
-          repository: extractRepoFromGitUrl(row.gitUrl) ?? '',
-          branch: row.branch,
-          worktreeId: row.worktreeId,
-          prompt: getChatDisplayTitle(null),
-          mode: 'code',
-          model: '',
-          status: 'completed' as const,
-          messages: [],
-          cloudAgentSessionId: row.cloudAgentSessionId,
-          associatedPr: row.pr,
-        }),
+    sessionId,
+    repository: extractRepoFromGitUrl(row.gitUrl) ?? '',
+    branch: row.branch,
+    worktreeId: row.worktreeId,
+    prompt: getChatDisplayTitle(row.defaultTitle),
+    mode: 'code',
+    model: '',
+    status: row.cloudAgentSessionId ? 'active' : 'completed',
+    messages: [],
+    cloudAgentSessionId: row.cloudAgentSessionId,
+    associatedPr: row.pr,
     createdAt: row.createdAt,
     updatedAt: row.lastActivityAt,
     lastActivityAt: row.lastActivityAt,
@@ -109,7 +89,7 @@ export function groupSidebarWorkspaces(
     groups.set(row.worktreeId, {
       type: 'worktree',
       worktreeId: row.worktreeId,
-      sessions: workspaceSummaryChats(row),
+      sessions: [],
       latestSession: workspaceRowRepresentativeSession(row),
       details: details[row.worktreeId] ?? workspaceRowToSidebarDetails(row),
       summary: row,

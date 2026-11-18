@@ -23,6 +23,7 @@ import {
   WORKSPACE_REFRESH_TIMEOUT_MS,
 } from './workspace-refresh';
 import { sidebarQueryInput } from './sidebar-query-scope';
+import { workspaceHasNavigationSession } from './sidebar-workspace-model';
 import {
   acceptsSidebarStatusUpdate,
   workspaceRefreshChangesMembership,
@@ -251,12 +252,25 @@ export function useSidebarLiveUpdates(options: Options): void {
 
   useEffect(() => {
     if (!connection) return;
+    const refreshTabs = (worktreeId: string) => {
+      void queryClient.invalidateQueries(
+        {
+          ...trpc.cliSessionsV2.workspaceChats.pathFilter(),
+          predicate: query => {
+            const input = sidebarQueryInput(query.queryKey);
+            return (
+              input?.organizationId === current.current.organizationId &&
+              input?.worktreeId === worktreeId
+            );
+          },
+        },
+        { cancelRefetch: false }
+      );
+    };
     const refreshSessionWorkspace = (sessionId: string, worktreeId?: string | null) => {
       const scope = current.current;
       const hasSession = (workspace: WorkspaceSummary) =>
-        [...workspace.openChats, ...workspace.closedChats].some(
-          chat => chat.sessionId === sessionId
-        );
+        workspaceHasNavigationSession(workspace, sessionId);
       const workspaceId =
         worktreeId ??
         scope.workspaces.find(hasSession)?.worktreeId ??
@@ -371,11 +385,18 @@ export function useSidebarLiveUpdates(options: Options): void {
       );
     };
     const unsubscribe = [
-      connection.onSessionEvent('workspace.updated', event =>
-        refresh.current?.schedule(event.worktreeId)
-      ),
+      connection.onSessionEvent('workspace.updated', event => {
+        refresh.current?.schedule(event.worktreeId);
+        refreshTabs(event.worktreeId);
+      }),
       connection.onSessionEvent('session.created', event => {
         patchRow(event.session, true);
+        if (
+          event.session.organizationId === current.current.organizationId &&
+          event.session.worktreeId &&
+          !event.session.parentSessionId
+        )
+          refreshTabs(event.session.worktreeId);
         if (matchesRow(event.session, current.current)) refreshRepositories();
       }),
       connection.onSessionEvent('session.updated', event => {
@@ -384,10 +405,10 @@ export function useSidebarLiveUpdates(options: Options): void {
           .getQueryData<Outputs['list']>(trpc.cliSessionsV2.list.queryKey(scope.listInput))
           ?.cliSessions.find(row => row.session_id === event.session.sessionId);
         patchRow(event.session, true);
-        const previousWorkspace = scope.workspaces.find(workspace =>
-          [...workspace.openChats, ...workspace.closedChats].some(
-            chat => chat.sessionId === event.session.sessionId
-          )
+        const previousWorkspace = scope.workspaces.find(
+          workspace =>
+            workspace.worktreeId === event.session.worktreeId ||
+            workspaceHasNavigationSession(workspace, event.session.sessionId)
         );
         if (
           matchesRow(event.session, scope) &&
@@ -471,7 +492,10 @@ export function useSidebarLiveUpdates(options: Options): void {
       connection.onSessionEvent('session.deleted', event => {
         const scope = current.current;
         if (event.organizationId !== scope.organizationId) return;
-        if (!event.parentSessionId) refreshSessionWorkspace(event.sessionId, event.worktreeId);
+        if (!event.parentSessionId) {
+          refreshSessionWorkspace(event.sessionId, event.worktreeId);
+          if (event.worktreeId) refreshTabs(event.worktreeId);
+        }
         queryClient.setQueryData<Outputs['list']>(
           trpc.cliSessionsV2.list.queryKey(scope.listInput),
           data =>

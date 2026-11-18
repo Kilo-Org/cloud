@@ -4,7 +4,17 @@ import { useTRPC } from '@/lib/trpc/utils';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import type { StoredSession } from '../types';
 import type { WorkspaceSummary } from './useWorkspaceSummaries';
-import { workspaceChatToStoredSession, workspaceSummaryChats } from './sidebar-workspace-model';
+import { workspaceChatToStoredSession } from './sidebar-workspace-model';
+
+export const OPEN_CHAT_TAB_PAGE_SIZE = 50;
+export const CLOSED_CHAT_TAB_PAGE_SIZE = 20;
+
+export type ChatTabPages = {
+  hasMore: boolean;
+  loading: boolean;
+  error: boolean;
+  loadMore: () => void;
+};
 
 export function mergeWorkspaceChats(
   worktreeId: string | null,
@@ -24,44 +34,94 @@ export function useWorkspaceChats({
   organizationId,
   worktreeId,
   workspace,
-  pendingChats,
+  currentSessionId,
 }: {
   organizationId: string | null;
   worktreeId: CloudAgentWorktreeId | null;
   workspace: WorkspaceSummary | undefined;
-  pendingChats: readonly StoredSession[];
+  currentSessionId: string | null;
 }) {
   const trpc = useTRPC();
-  const [requestedHistoryId, setRequestedHistoryId] = useState<string | null>(null);
-  const query = useInfiniteQuery({
+  const [requestedHistory, setRequestedHistory] = useState<string | null>(null);
+  const scope = worktreeId ? { organizationId, worktreeId } : null;
+  const scopeKey = scope ? JSON.stringify(scope) : null;
+  const historyRequested = scopeKey !== null && requestedHistory === scopeKey;
+  const open = useInfiniteQuery({
     ...trpc.cliSessionsV2.workspaceChats.infiniteQueryOptions(
-      worktreeId ? { organizationId, worktreeId, limit: 50 } : skipToken,
+      scope ? { ...scope, tabState: 'open', limit: OPEN_CHAT_TAB_PAGE_SIZE } : skipToken,
       { getNextPageParam: page => page.nextCursor ?? undefined }
     ),
-    enabled: Boolean(worktreeId && requestedHistoryId === worktreeId),
     staleTime: 5_000,
   });
-  const serverChats = useMemo(() => {
-    if (!workspace) return [];
-    const byId = new Map(workspaceSummaryChats(workspace).map(chat => [chat.sessionId, chat]));
-    for (const chat of query.data?.pages.flatMap(page => page.chats) ?? []) {
-      if (!byId.has(chat.sessionId))
-        byId.set(chat.sessionId, workspaceChatToStoredSession(workspace, chat));
+  const closed = useInfiniteQuery({
+    ...trpc.cliSessionsV2.workspaceChats.infiniteQueryOptions(
+      scope ? { ...scope, tabState: 'closed', limit: CLOSED_CHAT_TAB_PAGE_SIZE } : skipToken,
+      { getNextPageParam: page => page.nextCursor ?? undefined }
+    ),
+    enabled: historyRequested,
+    staleTime: 5_000,
+  });
+  const currentInOpen = open.data?.pages.some(page =>
+    page.chats.some(chat => chat.sessionId === currentSessionId)
+  );
+  const current = useInfiniteQuery({
+    ...trpc.cliSessionsV2.workspaceChats.infiniteQueryOptions(
+      scope && currentSessionId ? { ...scope, sessionId: currentSessionId, limit: 1 } : skipToken,
+      { getNextPageParam: () => undefined }
+    ),
+    enabled: scope !== null && currentSessionId !== null && !currentInOpen,
+    staleTime: 5_000,
+  });
+  const { openChats, closedChats } = useMemo(() => {
+    const openChats = open.data?.pages.flatMap(page => page.chats) ?? [];
+    const closedChats = closed.data?.pages.flatMap(page => page.chats) ?? [];
+    const active = current.data?.pages[0]?.chats[0];
+    if (active && !currentInOpen) {
+      if (!active.tabClosed) openChats.push(active);
+      else if (!closedChats.some(chat => chat.sessionId === active.sessionId))
+        closedChats.push(active);
     }
-    return [...byId.values()];
-  }, [query.data?.pages, workspace]);
-  const chats = useMemo(
-    () => mergeWorkspaceChats(worktreeId, serverChats, pendingChats),
-    [pendingChats, serverChats, worktreeId]
+    const openIds = new Set(openChats.map(chat => chat.sessionId));
+    return {
+      openChats,
+      closedChats: closedChats.filter(chat => !openIds.has(chat.sessionId)),
+    };
+  }, [open.data, closed.data, current.data, currentInOpen]);
+  const serverChats = useMemo(
+    () =>
+      workspace
+        ? [...openChats, ...closedChats].map(chat => workspaceChatToStoredSession(workspace, chat))
+        : [],
+    [workspace, openChats, closedChats]
   );
   return {
-    chats,
     serverChats,
-    isLoading: query.isLoading,
-    hasNextPage: query.hasNextPage,
-    loadMore: () => {
-      if (requestedHistoryId !== worktreeId) setRequestedHistoryId(worktreeId);
-      else void query.fetchNextPage();
+    openChats,
+    closedChats,
+    closedHistoryIds: useMemo(
+      () => new Set(closed.data?.pages.flatMap(page => page.chats.map(chat => chat.sessionId))),
+      [closed.data]
+    ),
+    requestClosedHistory: () => setRequestedHistory(scopeKey),
+    openPages: {
+      hasMore: open.hasNextPage,
+      loading: open.isFetching,
+      error: open.isError,
+      loadMore: () => {
+        if (open.isFetching) return;
+        if (open.data) void open.fetchNextPage();
+        else void open.refetch();
+      },
+    },
+    closedPages: {
+      hasMore: closed.hasNextPage,
+      loading: !historyRequested || closed.isFetching,
+      error: closed.isError,
+      loadMore: () => {
+        if (closed.isFetching) return;
+        if (closed.data) void closed.fetchNextPage();
+        else void closed.refetch();
+      },
     },
   };
 }

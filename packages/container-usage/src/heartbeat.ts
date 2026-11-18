@@ -193,10 +193,7 @@ export function installBillingHeartbeat(
   const recoverDeliveryFailure = async (
     context: BillingContext,
     error: unknown,
-    options: {
-      abandonAfterStoppedTimeout: boolean;
-      rethrowAfterReschedule: boolean;
-    }
+    options: { abandonAfterStoppedTimeout: boolean }
   ): Promise<void> => {
     if (isNonRetryableAdmissionError(error)) {
       const abandoned = await abandonIfCurrent(context, {
@@ -220,7 +217,28 @@ export function installBillingHeartbeat(
       return;
     }
     const rescheduled = await rescheduleIfCurrent(context);
-    if (options.rethrowAfterReschedule || rescheduled) throw error;
+    if (rescheduled) {
+      console.warn('Billing usage delivery deferred after a retryable failure', {
+        error: error instanceof Error ? error.message : String(error),
+        generation: context.generation,
+        instanceId: context.instanceId,
+      });
+    }
+  };
+
+  type StopDeliveryRecovery = (error: unknown) => Promise<void>;
+
+  const deliverForStop = async <Ack>(
+    deliver: () => Promise<Ack>,
+    onDeliveryFailure?: StopDeliveryRecovery
+  ): Promise<Ack | undefined> => {
+    try {
+      return await deliver();
+    } catch (error) {
+      if (!onDeliveryFailure) throw error;
+      await onDeliveryFailure(error);
+      return undefined;
+    }
   };
 
   const computeStopSegment = (context: BillingContext, usageEndedAtMs: number) => {
@@ -233,17 +251,23 @@ export function installBillingHeartbeat(
     };
   };
 
-  const acknowledgePendingHeartbeat = async (context: BillingContext): Promise<BillingContext> => {
+  const acknowledgePendingHeartbeat = async (
+    context: BillingContext,
+    onDeliveryFailure?: StopDeliveryRecovery
+  ): Promise<BillingContext | undefined> => {
     const pendingHeartbeat = context.pendingHeartbeat;
     if (!pendingHeartbeat) return context;
-    await dependencies.beforeHeartbeatDelivery?.(context);
-    await dependencies.client.recordHeartbeat({
-      instanceId: context.instanceId,
-      startEpochMs: context.startEpochMs,
-      seq: pendingHeartbeat.seq,
-      usageSinceLast: pendingHeartbeat.usageSinceLast,
-      context: contextForHeartbeat(context),
-    });
+    const ack = await deliverForStop(async () => {
+      await dependencies.beforeHeartbeatDelivery?.(context);
+      return dependencies.client.recordHeartbeat({
+        instanceId: context.instanceId,
+        startEpochMs: context.startEpochMs,
+        seq: pendingHeartbeat.seq,
+        usageSinceLast: pendingHeartbeat.usageSinceLast,
+        context: contextForHeartbeat(context),
+      });
+    }, onDeliveryFailure);
+    if (!ack) return undefined;
     const current = await getBillingContext(dependencies.storage);
     if (!current || !isSameBillingGeneration(current, context)) return context;
     if (
@@ -262,7 +286,8 @@ export function installBillingHeartbeat(
   const recordStopForGeneration = async (
     params: Parameters<BillingHeartbeatController['recordStop']>[0],
     expectedGeneration?: string,
-    usageEndedAtMs = Date.now()
+    usageEndedAtMs = Date.now(),
+    onDeliveryFailure?: StopDeliveryRecovery
   ): Promise<RecordAck | undefined> => {
     let context = await getBillingContext(dependencies.storage);
     if (!context) return undefined;
@@ -280,24 +305,28 @@ export function installBillingHeartbeat(
       if (!current || !isSameBillingGeneration(current, context)) return undefined;
       context = current;
     }
-    context = await acknowledgePendingHeartbeat(context);
-    const stopIntent = context.pendingStop;
+    const acknowledgedContext = await acknowledgePendingHeartbeat(context, onDeliveryFailure);
+    if (!acknowledgedContext) return undefined;
+    const stopIntent = acknowledgedContext.pendingStop;
     if (!stopIntent) throw new Error('Billing stop intent was not persisted');
-    await dependencies.beforeStopDelivery?.(context);
-    const ack = await dependencies.client.recordStop({
-      instanceId: context.instanceId,
-      startEpochMs: context.startEpochMs,
-      seq: stopIntent.seq,
-      usageSinceLast: stopIntent.usageSinceLast,
-      reason: stopIntent.reason,
-      exitCode: stopIntent.exitCode,
-      context: contextForHeartbeat(context),
-    });
+    const ack = await deliverForStop(async () => {
+      await dependencies.beforeStopDelivery?.(acknowledgedContext);
+      return dependencies.client.recordStop({
+        instanceId: acknowledgedContext.instanceId,
+        startEpochMs: acknowledgedContext.startEpochMs,
+        seq: stopIntent.seq,
+        usageSinceLast: stopIntent.usageSinceLast,
+        reason: stopIntent.reason,
+        exitCode: stopIntent.exitCode,
+        context: contextForHeartbeat(acknowledgedContext),
+      });
+    }, onDeliveryFailure);
+    if (!ack) return undefined;
     const current = await getBillingContext(dependencies.storage);
-    if (!current || !isSameBillingGeneration(current, context)) return ack;
-    cancelHeartbeat();
+    if (!current || !isSameBillingGeneration(current, acknowledgedContext)) return ack;
     await clearBillingContext(dependencies.storage);
-    await notifyGenerationClosed(context);
+    cancelHeartbeat();
+    await notifyGenerationClosed(acknowledgedContext);
     return ack;
   };
 
@@ -323,21 +352,22 @@ export function installBillingHeartbeat(
     });
 
   const billingHeartbeatTickForGeneration = async (generation?: string) => {
-    let context = await getBillingContext(dependencies.storage);
-    if (!context) {
+    const storedContext = await getBillingContext(dependencies.storage);
+    if (!storedContext) {
       cancelHeartbeat();
       return;
     }
+    let context = storedContext;
     if (generation !== undefined && context.generation !== generation) return;
+    const recoverStopDelivery = (error: unknown) =>
+      recoverDeliveryFailure(context, error, { abandonAfterStoppedTimeout: true });
     if (context.pendingStop) {
-      try {
-        await recordStopForGeneration(context.pendingStop, context.generation);
-      } catch (error) {
-        await recoverDeliveryFailure(context, error, {
-          abandonAfterStoppedTimeout: true,
-          rethrowAfterReschedule: false,
-        });
-      }
+      await recordStopForGeneration(
+        context.pendingStop,
+        context.generation,
+        undefined,
+        recoverStopDelivery
+      );
       return;
     }
 
@@ -369,21 +399,15 @@ export function installBillingHeartbeat(
           return;
         }
       }
-      try {
-        await recordStopForGeneration(
-          {
-            reason: 'runtime_signal',
-            exitCode: state.status === 'stopped_with_code' ? state.exitCode : undefined,
-          },
-          context.generation,
-          context.stoppedObservedAtMs
-        );
-      } catch (error) {
-        await recoverDeliveryFailure(context, error, {
-          abandonAfterStoppedTimeout: true,
-          rethrowAfterReschedule: false,
-        });
-      }
+      await recordStopForGeneration(
+        {
+          reason: 'runtime_signal',
+          exitCode: state.status === 'stopped_with_code' ? state.exitCode : undefined,
+        },
+        context.generation,
+        context.stoppedObservedAtMs,
+        recoverStopDelivery
+      );
       return;
     }
 
@@ -413,19 +437,27 @@ export function installBillingHeartbeat(
     if (!context.pendingHeartbeat) {
       await updateBillingContext(dependencies.storage, { ...context, pendingHeartbeat });
     }
+    let ack: HeartbeatAck | undefined;
     try {
       await dependencies.beforeHeartbeatDelivery?.(context);
-      let ack: HeartbeatAck;
-      try {
-        ack = await dependencies.client.recordHeartbeat({
+      ack = await dependencies.client
+        .recordHeartbeat({
           instanceId: context.instanceId,
           startEpochMs: context.startEpochMs,
           seq: pendingHeartbeat.seq,
           usageSinceLast: pendingHeartbeat.usageSinceLast,
           context: contextForHeartbeat(context),
+        })
+        .catch((error: unknown) => {
+          if (!(error instanceof ContainerUsageContractError)) throw error;
+          return undefined;
         });
-      } catch (error) {
-        if (!(error instanceof ContainerUsageContractError)) throw error;
+    } catch (error) {
+      await recoverDeliveryFailure(context, error, { abandonAfterStoppedTimeout: false });
+      return;
+    }
+    try {
+      if (!ack) {
         // The meter durably recorded this segment, so the usage is already
         // settled; only the budget verdict was unreadable. Stopping is the
         // fail-closed reading of an unverifiable verdict.
@@ -449,7 +481,12 @@ export function installBillingHeartbeat(
           'BILLING_UNAVAILABLE'
         );
         if (!dependencies.deferBudgetStopFinalSettlement) {
-          await recordStopForGeneration({ reason: 'runtime_signal' }, context.generation);
+          await recordStopForGeneration(
+            { reason: 'runtime_signal' },
+            context.generation,
+            undefined,
+            recoverStopDelivery
+          );
         }
         return;
       }
@@ -477,7 +514,12 @@ export function installBillingHeartbeat(
           startEpochMs: context.startEpochMs,
         });
         if (!dependencies.deferBudgetStopFinalSettlement) {
-          await recordStopForGeneration({ reason: 'runtime_signal' }, context.generation);
+          await recordStopForGeneration(
+            { reason: 'runtime_signal' },
+            context.generation,
+            undefined,
+            recoverStopDelivery
+          );
         }
         return;
       }
@@ -486,10 +528,8 @@ export function installBillingHeartbeat(
       }
       await rescheduleIfCurrent(context);
     } catch (error) {
-      await recoverDeliveryFailure(context, error, {
-        abandonAfterStoppedTimeout: false,
-        rethrowAfterReschedule: true,
-      });
+      await rescheduleIfCurrent(context);
+      throw error;
     }
   };
   const billingHeartbeatTick = (generation?: string) =>

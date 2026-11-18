@@ -1,4 +1,8 @@
-import { runtimeHarness, kilo2RuntimeEnvironment, probeKilo2Health } from './runtime-harness.js';
+import {
+  runtimeHarness,
+  prepareKilo2RuntimeEnvironment,
+  probeKilo2Health,
+} from './runtime-harness.js';
 import {
   GH_STACK_EXTENSION_NAME,
   GH_STACK_EXTENSIONS_ROOT,
@@ -57,6 +61,7 @@ const PIDFILE_SUFFIX = '.pid.json';
 const KILO_STARTUP_OUTPUT_LIMIT = 65_536;
 /** Stop a replaced runtime within this bound; the wrapper's own cleanup budget. */
 const KILO_STOP_TIMEOUT_MS = 30_000;
+const KILO2_SERVE_SETTLE_MS = 5_000;
 /** Watchdog granularity: six checks per silence window detects the 30 s rule promptly. */
 const SILENCE_CHECKS_PER_WINDOW = 6;
 /**
@@ -231,16 +236,19 @@ export type KiloProcessSpawnInput = {
 export type KiloProcessSpawner = (input: KiloProcessSpawnInput) => Promise<KiloProcess>;
 
 async function defaultSpawnKiloProcess(input: KiloProcessSpawnInput): Promise<KiloProcess> {
+  const backend = runtimeHarness();
+  const env =
+    backend.kind === 'kilo2' ? await prepareKilo2RuntimeEnvironment(input.env) : input.env;
+  input.signal?.throwIfAborted();
   const placement = admitControlWorkload(input.workload);
   const processes = createOwnedProcessScope(placement);
   input.onProcessScope?.(processes);
-  const backend = runtimeHarness();
   const credential = createKiloServerCredential(backend.username);
   // Own process group via the owned-process scope's detached spawn.
   const proc = processes.spawn(backend.cli, ['serve', '--hostname=127.0.0.1', '--port=0'], {
     cwd: input.directory,
     env: {
-      ...(backend.kind === 'kilo2' ? kilo2RuntimeEnvironment(input.env) : input.env),
+      ...env,
       ...credential.env,
     },
   });
@@ -995,6 +1003,8 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       throw error;
     }
     clearTimeout(deadline);
+    if (runtimeHarness().kind === 'kilo2')
+      await new Promise(resolve => setTimeout(resolve, KILO2_SERVE_SETTLE_MS));
     if (phase === 'stopped') {
       await spawned.stop(scheduler.now() + KILO_STOP_TIMEOUT_MS);
       throw new Error('Kilo runtime is shutting down');

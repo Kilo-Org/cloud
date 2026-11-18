@@ -65,6 +65,7 @@ import {
   bot_request_cloud_agent_sessions,
   kiloclaw_admin_audit_logs,
   admin_action_audit_logs,
+  blacklisted_domains_settings,
   kiloclaw_scheduled_actions,
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
@@ -285,6 +286,7 @@ describe('User', () => {
   });
 
   afterEach(async () => {
+    await db.delete(blacklisted_domains_settings);
     await db.delete(cloud_agent_pr_watches);
     await db.delete(cloud_agent_worktrees);
     await db.delete(cloud_agent_workspace_folders);
@@ -3090,6 +3092,29 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('anonymizes the matching signup settings editor without changing the settings', async () => {
+      const editor = await insertTestUser({ id: `oauth/github:signup-settings-${randomUUID()}` });
+      const otherUser = await insertTestUser();
+      const [settings] = await db
+        .insert(blacklisted_domains_settings)
+        .values({
+          blocked_signup_tlds: ['example', 'test'],
+          updated_at: '2026-01-01T12:00:00.000Z',
+          updated_by: editor.id,
+          updated_by_email: editor.google_user_email,
+        })
+        .returning();
+      if (!settings) throw new Error('Missing signup settings fixture');
+
+      await softDeleteUser(otherUser.id);
+      expect(await db.select().from(blacklisted_domains_settings)).toEqual([settings]);
+
+      await softDeleteUser(editor.id);
+      expect(await db.select().from(blacklisted_domains_settings)).toEqual([
+        { ...settings, updated_by: null, updated_by_email: null },
+      ]);
+    });
+
     it('revokes the actor open support access grants and records events', async () => {
       const admin = await insertTestUser({
         is_admin: true,

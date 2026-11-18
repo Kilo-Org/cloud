@@ -128,7 +128,7 @@ vi.mock('@kilocode/app-shared/code-review', () => ({
 vi.mock('@kilocode/app-shared/utils', () => ({
   fromMicrodollars: (value: unknown) => value,
 }));
-vi.mock('@/components/code-reviewer/review-list-screen', () => ({
+vi.mock('@/components/code-reviewer/review-list-rows', () => ({
   statusMeta: (status: string) => ({
     label: status === 'completed' ? 'Completed' : status,
     className: 'text-good',

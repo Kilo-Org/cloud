@@ -71,7 +71,18 @@ function familyOf(address: string): number {
   return address.includes(':') ? 6 : 4;
 }
 
-function pinUpstreamAddresses(hostname: string, addresses: readonly string[]): void {
+/** The address family a lookup asks for, or null when any family will do. */
+function requestedFamily(family: number | string | undefined): 4 | 6 | null {
+  if (family === 4 || family === 'IPv4') return 4;
+  if (family === 6 || family === 'IPv6') return 6;
+  return null;
+}
+
+function pinUpstreamAddresses(
+  hostname: string,
+  addresses: readonly string[],
+  checkExpiresAt: number
+): void {
   const normalized = normalizeUpstreamHostname(hostname);
   // Re-inserting moves the host to the newest position, so the bound evicts the
   // host that has gone unused the longest.
@@ -83,24 +94,30 @@ function pinUpstreamAddresses(hostname: string, addresses: readonly string[]): v
   }
   pinnedAddresses.set(normalized, {
     addresses: [...addresses],
-    expiresAt: Date.now() + UPSTREAM_PIN_TTL_MS,
+    // A pin never outlives the check that produced its addresses.
+    expiresAt: Math.min(checkExpiresAt, Date.now() + UPSTREAM_PIN_TTL_MS),
   });
 }
 
 /**
- * The connection pool for `hostname`. `addresses` must be the checked list an
- * allowed `UpstreamUrlDecision` carried; this registers it as the pin the
- * pool's lookup answers with.
+ * The connection pool for `hostname`. `addresses` and `checkExpiresAt` must be
+ * the checked list and expiry an allowed `UpstreamUrlDecision` carried; this
+ * registers them as the pin the pool's lookup answers with.
  *
- * The pin lasts `UPSTREAM_PIN_TTL_MS`, shorter than the request budget: a
- * connection the request opens later asks the URL policy to re-check the host
- * (`refreshUpstreamHostAddresses`) instead of failing.
+ * The pin lasts until the check expires, at most `UPSTREAM_PIN_TTL_MS`, shorter
+ * than the request budget: a connection the request opens later asks the URL
+ * policy to re-check the host (`refreshUpstreamHostAddresses`) instead of
+ * failing.
  *
  * Throws `UpstreamAddressUnverifiedError` for an empty list or a non-public
  * address: a caller that reaches this without a validated address list has a
  * bug.
  */
-export function upstreamDispatcherFor(hostname: string, addresses: readonly string[]): Dispatcher {
+export function upstreamDispatcherFor(
+  hostname: string,
+  addresses: readonly string[],
+  checkExpiresAt: number
+): Dispatcher {
   if (addresses.length === 0) {
     throw new UpstreamAddressUnverifiedError(hostname, 'the URL policy returned no address');
   }
@@ -109,7 +126,7 @@ export function upstreamDispatcherFor(hostname: string, addresses: readonly stri
     throw new UpstreamAddressUnverifiedError(hostname, `${nonPublic} is not a public address`);
   }
 
-  pinUpstreamAddresses(hostname, addresses);
+  pinUpstreamAddresses(hostname, addresses, checkExpiresAt);
 
   const normalized = normalizeUpstreamHostname(hostname);
   const cached = upstreamDispatchers.get(normalized);
@@ -156,14 +173,20 @@ export const lookupPinnedUpstreamAddress: LookupFunction = (hostname, options, c
       );
       return;
     }
+    const family = requestedFamily(options.family);
+    const usable = family ? addresses.filter(address => familyOf(address) === family) : addresses;
+    if (usable.length === 0) {
+      callback(new UpstreamAddressUnverifiedError(hostname, `no checked IPv${family} address`), '');
+      return;
+    }
     if (options.all === true) {
       callback(
         null,
-        addresses.map(address => ({ address, family: familyOf(address) }))
+        usable.map(address => ({ address, family: familyOf(address) }))
       );
       return;
     }
-    const [address] = addresses;
+    const [address] = usable;
     callback(null, address, familyOf(address));
   };
   const refuse = (detail: string) => {
@@ -188,7 +211,7 @@ export const lookupPinnedUpstreamAddress: LookupFunction = (hostname, options, c
         refuse('the refreshed check found no address');
         return;
       }
-      pinUpstreamAddresses(hostname, addresses);
+      pinUpstreamAddresses(hostname, addresses, Date.now() + UPSTREAM_PIN_TTL_MS);
       answer(addresses);
     },
     error => {

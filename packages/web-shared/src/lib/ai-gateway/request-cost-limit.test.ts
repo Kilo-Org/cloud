@@ -501,6 +501,20 @@ describe('request cost admission', () => {
       ).resolves.toBeNull();
     }
   );
+  it('accepts the target id OpenRouter is sent for an alias', async () => {
+    const target = { ...model, id: 'qwen/bounded' };
+    const alias: GatewayModelWithEndpoints = {
+      id: '~qwen/bounded-latest',
+      name: 'Bounded latest',
+      endpoints: [],
+      alias_target: { slug: target.id },
+    };
+    jest.mocked(getVercelModelIdOverrides).mockResolvedValue(new Map());
+    mockModels([alias, target]);
+    await expect(
+      enforceRequestCostLimit('2000000', alias.id, { ...body, model: target.id }, 2_000_000)
+    ).resolves.toBeNull();
+  });
   it('rejects an alias attempt without a transformed model', async () => {
     const alias: GatewayModelWithEndpoints = {
       id: '~test/bounded-latest',

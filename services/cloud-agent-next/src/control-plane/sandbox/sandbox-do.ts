@@ -138,7 +138,7 @@ import {
   type SessionCredentialGrant,
 } from '../../sandbox-control/session-credentials.js';
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
-import { getManagedOutboundContainerId } from '../../sandbox-id.js';
+import { classifySandboxId, getManagedOutboundContainerId } from '../../sandbox-id.js';
 import {
   resolveSandboxIdClass,
   sandboxKindMatchesKey,
@@ -246,6 +246,7 @@ import {
   controlPlaneRouteSpecSchema,
   controlPlaneSessionCredentialsPayloadSchema,
   controlPlaneSessionRefPayloadSchema,
+  controlPlaneReleasePayloadSchema,
   controlPlaneTerminalInputSchema,
   controlPlaneWorktreeCaptureInputSchema,
   controlPlaneWorktreeDeletionPayloadSchema,
@@ -271,6 +272,7 @@ import {
   type ControlPlaneRouteView,
   type ControlPlaneSessionCredentialsPayload,
   type ControlPlaneSessionRefPayload,
+  type ControlPlaneReleasePayload,
   type ControlPlaneStatusResult,
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
@@ -467,6 +469,8 @@ import {
   snapshotValidatorInputSchema,
   type SnapshotValidatorInput,
 } from './snapshot-validator.js';
+
+import { readSentryIdentity, sentryIdentityFromBilling } from '../../sentry-identity.js';
 
 const GENERATION_KEY = 'control_plane_generation';
 const GENERATION = 2;
@@ -1062,6 +1066,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
 
+  async [readSentryIdentity]() {
+    const pin = this.providerPin;
+    const billing = pin?.billing ? sentryIdentityFromBilling(pin.billing) : undefined;
+    return {
+      userId: (await this.requireOwner().catch(() => null)) ?? billing?.userId ?? pin?.byoc?.userId,
+      orgId:
+        billing?.orgId ??
+        pin?.byoc?.organizationId ??
+        (pin?.byoc?.userId ? '(personal)' : undefined),
+      sessionId: billing?.sessionId,
+      sandboxId: this.sandboxId,
+    };
+  }
+
   async requestBillingStop(input: NativeBillingStopRequest): Promise<boolean> {
     await this.initialized;
     const request = nativeBillingStopRequestSchema.parse(input);
@@ -1583,10 +1601,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
   }
 
-  async release(payload: ControlPlaneSessionRefPayload): Promise<void> {
+  async release(payload: ControlPlaneReleasePayload): Promise<void> {
     await this.initialized;
-    const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
-    await this.enqueue(() => this.retireRoute(parsed.sessionId));
+    const parsed = controlPlaneReleasePayloadSchema.parse(payload);
+    await this.enqueue(async () => {
+      await this.retireRoute(parsed.sessionId);
+      if (parsed.reason !== 'standalone_session_deleted') return;
+      const sandboxClass = classifySandboxId(this.sandboxId);
+      if (sandboxClass === 'shared' || sandboxClass === 'legacy-shared') return;
+      if ((await listRoutes(this.db)).length !== 0) return;
+      await this.applyEvent({ type: 'stop-requested', at: Date.now(), reason: 'sandbox_stopped' });
+      await this.clearWorkspaceArtifactsForDeletion();
+    });
   }
 
   /**
@@ -2110,20 +2136,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   async listWorkspaceArtifacts(): Promise<WorkspaceArtifactList> {
     await this.initialized;
-    return this.enqueue(async () => {
-      const result = this.workspaceArtifacts.list();
-      await this.scheduleWorkspaceArtifactOrphanSweepIfNeeded();
-      return result;
-    });
+    return this.enqueue(async () => this.workspaceArtifacts.list());
   }
 
   async getWorkspaceArtifact(relativePath: string): Promise<WorkspaceArtifactEntryLookup | null> {
     await this.initialized;
-    return this.enqueue(async () => {
-      const result = this.workspaceArtifacts.get(relativePath);
-      await this.scheduleWorkspaceArtifactOrphanSweepIfNeeded();
-      return result;
-    });
+    return this.enqueue(async () => this.workspaceArtifacts.get(relativePath));
   }
 
   /**
@@ -7752,8 +7770,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async clearWorkspaceArtifactsForDeletion(): Promise<void> {
-    const removed = this.workspaceArtifacts.clear();
-    if (removed > 0) await this.scheduleWorkspaceArtifactOrphanSweep();
+    this.workspaceArtifacts.clear();
+    await this.scheduleWorkspaceArtifactOrphanSweep();
   }
 
   private async sweepWorkspaceArtifactOrphans(): Promise<void> {

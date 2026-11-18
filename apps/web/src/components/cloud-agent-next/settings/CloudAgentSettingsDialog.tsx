@@ -36,6 +36,7 @@ import { EnvironmentsSection } from './EnvironmentsSection';
 import { ModelContextLimitsSection } from './ModelContextLimitsSection';
 import { RepositoryOverridesSection } from './RepositoryOverridesSection';
 import { SidebarSettingsSection } from './SidebarSettingsSection';
+import { SoundPreferencesSection } from './SoundPreferencesSection';
 import { TranscriptPreferencesSection } from './TranscriptPreferencesSection';
 import { VercelComputeSettings } from './VercelComputeSettings';
 
@@ -263,6 +264,7 @@ function CloudAgentSettings({
               </Badge>
             </div>
             <TranscriptPreferencesSection />
+            <SoundPreferencesSection />
             {settings ? (
               <>
                 <BuiltinAgentsSection organizationId={organizationId} settings={settings} />

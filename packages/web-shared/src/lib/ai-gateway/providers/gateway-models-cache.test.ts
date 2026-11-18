@@ -8,7 +8,8 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   warnExceptInTest: (...args: unknown[]) => mockWarnExceptInTest(...args),
 }));
 
-import { ai_gateway_metadata_cache } from '@kilocode/db/schema';
+import { ai_gateway_config, ai_gateway_metadata_cache } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 import * as drizzle from '@kilocode/web-shared/lib/drizzle';
 import { db, readDb, sql } from '@kilocode/web-shared/lib/drizzle';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
@@ -692,6 +693,31 @@ describe('isValidOpenRouterModelId', () => {
     await expect(resolveOpenRouterModelAlias('~deepseek/deepseek-pro-latest')).resolves.toBe(
       'deepseek/deepseek-v4-pro-0813'
     );
+  });
+
+  it('resolves an OpenRouter alias to its stored target, falling back to the live target', async () => {
+    const alias = '~vendor/pinned-latest';
+    await storeOpenRouterModels([
+      gatewayModel({ id: alias, alias_target: { slug: 'vendor/pinned-new' } }),
+      gatewayModel({ id: 'vendor/pinned-old' }),
+      gatewayModel({ id: 'vendor/pinned-new' }),
+    ]);
+    await db.insert(ai_gateway_config).values({
+      latest_alias_targets: { aliases: [{ alias, target: 'vendor/pinned-old' }] },
+    });
+    try {
+      await expect(resolveOpenRouterModelAlias(alias)).resolves.toBe('vendor/pinned-old');
+
+      await db
+        .update(ai_gateway_config)
+        .set({ latest_alias_targets: null })
+        .where(eq(ai_gateway_config.id, 1));
+      startNextCacheWindow();
+
+      await expect(resolveOpenRouterModelAlias(alias)).resolves.toBe('vendor/pinned-new');
+    } finally {
+      await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
+    }
   });
 
   it('returns an unresolved OpenRouter alias unchanged', async () => {

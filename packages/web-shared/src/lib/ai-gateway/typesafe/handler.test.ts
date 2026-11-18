@@ -869,7 +869,7 @@ describe('handleSystemOneRequest', () => {
     { model: OTHER_SYSTEM_ONE_MODEL, policyModel: OTHER_SYSTEM_ONE_MODEL, isFree: true },
     { model: SYSTEM_ONE_ALIAS, policyModel: TYPESAFE_MODEL, isFree: false },
   ])(
-    'forwards OpenRouter System One model $model unchanged',
+    'forwards OpenRouter System One model $model as the model it resolves to',
     async ({ model, policyModel, isFree }) => {
       setAuth('org-123');
 
@@ -881,7 +881,7 @@ describe('handleSystemOneRequest', () => {
         model: model === SYSTEM_ONE_ALIAS ? TYPESAFE_MODEL : model,
         usage: { cost: isFree ? 0 : 0.000124 },
       });
-      expect(upstreamRequest().body.model).toBe(model);
+      expect(upstreamRequest().body.model).toBe(policyModel);
       expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith(
         expect.objectContaining({ modelId: policyModel })
       );

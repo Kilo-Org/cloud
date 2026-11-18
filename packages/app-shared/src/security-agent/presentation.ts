@@ -273,8 +273,52 @@ function isSupersededFinding(finding: SecurityFinding): boolean {
   return finding.status === 'ignored' && getSupersedingFindingId(finding) !== null;
 }
 
+// Reused instead of building a DateTimeFormat per call
+// (toLocaleDateString with options constructs one every time): the deadline
+// helpers run once per finding row, so a full page is N constructions per
+// render. Construction is deferred to first use — mobile imports this module
+// before its Intl polyfill warm-up, and the native Intl that exists at import
+// time must not own the cached formatter. The zone guard keeps the reused
+// formatter honest: a formatter resolves its zone when built, so a device that
+// moves time zones must rebuild it or keep writing the old wall clock.
+const FINDING_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+};
+let findingDateFormatValue: Intl.DateTimeFormat | null = null;
+let findingDateDeviceZone: string | null = null;
+let findingDateZoneCheckedAt = 0;
+const FINDING_DATE_ZONE_CHECK_MS = 1000;
+
 function formatFindingDate(date: Date): string {
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  // toLocaleDateString's spec path renders an invalid Date as its "Invalid
+  // Date" string instead of throwing; a row whose timestamp does not parse
+  // keeps that behavior here rather than aborting its render.
+  if (Number.isNaN(date.getTime())) {
+    return 'Invalid Date';
+  }
+  // One Intl read per second, matching the mobile intl-cache convention
+  // (dropDateFormattersForNewDeviceZone) so a row render cannot re-probe Intl
+  // on every keystroke. A clock that stepped backwards reads as a stale check
+  // rather than a negative age, so it re-probes instead of waiting for the
+  // wall clock to catch up.
+  const zoneProbeAt = Date.now();
+  const sinceLastCheck = zoneProbeAt - findingDateZoneCheckedAt;
+  if (
+    findingDateDeviceZone === null ||
+    sinceLastCheck < 0 ||
+    sinceLastCheck >= FINDING_DATE_ZONE_CHECK_MS
+  ) {
+    findingDateZoneCheckedAt = zoneProbeAt;
+    const deviceZone = new Intl.DateTimeFormat(undefined, {}).resolvedOptions().timeZone;
+    if (deviceZone !== findingDateDeviceZone) {
+      findingDateDeviceZone = deviceZone;
+      findingDateFormatValue = null;
+    }
+  }
+  findingDateFormatValue ??= new Intl.DateTimeFormat('en-US', FINDING_DATE_OPTIONS);
+  return findingDateFormatValue.format(date);
 }
 
 function startOfDay(date: Date): number {

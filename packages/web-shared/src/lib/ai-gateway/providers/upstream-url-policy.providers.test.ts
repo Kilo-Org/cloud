@@ -73,6 +73,7 @@ async function expectPassesUpstreamUrlPolicy(url: string) {
     allowed: true,
     hostname: new URL(url).hostname,
     addresses: ['104.18.2.115'],
+    expiresAt: expect.any(Number),
   });
   expect(resolvedHosts).toHaveLength(1);
 }

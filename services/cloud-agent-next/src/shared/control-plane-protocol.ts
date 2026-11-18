@@ -978,6 +978,10 @@ export const controlPlaneSessionRefPayloadSchema = z
   .object({ sessionId: z.string().min(1) })
   .strict();
 
+export const controlPlaneReleasePayloadSchema = controlPlaneSessionRefPayloadSchema.extend({
+  reason: z.literal('standalone_session_deleted').optional(),
+});
+
 /**
  * Workspace Stop during environment preparation. One sandbox serves one
  * workspace, so the Sandbox DO retires every route on it. `requestedAt` is when
@@ -1774,6 +1778,7 @@ export type ControlPlaneOutcome = z.infer<typeof controlPlaneOutcomeSchema>;
 export type ControlPlaneDeliverPayload = z.infer<typeof controlPlaneDeliverPayloadSchema>;
 export type ControlPlaneDeliverResult = z.infer<typeof controlPlaneDeliverResultSchema>;
 export type ControlPlaneSessionRefPayload = z.infer<typeof controlPlaneSessionRefPayloadSchema>;
+export type ControlPlaneReleasePayload = z.infer<typeof controlPlaneReleasePayloadSchema>;
 export type ControlPlaneAnswerReply = z.infer<typeof controlPlaneAnswerReplySchema>;
 export type ControlPlaneAnswerPayload = z.infer<typeof controlPlaneAnswerPayloadSchema>;
 export type ControlPlaneDispatchResult = z.infer<typeof controlPlaneDispatchResultSchema>;

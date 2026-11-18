@@ -28,7 +28,14 @@ type DiagnosticReason =
 
 export function logRuntimeAuthorizationDiagnostic(
   sessionId: string | undefined,
-  stage: 'preflight' | 'recovery_state' | 'renewal' | 'binding_check' | 'recovery' | 'admission',
+  stage:
+    | 'preflight'
+    | 'recovery_state'
+    | 'renewal'
+    | 'binding_check'
+    | 'recovery'
+    | 'admission'
+    | 'mcp_grant',
   reason: DiagnosticReason
 ): void {
   try {

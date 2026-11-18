@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Kunde inte läsa in sessionerna.",
-    "couldNotLoadActiveSessions": "Kunde inte läsa in de aktiva sessionerna.",
     "agentSessions": "Pågår nu",
     "newCodingTask": "Ny programmeringsuppgift",
     "newTaskFromPicture": "Ny uppgift från en bild",

@@ -93,6 +93,10 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound', Plus: 'Plus' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/icon-button', () => ({
+  IconButton: (props: { accessibilityLabel?: string; onPress?: () => void; children?: ReactNode }) =>
+    createElement('IconButton', props, props.children),
+}));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/empty-state', () => ({
@@ -103,11 +107,17 @@ vi.mock('@/components/organization/organization-boundary', () => ({
   OrganizationBoundary: 'OrganizationBoundary',
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+// The header renders its trailing slot, so the suite can read the screen's one
+// create control the way the screen hands it over.
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: (props: { headerRight?: ReactNode }) =>
+    createElement('ScreenHeader', null, props.headerRight),
+}));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 
 const SWITCH = 'Switch' as ElementType;
 const BUTTON = 'Button' as ElementType;
+const ICON_BUTTON = 'IconButton' as ElementType;
 const STATE_ACTION = 'StateAction' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
@@ -143,8 +153,11 @@ function textsInRow(root: ReactTestRenderer['root'], provider: string) {
 function button(root: ReactTestRenderer['root'], label: string) {
   const found = root.findAll(
     node =>
-      (Object.is(node.type, BUTTON) || Object.is(node.type, STATE_ACTION)) &&
+      (Object.is(node.type, BUTTON) ||
+        Object.is(node.type, STATE_ACTION) ||
+        Object.is(node.type, ICON_BUTTON)) &&
       (node.props.label === label ||
+        node.props.accessibilityLabel === label ||
         node.findAll(child => child.props.children === label).length > 0)
   );
   const [first] = found;
@@ -340,8 +353,9 @@ describe('ProviderKeysScreen', () => {
     expect(
       root.findAll(
         node =>
-          Object.is(node.type, BUTTON) &&
-          node.findAll(child => child.props.children === 'Add key').length > 0
+          (Object.is(node.type, BUTTON) || Object.is(node.type, ICON_BUTTON)) &&
+          (node.props.accessibilityLabel === 'Add key' ||
+            node.findAll(child => child.props.children === 'Add key').length > 0)
       )
     ).toHaveLength(0);
     expect(

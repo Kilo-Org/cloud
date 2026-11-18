@@ -173,17 +173,32 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/format', () => ({
   formatDate: () => 'Jan 1, 2026',
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  // The header renders its trailing slot, so the suite can read and press the
+  // screen's one create control.
+  ScreenHeader: (props: { headerRight?: ReactNode }) =>
+    createElement('ScreenHeader', null, props.headerRight),
+}));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 vi.mock('@/components/empty-state', () => ({
   // Renders the action so a test can reach the CTA that lives inside it.
   EmptyState: (props: { action?: ReactNode }) => createElement('EmptyState', props, props.action),
-  // The action is a control: the suites read its label from the node and press
-  // it through the same `Pressable` shape a row control has.
-  StateAction: (props: { label?: string; onPress?: () => void }) =>
+  // The action is a control: the suites read its label and its busy state from
+  // the node and press it through the same `Pressable` shape a row control has.
+  StateAction: (props: {
+    label?: string;
+    onPress?: () => void;
+    loading?: boolean;
+    disabled?: boolean;
+  }) =>
     createElement(
       'Pressable',
-      { accessibilityLabel: props.label, onPress: props.onPress },
+      {
+        accessibilityLabel: props.label,
+        onPress: props.onPress,
+        loading: props.loading,
+        disabled: props.disabled,
+      },
       createElement('Text', null, props.label)
     ),
 }));
@@ -209,10 +224,6 @@ vi.mock('@/components/ui/row-group', () => ({
   RowGroup: (props: { children?: ReactNode }) => props.children,
 }));
 vi.mock('@/components/ui/card', () => ({ Card: 'Card' }));
-vi.mock('@/components/ui/screen-footer', () => ({
-  ScreenFooter: (props: { children?: ReactNode }) =>
-    createElement('ScreenFooter', null, props.children),
-}));
 vi.mock('@/components/ui/row-skeleton', () => ({
   RowSkeleton: (props: { tile?: boolean; subtitle?: boolean }) =>
     createElement(
@@ -383,10 +394,11 @@ export function emptyDescription(view: PasskeysView): string {
 }
 
 export function buttonByLabel(view: PasskeysView, label: string): ReactTestInstance {
-  // The empty state's one action is a `StateAction`, whose stub renders a
-  // pressable; a footer action is a `Button`. Both carry their label as text.
+  // The create control is the header's icon button, whose announced name is
+  // its label; a row action carries its label as text.
   const button = [...nodes(view, 'Button'), ...nodes(view, 'Pressable')].find(
     node =>
+      node.props.accessibilityLabel === label ||
       node.findAll(inner => String(inner.type) === 'Text' && inner.props.children === label)
         .length > 0
   );
@@ -404,6 +416,7 @@ export function hasButtonLabel(view: PasskeysView, label: string): boolean {
   ].some(
     node =>
       node.props.label === label ||
+      node.props.accessibilityLabel === label ||
       node.findAll(inner => String(inner.type) === 'Text' && inner.props.children === label)
         .length > 0
   );

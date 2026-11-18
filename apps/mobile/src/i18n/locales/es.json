@@ -2490,7 +2490,6 @@
   },
   "home": {
     "couldNotLoadSessions": "No se pudieron cargar las sesiones.",
-    "couldNotLoadActiveSessions": "No se pudieron cargar las sesiones activas.",
     "agentSessions": "En curso ahora",
     "newCodingTask": "Nueva tarea de programación",
     "newTaskFromPicture": "Nueva tarea a partir de una imagen",

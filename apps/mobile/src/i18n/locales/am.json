@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ክፍለ ጊዜዎችን መጫን አልተቻለም።",
-    "couldNotLoadActiveSessions": "ንቁ ክፍለ ጊዜዎችን መጫን አልተቻለም።",
     "agentSessions": "አሁን በሂደት ላይ",
     "newCodingTask": "አዲስ የኮድ ሥራ",
     "newTaskFromPicture": "ከምስል አዲስ ሥራ",

@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "அமர்வுகளை ஏற்ற முடியவில்லை.",
-    "couldNotLoadActiveSessions": "செயலில் உள்ள அமர்வுகளை ஏற்ற முடியவில்லை.",
     "agentSessions": "இப்போது இயங்குபவை",
     "newCodingTask": "புதிய நிரலாக்கப் பணி",
     "newTaskFromPicture": "படத்திலிருந்து புதிய பணி",

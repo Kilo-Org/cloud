@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "সেশনগুলো লোড করা যায়নি।",
-    "couldNotLoadActiveSessions": "সক্রিয় সেশনগুলো লোড করা যায়নি।",
     "agentSessions": "এখন চলছে",
     "newCodingTask": "নতুন কোডিং কাজ",
     "newTaskFromPicture": "ছবি থেকে নতুন কাজ",

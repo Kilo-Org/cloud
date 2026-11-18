@@ -9,19 +9,17 @@ import { PasskeyVerificationPanel } from '@/components/passkey-verification-pane
 import { QueryError } from '@/components/query-error';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { KeyRound, Plus } from '@/components/ui/icons';
+import { IconButton } from '@/components/ui/icon-button';
+import { KeyRound, Plus, RotateCcw } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
-import { ScreenFooter } from '@/components/ui/screen-footer';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { SCREEN_BODY_CLASS } from '@/lib/layout';
+import { SCREEN_BODY_CLASS, SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { addFailureNoticeKey } from '@/lib/passkeys/add-failure-notice';
 import { type PasskeyRow } from '@/lib/passkeys/passkey-types';
 import { usePasskeyManagement } from '@/lib/passkeys/use-passkey-management';
@@ -51,15 +49,7 @@ function InlineFailure({
       <Text accessibilityRole="alert" className="min-w-0 flex-1 text-sm text-muted-foreground">
         {message}
       </Text>
-      <Button
-        variant="outline"
-        size="sm"
-        className={STATE_ACTION_CLASS}
-        loading={pending}
-        onPress={onRetry}
-      >
-        <Text>{t('common.retry')}</Text>
-      </Button>
+      <StateAction label={t('common.retry')} icon={RotateCcw} loading={pending} onPress={onRetry} />
     </Card>
   );
 }
@@ -78,21 +68,17 @@ function InlineFailure({
  * cannot manage passkeys) withdraws the control and says so, and a session the
  * server has ended puts the person back on sign-in.
  *
- * Four list states: loading reserves the final rows' boxes, empty offers
- * creation as its only action in its own state slot, happy lists a row per
- * passkey, and a failure is either retryable in place (the list request or a
- * removal, with whatever the query last rendered kept — the rows or the empty
- * state) or non-retryable. A cancelled creation sheet changed nothing, so the
- * list is left as it was and the toast says so. A retry is single-flight — its
- * control is disabled while the request it starts is pending — and a removal
- * failure is only actionable while that delete runs or its row has rolled back,
- * never after the server list drops it.
+ * Four list states: loading reserves the final rows' boxes, empty states the
+ * list, happy lists a row per passkey, and a failure is either retryable in
+ * place (the list request or a removal, with whatever the query last rendered
+ * kept — the rows or the empty state) or non-retryable. A cancelled creation
+ * sheet changed nothing, so the list is left as it was and the toast says so.
+ * A retry is single-flight — its control is disabled while the request it
+ * starts is pending — and a removal failure is only actionable while that
+ * delete runs or its row has rolled back, never after the server list drops it.
  *
- * An empty list is the whole surface, so its state carries the Add control
- * inline; a populated list keeps that control in the footer above the tab bar,
- * where it holds the same coordinates whatever the query renders (skeletons, a
- * refresh failure, rows), so data arriving never moves the control the user is
- * reaching for.
+ * The header's "+" is the screen's one create control, as on every list screen
+ * with a create action; the empty state carries the title and its hint only.
  */
 export function PasskeysScreen() {
   const { t } = useTranslation();
@@ -132,39 +118,10 @@ export function PasskeysScreen() {
     });
   };
 
-  // The Add control is the screen's one action. An empty list is the whole
-  // surface, so its state carries the control inline as the shared state
-  // action. A list keeps the full-width footer slot, below the rows, where the
-  // control holds the same coordinates whatever the query renders (skeletons,
-  // a refresh failure, rows). The label is sized to its own content inside that
-  // full-width control, so the glyph and the label centre as one group.
-  const addControl = management.canCreatePasskeys ? (
-    <Button
-      variant="outline"
-      className="w-full"
-      loading={management.isAdding}
-      // A second operation waits for the proof already being given: the panel
-      // below owns the next step while it is open.
-      disabled={management.verifying}
-      onPress={management.handleAddPasskey}
-    >
-      <Plus size={16} color={colors.foreground} />
-      <Text className="shrink text-center" numberOfLines={1}>
-        {t('profile.addPasskey')}
-      </Text>
-    </Button>
-  ) : null;
-  const addStateAction = management.canCreatePasskeys ? (
-    <StateAction
-      label={t('profile.addPasskey')}
-      icon={Plus}
-      loading={management.isAdding}
-      onPress={management.handleAddPasskey}
-    />
-  ) : undefined;
-
-  // On a device that cannot create passkeys the notice is not a reaction to a
-  // press: it is the reason no Add control is offered, shown beside the rows.
+  // The header's "+" is the screen's one create control; the empty state keeps
+  // only its title and description. On a device that cannot create passkeys the
+  // notice is not a reaction to a press: it is the reason no Add control is
+  // offered, so it stays in the body beside the rows it explains.
   const noticeKey = addFailureNoticeKey(management.canCreatePasskeys, management.addFailure);
   const addFailureNotice = noticeKey ? (
     <Text accessibilityRole="alert" className="text-sm text-muted-foreground">
@@ -172,14 +129,13 @@ export function PasskeysScreen() {
     </Text>
   ) : null;
 
-  // The notice and the control it explains share the footer. The one exception
-  // is the empty state on a device or account that cannot create passkeys: there
-  // the notice replaces the hint that would name the withdrawn control, so the
-  // footer must not repeat it. Every other body — the skeleton and a failed
-  // first load included — keeps the notice in the footer, where it is the only
-  // explanation for the control that is no longer offered.
+  // The one exception is the empty state on a device or account that cannot
+  // create passkeys: there the notice replaces the hint that would name the
+  // withdrawn control, so the body must not repeat it. Every other body — the
+  // skeleton and a failed first load included — keeps the notice in the body,
+  // where it is the only explanation for the control that is no longer offered.
   const emptyBodyRendered = !isPending && !(isError && data === undefined) && passkeys.length === 0;
-  const footerNotice = emptyBodyRendered && !management.canCreatePasskeys ? null : addFailureNotice;
+  const bodyNotice = emptyBodyRendered && !management.canCreatePasskeys ? null : addFailureNotice;
 
   let failureNotice: ReactNode = null;
   if (management.removeFailureId !== null) {
@@ -258,7 +214,6 @@ export function PasskeysScreen() {
           description={
             management.canCreatePasskeys ? t('profile.passkeysEmptyHint') : addFailureNotice
           }
-          action={addStateAction}
         />
       </>
     );
@@ -281,15 +236,36 @@ export function PasskeysScreen() {
     );
   }
 
-  // The footer carries the Add control only while a list or a failure needs it;
-  // the empty state's own action replaced it, and its notice replaced the hint.
-  const showsFooter = !emptyBodyRendered || footerNotice !== null;
-
   return (
     <View testID="passkeys-screen" className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.passkeysTitle')} backFallback={PROFILE_TAB_HREF} />
+      <ScreenHeader
+        title={t('profile.passkeysTitle')}
+        backFallback={PROFILE_TAB_HREF}
+        headerRight={
+          management.canCreatePasskeys ? (
+            <IconButton
+              accessibilityLabel={t('profile.addPasskey')}
+              // A second operation waits for the proof already being given: the
+              // panel owns the next step while it is open.
+              disabled={management.isAdding || management.verifying}
+              accessibilityState={{
+                busy: management.isAdding,
+                disabled: management.isAdding || management.verifying,
+              }}
+              onPress={management.handleAddPasskey}
+            >
+              <Plus size={20} color={colors.foreground} />
+            </IconButton>
+          ) : undefined
+        }
+      />
       {hoistedState ? (
-        body
+        <>
+          {bodyNotice === null ? null : (
+            <View className={SCREEN_GUTTER_CLASS}>{bodyNotice}</View>
+          )}
+          {body}
+        </>
       ) : (
         <ScrollView
           className="flex-1"
@@ -311,22 +287,10 @@ export function PasskeysScreen() {
               onCancel={management.verification.handleCancel}
             />
           )}
+          {bodyNotice}
           {body}
         </ScrollView>
       )}
-      {/* The Add control's slot for a populated list: outside the scrolling body
-          and above the tab bar, where it keeps the same coordinates whatever the
-          query renders (skeletons, a refresh failure, rows). The notice that
-          explains a failed or unavailable add shares the slot, beside the
-          control it is about. An empty list owns its Add action inline instead. */}
-      {showsFooter ? (
-        <ScreenFooter clearance="tab-bar" keyboard="host">
-          <View className="gap-3">
-            {footerNotice}
-            {addControl}
-          </View>
-        </ScreenFooter>
-      ) : null}
 
       {renameTarget && (
         <RenameModal

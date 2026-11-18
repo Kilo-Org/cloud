@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "بارگذاری نشست‌ها ممکن نشد.",
-    "couldNotLoadActiveSessions": "بارگذاری نشست‌های فعال ممکن نشد.",
     "agentSessions": "در حال اجرا",
     "newCodingTask": "کار کدنویسی جدید",
     "newTaskFromPicture": "کار جدید از یک تصویر",

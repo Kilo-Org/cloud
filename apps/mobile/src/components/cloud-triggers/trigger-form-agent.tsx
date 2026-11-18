@@ -9,7 +9,7 @@
  */
 
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
 import {
   getBuiltinModeDescriptionKey,
@@ -17,10 +17,9 @@ import {
 } from '@/components/agents/mode-options';
 import { BUILTIN_AGENT_MODES } from '@/components/agents/mode-normalize';
 import { ModelSelector } from '@/components/agents/model-selector';
-import { cn } from '@/lib/utils';
+import { QueryError } from '@/components/query-error';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
-import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
@@ -137,22 +136,14 @@ export function TriggerFormAgent({
           />
         </View>
         {catalogueFailed ? (
-          <View className="flex-row items-center gap-2">
-            <Text accessibilityRole="alert" className="min-w-0 flex-1 text-xs text-destructive">
-              {t('common.couldNotLoadModels')}
-            </Text>
-            <Pressable
-              accessibilityLabel={t('common.retry')}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: models.isFetching }}
-              className={cn(LINE_ACTION_BOX_CLASS, 'min-w-10 justify-center active:opacity-70')}
-              disabled={models.isFetching}
-              hitSlop={LINE_ACTION_HIT_SLOP}
-              onPress={() => void models.refetch()}
-            >
-              <Text className="text-xs font-medium text-destructive">{t('common.retry')}</Text>
-            </Pressable>
-          </View>
+          <QueryError
+            placement="top"
+            compact
+            variant="server"
+            title={t('common.couldNotLoadModels')}
+            onRetry={() => void models.refetch()}
+            isRetrying={models.isFetching}
+          />
         ) : null}
         {modelProblemText === undefined ? null : (
           <Text className="text-xs text-destructive">{modelProblemText}</Text>

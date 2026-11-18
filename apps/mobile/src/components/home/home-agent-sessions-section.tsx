@@ -43,7 +43,7 @@ export function AgentSessionsSection({
   const { reducedMotion } = useMotionPolicy();
   const handleRowPress = useSessionRowPress();
   const content = liveSessionContent(context, sessions);
-  const failureLabel = t('home.couldNotLoadActiveSessions');
+  const failureLabel = t('agents.sessionList.couldNotLoadActive');
   const notice = useLiveSessionHeaderNotice(context, sessions, failureLabel);
   const showBriefing = briefing?.visible === true;
   const briefingCard = briefing?.card ?? null;

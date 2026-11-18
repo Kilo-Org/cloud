@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Nem sikerült betölteni a munkameneteket.",
-    "couldNotLoadActiveSessions": "Nem sikerült betölteni az aktív munkameneteket.",
     "agentSessions": "Most fut",
     "newCodingTask": "Új kódolási feladat",
     "newTaskFromPicture": "Új feladat képből",

@@ -6,19 +6,18 @@ import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { type ProviderKey, ProviderKeyRow } from '@/components/account/provider-key-row';
-import { EmptyState, StateAction } from '@/components/empty-state';
+import { EmptyState } from '@/components/empty-state';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useConfirmDialog } from '@/components/ui/dialog';
+import { IconButton } from '@/components/ui/icon-button';
 import { KeyRound, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   providerKeyAddHref,
   providerKeyNewHref,
@@ -37,9 +36,8 @@ const SKELETON_ROWS = [0, 1];
 
 /**
  * The height the pending band already occupies: two key cards and the gap
- * between them. Every state that is not the key list keeps it, so the Add key
- * action below never moves when the skeletons are replaced by the settled
- * state.
+ * between them. Every state that is not the key list keeps it, so the list
+ * never moves when the skeletons are replaced by the settled state.
  */
 const BODY_BAND_CLASS = 'min-h-64 gap-3';
 
@@ -178,26 +176,14 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
       />
     );
   } else if (keys.data.length === 0) {
-    // An empty list is where the Add action belongs: the state's own slot
-    // carries it, in the shared state-action style, instead of a second
-    // full-width control under the state.
+    // The header's "+" is the screen's one create control, so the empty state
+    // carries the title and its hint only.
     body = (
       <EmptyState
         placement="top"
         icon={KeyRound}
         title={t('profile.providerKeys.emptyTitle')}
         description={t('profile.providerKeys.emptyDescription')}
-        action={
-          permissions.canEdit ? (
-            <StateAction
-              label={t('profile.providerKeys.add')}
-              icon={Plus}
-              onPress={() => {
-                router.push(providerKeyAddHref(scope));
-              }}
-            />
-          ) : undefined
-        }
       />
     );
   } else {
@@ -232,7 +218,22 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.providerKeys.title')} backFallback={PROFILE_TAB_HREF} />
+      <ScreenHeader
+        title={t('profile.providerKeys.title')}
+        backFallback={PROFILE_TAB_HREF}
+        headerRight={
+          permissions.canEdit ? (
+            <IconButton
+              accessibilityLabel={t('profile.providerKeys.add')}
+              onPress={() => {
+                router.push(providerKeyAddHref(scope));
+              }}
+            >
+              <Plus size={20} color={colors.foreground} />
+            </IconButton>
+          ) : undefined
+        }
+      />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName={SCREEN_BODY_CLASS}
@@ -247,18 +248,6 @@ export function ProviderKeysScreen({ organizationId }: Readonly<{ organizationId
           <Text variant="muted">{t('profile.providerKeys.viewOnly')}</Text>
         ) : null}
         <View className={BODY_BAND_CLASS}>{body}</View>
-        {permissions.canEdit && keys.data !== undefined && keys.data.length > 0 ? (
-          <Button
-            variant="outline"
-            className={STATE_ACTION_CLASS}
-            onPress={() => {
-              router.push(providerKeyAddHref(scope));
-            }}
-          >
-            <Plus size={16} color={colors.foreground} />
-            <Text>{t('profile.providerKeys.add')}</Text>
-          </Button>
-        ) : null}
       </TabScreenScrollView>
       {dialog}
     </View>

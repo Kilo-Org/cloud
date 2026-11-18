@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Seansse ei õnnestunud laadida.",
-    "couldNotLoadActiveSessions": "Aktiivseid seansse ei õnnestunud laadida",
     "agentSessions": "Praegu käimas",
     "newCodingTask": "Uus programmeerimisülesanne",
     "newTaskFromPicture": "Uus ülesanne pildist",

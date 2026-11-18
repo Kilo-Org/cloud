@@ -8,12 +8,12 @@ import { Pressable, useWindowDimensions, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
+import { StateAction } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
-import { Wallet } from '@/components/ui/icons';
+import { RotateCcw, Wallet } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { ScreenFooter } from '@/components/ui/screen-footer';
@@ -198,13 +198,14 @@ export function CreditPurchaseScreen() {
   const packsEmpty = !isLoading && catalogEmpty;
   // The pack area holds at most one card at a time — the account read's
   // failure, the store's notice or the empty catalogue — and the priced rows
-  // render under it whenever the catalogue answered, also while the store is
-  // unavailable or timed out: the store's notice names that failure, and the
-  // rows stay on screen unpriced and disabled. The account read gates the
-  // catalogue, so its failure replaces the whole pack area.
+  // render only when no card stands in for them. The store's notice names why
+  // the packs cannot be bought, so the rows it would leave unpriced and
+  // disabled stay off the screen instead of repeating that failure. The
+  // account read gates the catalogue, so its failure replaces the whole pack
+  // area.
   const storeUnavailableAlone = storeUnavailable && !identityUnavailable;
   const showPlaceholders = isLoading && !identityUnavailable && !storeUnavailable;
-  const showRows = !isLoading && !identityUnavailable && !packsEmpty;
+  const showRows = !isLoading && !identityUnavailable && !packsEmpty && !storeUnavailable;
   // The store's credit-expiry policy belongs to the pack group, so the screen
   // states it once under the rows instead of repeating the same sentence under
   // every pack. A catalogue whose packs differ (one expiring, the rest not)
@@ -370,13 +371,13 @@ export function CreditPurchaseScreen() {
 
           {/* The pack area holds at most one card — the account read's
               failure, the store's notice or the empty catalogue — in flow
-              directly under the balance card, and the priced rows render under
-              it whenever the catalogue answered, also while the store is
-              unavailable. The description and the legal links are pinned in the
-              footer below the scroller, so a shorter state ends sooner instead
-              of leaving a reserved blank band under it, while the placeholder
-              rows keep exactly the priced row's height so the list never jumps
-              when the store answers. */}
+              directly under the balance card, and the priced rows follow it
+              only when the store can price the catalogue: the card is the
+              statement, so no unpriced row repeats it. The description and the
+              legal links are pinned in the footer below the scroller, so a
+              shorter state ends sooner instead of leaving a reserved blank band
+              under it, while the placeholder rows keep exactly the priced row's
+              height so the list never jumps when the store answers. */}
           <View className="gap-3">
             {/* The account read gates both catalogue reads, so its failure is
                 the one state where nothing else can settle. It keeps the store
@@ -386,18 +387,14 @@ export function CreditPurchaseScreen() {
               <Card>
                 <Text variant="heading">{t('queryError.serverTitle')}</Text>
                 <Text variant="muted">{t('organization.boundary.loadErrorMessage')}</Text>
-                <Button
-                  accessibilityLabel={t('common.tryAgain')}
-                  accessibilityState={{ busy: isRetryingIdentity, disabled: isRetryingIdentity }}
-                  className="self-start"
-                  disabled={isRetryingIdentity}
+                <StateAction
+                  label={t('common.tryAgain')}
+                  icon={RotateCcw}
+                  loading={isRetryingIdentity}
                   onPress={() => {
                     void retryIdentity();
                   }}
-                  variant="outline"
-                >
-                  <Text>{t('common.tryAgain')}</Text>
-                </Button>
+                />
               </Card>
             )}
 
@@ -409,18 +406,14 @@ export function CreditPurchaseScreen() {
                 <Text variant="muted" numberOfLines={3}>
                   {t(storeBannerBodyKey)}
                 </Text>
-                <Button
-                  accessibilityLabel={t('common.tryAgain')}
-                  accessibilityState={{ busy: isRefetching, disabled: isRefetching }}
-                  className="self-start"
-                  disabled={isRefetching}
+                <StateAction
+                  label={t('common.tryAgain')}
+                  icon={RotateCcw}
+                  loading={isRefetching}
                   onPress={() => {
                     void refetch();
                   }}
-                  variant="outline"
-                >
-                  <Text>{t('common.tryAgain')}</Text>
-                </Button>
+                />
               </Card>
             )}
 
@@ -465,9 +458,10 @@ export function CreditPurchaseScreen() {
                   // truncated.
                   const storePrice = hasStorePrice ? pack.displayPrice : null;
                   // The row's subtitle holds one state phrase, in place of the
-                  // expiry note. The store-unavailable card above already names
-                  // the failure, so only the partly priced state, where the store
-                  // answered and left this pack out, needs the row to say it.
+                  // expiry note. The store-unavailable card replaces the rows,
+                  // so the only phrase a live row can carry is the partly
+                  // priced state, where the store answered and left this pack
+                  // out.
                   const rowWaiting = purchaseWait?.productId === pack.storeProductId;
                   let completingLabel: string | null = null;
                   if (rowWaiting) {
@@ -476,9 +470,7 @@ export function CreditPurchaseScreen() {
                     completingLabel = t('kiloPass.completingPurchase');
                   }
                   const statusLabel =
-                    !rowCompleting && !hasStorePrice && !storeUnavailable
-                      ? t('credits.priceUnavailable')
-                      : null;
+                    !rowCompleting && !hasStorePrice ? t('credits.priceUnavailable') : null;
                   // Exactly one state phrase shows: the purchase in flight, or the
                   // reason this row is inactive.
                   const stateLabel = completingLabel ?? statusLabel;

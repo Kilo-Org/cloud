@@ -32,9 +32,10 @@ import {
 } from '@/lib/format';
 import { type OrgRequestLogEntry, useOrgRequestLogs } from '@/lib/hooks/use-org-billing-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
+import { useMutedDisabledInk, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ORGANIZATION_HUB_PATH } from '@/lib/organization-navigation';
 import { isRetryableTrpcError, trpcErrorVariant, type TrpcErrorVariant } from '@/lib/trpc-error';
-import { parseTimestamp } from '@/lib/utils';
+import { cn, parseTimestamp } from '@/lib/utils';
 
 /**
  * The hour the procedure lists: `organizations.requestLogs.list` answers the
@@ -189,6 +190,8 @@ export function OrganizationRequestLogsScreen() {
   // fixed edge to return to instead of sliding with the clock.
   const [anchorMs] = useState(() => Date.now());
   const [windowEndMs, setWindowEndMs] = useState(anchorMs);
+  const colors = useThemeColors();
+  const mutedDisabledInk = useMutedDisabledInk();
   const allowed = canManageOrganizationBilling(role);
   const logs = useOrgRequestLogs(organizationId, new Date(windowEndMs).toISOString(), allowed);
   const paddingBottom = useTabBarBottomPadding();
@@ -243,6 +246,8 @@ export function OrganizationRequestLogsScreen() {
       case 'retryable': {
         return (
           <QueryError
+            placement="top"
+            inset="gutter"
             variant={current.variant}
             message={t('organization.requestLogs.loadError')}
             onRetry={() => void logs.refetch()}
@@ -254,6 +259,8 @@ export function OrganizationRequestLogsScreen() {
       case 'refused': {
         return (
           <QueryError
+            placement="top"
+            inset="gutter"
             variant={current.variant}
             message={t('organization.requestLogs.loadError')}
             refreshControl={refreshControl}
@@ -263,6 +270,8 @@ export function OrganizationRequestLogsScreen() {
       case 'empty': {
         return (
           <EmptyState
+            placement="top"
+            inset="gutter"
             icon={DirectionalLogs}
             title={t('organization.requestLogs.emptyTitle')}
             refreshControl={refreshControl}
@@ -327,32 +336,45 @@ export function OrganizationRequestLogsScreen() {
             })}
           </Text>
         </View>
+        {/* A step with no further hour is still readable: it takes the muted
+            fill and ink at full strength, where the outline variant would halve
+            both into the page. */}
         <View className="flex-row gap-2">
           <Button
             variant="outline"
             size="sm"
-            className="flex-1"
+            className={cn('flex-1', !canStepOlder && 'bg-muted opacity-100')}
             disabled={!canStepOlder}
             onPress={() => {
               setWindowEndMs(current => current - HOUR_MS);
             }}
             accessibilityLabel={t('organization.requestLogs.older')}
           >
-            <DirectionalArrowLeft size={16} className="text-foreground" />
-            <Text>{t('organization.requestLogs.older')}</Text>
+            <DirectionalArrowLeft
+              size={16}
+              color={canStepOlder ? colors.foreground : mutedDisabledInk}
+            />
+            <Text className={canStepOlder ? undefined : 'text-muted-foreground'}>
+              {t('organization.requestLogs.older')}
+            </Text>
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="flex-1"
+            className={cn('flex-1', !canStepNewer && 'bg-muted opacity-100')}
             disabled={!canStepNewer}
             onPress={() => {
               setWindowEndMs(current => Math.min(current + HOUR_MS, anchorMs));
             }}
             accessibilityLabel={t('organization.requestLogs.newer')}
           >
-            <Text>{t('organization.requestLogs.newer')}</Text>
-            <DirectionalArrowRight size={16} className="text-foreground" />
+            <Text className={canStepNewer ? undefined : 'text-muted-foreground'}>
+              {t('organization.requestLogs.newer')}
+            </Text>
+            <DirectionalArrowRight
+              size={16}
+              color={canStepNewer ? colors.foreground : mutedDisabledInk}
+            />
           </Button>
         </View>
       </View>

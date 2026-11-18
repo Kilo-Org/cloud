@@ -3221,7 +3221,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Ni ellid llwytho'r sesiynau.",
-    "couldNotLoadActiveSessions": "Ni ellid llwytho'r sesiynau gweithredol.",
     "agentSessions": "Ar waith nawr",
     "newCodingTask": "Tasg codio newydd",
     "newTaskFromPicture": "Tasg newydd o lun",

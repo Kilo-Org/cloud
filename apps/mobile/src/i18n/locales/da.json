@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Sessionerne kunne ikke indlæses.",
-    "couldNotLoadActiveSessions": "De aktive sessioner kunne ikke indlæses.",
     "agentSessions": "I gang nu",
     "newCodingTask": "Ny programmeringsopgave",
     "newTaskFromPicture": "Ny opgave fra et billede",

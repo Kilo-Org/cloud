@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Ezin izan dira saioak kargatu.",
-    "couldNotLoadActiveSessions": "Ezin izan dira saio aktiboak kargatu.",
     "agentSessions": "Orain martxan",
     "newCodingTask": "Programazio-zeregin berria",
     "newTaskFromPicture": "Zeregin berria irudi batetik",

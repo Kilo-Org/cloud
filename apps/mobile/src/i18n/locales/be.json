@@ -3111,7 +3111,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Не атрымалася загрузіць сеансы.",
-    "couldNotLoadActiveSessions": "Не атрымалася загрузіць актыўныя сеансы.",
     "agentSessions": "Зараз выконваюцца",
     "newCodingTask": "Новая задача па праграмаванні",
     "newTaskFromPicture": "Новая задача з малюнка",

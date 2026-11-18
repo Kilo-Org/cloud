@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Tidak dapat memuatkan sesi.",
-    "couldNotLoadActiveSessions": "Tidak dapat memuatkan sesi aktif.",
     "agentSessions": "Sedang aktif",
     "newCodingTask": "Tugas pengekodan baharu",
     "newTaskFromPicture": "Tugas baharu daripada gambar",

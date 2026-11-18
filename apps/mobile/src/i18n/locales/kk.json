@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Сессияларды жүктеу мүмкін болмады.",
-    "couldNotLoadActiveSessions": "Белсенді сессияларды жүктеу мүмкін болмады.",
     "agentSessions": "Қазір орындалып жатыр",
     "newCodingTask": "Жаңа бағдарламалау тапсырмасы",
     "newTaskFromPicture": "Суреттен жаңа тапсырма",

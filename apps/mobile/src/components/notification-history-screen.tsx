@@ -311,6 +311,8 @@ export function NotificationHistoryScreen() {
 
           {failure ? (
             <QueryError
+              placement="top"
+              inset="gutter"
               message={t('notifications.history.loadError')}
               onRetry={() => {
                 void query.refetch();
@@ -322,6 +324,8 @@ export function NotificationHistoryScreen() {
 
           {!loading && !failure && !hasListContent ? (
             <EmptyState
+              placement="top"
+              inset="gutter"
               icon={BellOff}
               refreshControl={refreshControl}
               title={t(

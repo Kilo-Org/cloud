@@ -83,7 +83,10 @@ vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'Sess
 // The zero state's glyph comes from the icon set, whose native renderer the
 // pure project does not load.
 vi.mock('@/components/ui/icons', () => ({ Bot: 'Bot' }));
-vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'ArrowLeft',
+  DirectionalChevronRight: 'ChevronRight',
+}));
 // The briefing card reaches the native SQLCipher dismissal journal; these
 // assertions cover the live card and the section header only.
 vi.mock('@/components/agent-briefing/briefing-card', () => ({

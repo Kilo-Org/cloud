@@ -356,6 +356,42 @@ test('gutter: a sibling stacked above the box does not exempt its column', () =>
   assert.equal(run(nodes)[0]?.measured, 21);
 });
 
+/**
+ * A failed user turn as the device measured it: the turn is end-aligned, so its
+ * Retry / Copy to composer row begins where the bubble's column does, at 211 dp,
+ * and the row's first button is its own content.
+ */
+function messageActionsScreen(marked = true): ProbeNode[] {
+  return [
+    { parent: 0, tag: 'RNSScreen', rect: [0, 0, WIDTH, 800] },
+    { parent: 1, tag: 'View', rect: [0, 88, WIDTH, 600], style: { paddingHorizontal: 14 } },
+    {
+      parent: 2,
+      tag: 'View',
+      rect: [211, 96, 175, 32],
+      style: { flexDirection: 'row' },
+      ...(marked ? { testID: 'message-failure-actions' } : {}),
+    },
+    {
+      parent: 3,
+      tag: 'View',
+      rect: [211, 96, 80, 32],
+      pressable: true,
+      role: 'button',
+      label: 'Retry',
+      style: { backgroundColor: '#f0eee6' },
+    },
+  ];
+}
+
+test("gutter: a chat turn's failure actions follow the message, not the page column", () => {
+  assert.deepEqual(run(messageActionsScreen()), []);
+  const [finding, ...rest] = run(messageActionsScreen(false));
+  assert.equal(rest.length, 0);
+  assert.equal(finding?.measured, 211);
+  assert.equal(finding?.element.label, 'Retry');
+});
+
 test('gutter: an out-of-flow overlay is not a column', () => {
   assert.deepEqual(
     run([

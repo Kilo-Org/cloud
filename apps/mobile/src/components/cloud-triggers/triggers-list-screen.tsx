@@ -17,7 +17,6 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Copy, Plus, Workflow } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
@@ -26,7 +25,6 @@ import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { copyWebhookUrl } from '@/lib/cloud-triggers/copy-webhook-url';
 import { useCloudTriggers, useTriggerMutations } from '@/lib/cloud-triggers/use-cloud-triggers';
 import { type CloudTriggerListRow } from '@/lib/cloud-triggers/trigger-draft';
@@ -40,8 +38,8 @@ const SKELETON_ROWS = [0, 1];
 
 /**
  * The floor the pending band already occupies: two skeleton rows. Every state
- * that is not the list keeps it, so the New trigger action below never moves
- * when the two placeholders are replaced by the settled state.
+ * that is not the list keeps it, so the list never moves when the two
+ * placeholders are replaced by the settled state.
  */
 const BODY_BAND_CLASS = 'min-h-32';
 
@@ -220,16 +218,6 @@ export function TriggersListScreen({ organizationId }: TriggersListScreenProps) 
           <Section>
             <Text variant="muted">{t('cloudAgent.triggers.subtitle')}</Text>
             <View className={BODY_BAND_CLASS}>{body}</View>
-            <Button
-              variant="outline"
-              className={STATE_ACTION_CLASS}
-              onPress={() => {
-                router.push(triggerCreateHref(organizationId) as Href);
-              }}
-            >
-              <Plus size={16} color={colors.foreground} />
-              <Text>{t('cloudAgent.triggers.new')}</Text>
-            </Button>
           </Section>
         </TabScreenScrollView>
       )}

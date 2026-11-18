@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "სესიების ჩატვირთვა ვერ მოხერხდა.",
-    "couldNotLoadActiveSessions": "აქტიური სესიების ჩატვირთვა ვერ მოხერხდა.",
     "agentSessions": "ახლა აქტიურია",
     "newCodingTask": "კოდის წერის ახალი ამოცანა",
     "newTaskFromPicture": "ახალი ამოცანა სურათიდან",

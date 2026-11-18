@@ -89,7 +89,7 @@ export function HomeScreen() {
           <LiveSessionFeedback
             context={context}
             sessions={sessions}
-            failureLabel={t('home.couldNotLoadActiveSessions')}
+            failureLabel={t('agents.sessionList.couldNotLoadActive')}
             centered
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           />

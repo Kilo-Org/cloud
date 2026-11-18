@@ -2490,7 +2490,6 @@
   },
   "home": {
     "couldNotLoadSessions": "לא ניתן לטעון את הסשנים.",
-    "couldNotLoadActiveSessions": "לא ניתן לטעון את הסשנים הפעילים.",
     "agentSessions": "פעילים עכשיו",
     "newCodingTask": "משימת תכנות חדשה",
     "newTaskFromPicture": "משימה חדשה מתמונה",

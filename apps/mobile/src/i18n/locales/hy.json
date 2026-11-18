@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Չհաջողվեց բեռնել նստաշրջանները։",
-    "couldNotLoadActiveSessions": "Չհաջողվեց բեռնել ակտիվ նստաշրջանները։",
     "agentSessions": "Այժմ ընթացքի մեջ",
     "newCodingTask": "Նոր ծրագրավորման առաջադրանք",
     "newTaskFromPicture": "Նոր առաջադրանք նկարից",

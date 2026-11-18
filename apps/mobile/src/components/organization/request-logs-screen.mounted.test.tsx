@@ -90,6 +90,7 @@ vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: 'black' }),
+  useMutedDisabledInk: () => '#999999',
 }));
 
 vi.mock('@/components/ui/icons', () => ({ Logs: 'Logs' }));

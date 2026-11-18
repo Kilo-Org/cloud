@@ -2458,7 +2458,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Tidak dapat memuat sesi.",
-    "couldNotLoadActiveSessions": "Tidak dapat memuat sesi aktif.",
     "agentSessions": "Sedang berjalan",
     "newCodingTask": "Tugas pemrograman baru",
     "newTaskFromPicture": "Tugas baru dari gambar",

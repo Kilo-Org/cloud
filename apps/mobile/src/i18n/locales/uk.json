@@ -2522,7 +2522,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Не вдалося завантажити сеанси.",
-    "couldNotLoadActiveSessions": "Не вдалося завантажити активні сеанси.",
     "agentSessions": "Активні зараз",
     "newCodingTask": "Нове завдання з програмування",
     "newTaskFromPicture": "Нове завдання із зображення",

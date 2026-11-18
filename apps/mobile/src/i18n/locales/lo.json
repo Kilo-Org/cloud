@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "ບໍ່ສາມາດໂຫຼດເຊສຊັນໄດ້.",
-    "couldNotLoadActiveSessions": "ບໍ່ສາມາດໂຫຼດເຊສຊັນທີ່ກຳລັງໃຊ້ງານໄດ້.",
     "agentSessions": "ກຳລັງເຮັດວຽກ",
     "newCodingTask": "ວຽກຂຽນໂຄ້ດໃໝ່",
     "newTaskFromPicture": "ວຽກໃໝ່ຈາກຮູບພາບ",

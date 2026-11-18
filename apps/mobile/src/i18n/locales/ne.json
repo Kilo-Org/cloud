@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "सत्रहरू लोड गर्न सकिएन।",
-    "couldNotLoadActiveSessions": "सक्रिय सत्रहरू लोड गर्न सकिएन।",
     "agentSessions": "अहिले चलिरहेका",
     "newCodingTask": "नयाँ कोडिङ कार्य",
     "newTaskFromPicture": "तस्बिरबाट नयाँ कार्य",

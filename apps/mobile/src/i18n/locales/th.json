@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "โหลดเซสชันไม่สำเร็จ",
-    "couldNotLoadActiveSessions": "โหลดเซสชันที่ใช้งานอยู่ไม่สำเร็จ",
     "agentSessions": "กำลังทำงานอยู่",
     "newCodingTask": "งานเขียนโค้ดใหม่",
     "newTaskFromPicture": "งานใหม่จากรูปภาพ",

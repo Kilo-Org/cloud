@@ -2458,7 +2458,6 @@
   },
   "home": {
     "couldNotLoadSessions": "세션을 불러올 수 없습니다.",
-    "couldNotLoadActiveSessions": "활성 세션을 불러올 수 없습니다.",
     "agentSessions": "현재 실행 중",
     "newCodingTask": "새 코딩 작업",
     "newTaskFromPicture": "사진에서 새 작업",

@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "સત્રો લોડ કરી શકાયાં નહીં.",
-    "couldNotLoadActiveSessions": "સક્રિય સત્રો લોડ કરી શકાયાં નહીં.",
     "agentSessions": "અત્યારે ચાલુ",
     "newCodingTask": "નવું કોડિંગ કાર્ય",
     "newTaskFromPicture": "ચિત્રમાંથી નવું કાર્ય",

@@ -1,11 +1,12 @@
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, type ScrollViewProps, View } from 'react-native';
+import { type ScrollViewProps, View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import { StateAction } from '@/components/empty-state';
 import {
   liveSessionContent,
   type LiveSessionContext,
@@ -14,6 +15,7 @@ import {
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
+import { DirectionalArrowLeft } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -98,8 +100,15 @@ export function LiveSessionFeedback({
   // One message speaks while the refresh-status line owns the rows-state
   // failure: the line announces its own copy instead of a second label.
   const statusLineOwnsFailure = content === 'rows' && refresh && (refresh.busy || refresh.failed);
+  // Home reports a failed load beside readable rows in its section-header
+  // notice, so the block is suppressed there and this announcement is the only
+  // channel. Everywhere else the block's own description announces the label.
+  const rowsFailureInNotice = content === 'rows' && !inlineNotices;
   useStatusAnnouncement(
-    context.isReady && sessions.terminalError?.kind === 'retryable' && !statusLineOwnsFailure
+    context.isReady &&
+      sessions.terminalError?.kind === 'retryable' &&
+      !statusLineOwnsFailure &&
+      rowsFailureInNotice
       ? failureLabel
       : null
   );
@@ -120,6 +129,7 @@ export function LiveSessionFeedback({
     failure = (
       <QueryError
         placement="top"
+        compact={centered ? undefined : true}
         className={centered ? 'pt-0' : undefined}
         title={t('organization.boundary.loadErrorTitle')}
         message={t('organization.boundary.loadErrorMessage')}
@@ -143,24 +153,23 @@ export function LiveSessionFeedback({
       message = failureLabel;
     }
     failure = (
-      <>
-        <QueryError
-          placement="top"
-          className={centered ? 'pt-0' : undefined}
-          variant={variant}
-          title={title}
-          message={message}
-        />
-        <Button
-          variant="outline"
-          accessibilityLabel={t('organization.boundary.backToProfile')}
-          onPress={() => {
-            router.replace('/(app)/(tabs)/(3_profile)' as Href);
-          }}
-        >
-          <Text>{t('organization.boundary.backToProfile')}</Text>
-        </Button>
-      </>
+      <QueryError
+        placement="top"
+        compact={centered ? undefined : true}
+        className={centered ? 'pt-0' : undefined}
+        variant={variant}
+        title={title}
+        message={message}
+        action={
+          <StateAction
+            label={t('organization.boundary.backToProfile')}
+            icon={DirectionalArrowLeft}
+            onPress={() => {
+              router.replace('/(app)/(tabs)/(3_profile)' as Href);
+            }}
+          />
+        }
+      />
     );
   } else if (
     context.isReady &&
@@ -170,36 +179,20 @@ export function LiveSessionFeedback({
     // error still shows the load-failure label.
     !statusLineOwnsFailure
   ) {
-    const compact = content === 'rows';
-    // The compact form sits beside rows that are still readable, so the two
-    // retries stay separate there; the card form is the whole surface, so it
-    // is the single recovery action (see `failureOwnsRetry` above).
-    failureOwnsRetry = !compact;
+    // Rows that stay readable keep the connection row's own retry separate;
+    // the whole surface owns the one recovery action.
+    failureOwnsRetry = content !== 'rows';
     failure = (
-      <View className="gap-1">
-        {!compact && (
-          <QueryError placement="top" className={centered ? 'pt-0' : undefined} message="" />
-        )}
-        <View className={cn('items-center', compact ? 'flex-row gap-2' : 'gap-4')}>
-          <Text
-            accessibilityLiveRegion={Platform.OS === 'android' ? 'polite' : undefined}
-            className={cn('text-destructive', compact ? 'flex-1 text-xs' : 'text-center text-sm')}
-          >
-            {failureLabel}
-          </Text>
-          <Button
-            variant={compact ? 'ghost' : 'outline'}
-            size={compact ? 'sm' : 'default'}
-            onPress={handleRetry}
-            loading={retrying}
-            accessibilityLabel={t('common.retry')}
-          >
-            <Text>{t('common.retry')}</Text>
-          </Button>
-        </View>
-      </View>
+      <QueryError
+        placement="top"
+        compact={centered ? undefined : true}
+        className={centered ? 'pt-0' : undefined}
+        message={failureLabel}
+        onRetry={handleRetry}
+        isRetrying={retrying}
+      />
     );
-    if (compact && !inlineNotices) {
+    if (rowsFailureInNotice) {
       failure = null;
     }
   }

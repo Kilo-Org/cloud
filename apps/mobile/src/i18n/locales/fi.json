@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Istuntoja ei voitu ladata.",
-    "couldNotLoadActiveSessions": "Aktiivisia istuntoja ei voitu ladata.",
     "agentSessions": "Käynnissä nyt",
     "newCodingTask": "Uusi koodaustehtävä",
     "newTaskFromPicture": "Uusi tehtävä kuvasta",

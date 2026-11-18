@@ -293,7 +293,7 @@ function MessageBubbleImpl({
             ) : null}
           </>
         )}
-        <View className="flex-row gap-2">
+        <View className="flex-row gap-2" testID="message-failure-actions">
           {retryAction ? (
             <Button
               variant="outline"

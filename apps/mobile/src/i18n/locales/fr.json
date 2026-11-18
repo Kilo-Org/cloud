@@ -2419,7 +2419,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Impossible de charger les sessions",
-    "couldNotLoadActiveSessions": "Impossible de charger les sessions actives",
     "agentSessions": "En cours",
     "newCodingTask": "Nouvelle tâche de programmation",
     "newTaskFromPicture": "Nouvelle tâche à partir d'une image",

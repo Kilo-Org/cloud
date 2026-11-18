@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Сессүүдийг ачаалж чадсангүй.",
-    "couldNotLoadActiveSessions": "Идэвхтэй сессүүдийг ачаалж чадсангүй.",
     "agentSessions": "Одоо ажиллаж байгаа",
     "newCodingTask": "Код бичих шинэ даалгавар",
     "newTaskFromPicture": "Зургаас шинэ даалгавар",

@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Seanslarni yuklab bo'lmadi.",
-    "couldNotLoadActiveSessions": "Faol seanslarni yuklab bo'lmadi.",
     "agentSessions": "Hozir faol",
     "newCodingTask": "Yangi kodlash vazifasi",
     "newTaskFromPicture": "Rasmdan yangi vazifa",

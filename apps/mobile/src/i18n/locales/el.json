@@ -3001,7 +3001,6 @@
   },
   "home": {
     "couldNotLoadSessions": "Δεν ήταν δυνατή η φόρτωση των συνεδριών.",
-    "couldNotLoadActiveSessions": "Δεν ήταν δυνατή η φόρτωση των ενεργών συνεδριών.",
     "agentSessions": "Σε εξέλιξη τώρα",
     "newCodingTask": "Νέα εργασία προγραμματισμού",
     "newTaskFromPicture": "Νέα εργασία από εικόνα",

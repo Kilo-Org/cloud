@@ -361,13 +361,7 @@ export function DesignSystemFixture() {
             title="Nothing here"
             description="The state's way out sits under it."
             placement="static"
-            action={
-              <StateAction
-                label="Action"
-                icon={Plus}
-                onPress={() => undefined}
-              />
-            }
+            action={<StateAction label="Action" icon={Plus} onPress={() => undefined} />}
           />
         </Section>
 

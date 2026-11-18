@@ -96,7 +96,10 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyStateMock', StateAction: 'StateAction' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyStateMock',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'SkeletonMock' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 

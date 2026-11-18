@@ -14,7 +14,11 @@ const schemeState = vi.hoisted(() => ({ current: 'light' as 'light' | 'dark' }))
 const platformState = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
 
 vi.mock('react-native', () => ({
-  Platform: { get OS() { return platformState.os; } },
+  Platform: {
+    get OS() {
+      return platformState.os;
+    },
+  },
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',

@@ -135,7 +135,10 @@ vi.mock('@/components/pr-review/pr-review-unavailable-actions', () => ({
 }));
 vi.mock('@/components/agents/markdown-text', () => ({ MarkdownText: 'MarkdownText' }));
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'ScrollView' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: record('button') }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

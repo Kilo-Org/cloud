@@ -74,7 +74,10 @@ vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: 'StateSurfaceInsets',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 // The workspace row has its own suite (`chat-list-screen.workspace.mounted.test.tsx`);
 // here it is stubbed so these assertions stay about starting a chat.
 vi.mock('@/components/context-control', () => ({ ContextControl: () => null }));

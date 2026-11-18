@@ -141,9 +141,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
         title={t('todos.lists.empty')}
         placement="top"
         inset="gutter"
-        action={
-          <StateAction label={t('todos.lists.newList')} icon={Plus} onPress={openNewList} />
-        }
+        action={<StateAction label={t('todos.lists.newList')} icon={Plus} onPress={openNewList} />}
       />
     );
   } else {

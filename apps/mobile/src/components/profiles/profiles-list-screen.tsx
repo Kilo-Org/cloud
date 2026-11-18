@@ -174,11 +174,7 @@ export function ProfilesListScreen({
             description={t('profiles.emptyDescription')}
             placement="top"
             action={
-              <StateAction
-                label={t('profiles.newProfile')}
-                icon={Plus}
-                onPress={openNewProfile}
-              />
+              <StateAction label={t('profiles.newProfile')} icon={Plus} onPress={openNewProfile} />
             }
           />
         )}

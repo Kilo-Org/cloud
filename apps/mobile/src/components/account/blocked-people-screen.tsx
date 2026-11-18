@@ -146,8 +146,7 @@ export function BlockedPeopleScreen() {
     })
   );
 
-  const isEmpty =
-    hidden.data?.blockedLogins.length === 0 && hidden.data.mutedLogins.length === 0;
+  const isEmpty = hidden.data?.blockedLogins.length === 0 && hidden.data.mutedLogins.length === 0;
   // An empty or failed list is the whole surface: its own state says everything
   // the intro would, so the intro is hidden there instead of repeating it.
   const wholeSurface = hidden.isError || isEmpty;

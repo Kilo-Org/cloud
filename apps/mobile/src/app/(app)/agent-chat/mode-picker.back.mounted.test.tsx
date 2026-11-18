@@ -86,7 +86,10 @@ vi.mock('react-i18next', () => ({
   // module load. Partially mocked callers keep the real export instead.
   initReactI18next: { type: '3rdParty', init: () => undefined },
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Icon',

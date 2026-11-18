@@ -217,11 +217,7 @@ export function ProfileVariablesScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <StateAction
-              label={t('profiles.addVariable')}
-              icon={Plus}
-              onPress={startAdd}
-            />
+            <StateAction label={t('profiles.addVariable')} icon={Plus} onPress={startAdd} />
           </ProfileManageSlot>
         }
       />

@@ -63,7 +63,10 @@ vi.mock('@/components/screen-header', () => ({
   ScreenHeader: (props: { headerRight?: ReactNode }) =>
     createElement('ScreenHeader', null, props.headerRight),
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),

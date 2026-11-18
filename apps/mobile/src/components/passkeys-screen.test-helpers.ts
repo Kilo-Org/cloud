@@ -397,7 +397,11 @@ export function buttonByLabel(view: PasskeysView, label: string): ReactTestInsta
 }
 
 export function hasButtonLabel(view: PasskeysView, label: string): boolean {
-  return [...nodes(view, 'Button'), ...nodes(view, 'StateAction'), ...nodes(view, 'Pressable')].some(
+  return [
+    ...nodes(view, 'Button'),
+    ...nodes(view, 'StateAction'),
+    ...nodes(view, 'Pressable'),
+  ].some(
     node =>
       node.props.label === label ||
       node.findAll(inner => String(inner.type) === 'Text' && inner.props.children === label)

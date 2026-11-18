@@ -32,13 +32,8 @@ vi.mock('expo-router', () => ({ useRouter: () => ({ push: requests.push }) }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
-  StateAction: ({
-    label,
-    onPress,
-  }: {
-    label: string;
-    onPress: () => void;
-  }) => createElement('StateAction', { label, onPress }),
+  StateAction: ({ label, onPress }: { label: string; onPress: () => void }) =>
+    createElement('StateAction', { label, onPress }),
   EmptyState: ({
     action,
     ...props

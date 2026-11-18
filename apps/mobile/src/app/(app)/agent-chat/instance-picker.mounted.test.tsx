@@ -78,7 +78,10 @@ vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({

@@ -123,7 +123,10 @@ vi.mock('@/components/security-agent/orphaned-findings-card', () => ({
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: 'PlatformErrorScreen',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 // `headerRight` is a prop, not a child: the stub renders it so the Save button
 // (the screen's only save path) actually mounts.
@@ -132,7 +135,10 @@ vi.mock('@/components/screen-header', () => ({
     createElement(Fragment, null, props.headerRight),
 }));
 vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
-vi.mock('@/components/ui/icons', () => ({ ExternalLink: 'ExternalLink', FolderGit2: 'FolderGit2' }));
+vi.mock('@/components/ui/icons', () => ({
+  ExternalLink: 'ExternalLink',
+  FolderGit2: 'FolderGit2',
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/radio-group', () => ({ RadioGroup: 'RadioGroup' }));
@@ -352,9 +358,7 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect(empty.props as { action: unknown }).toHaveProperty('action');
     // The grant is the only way out of this state, so it is the state's one
     // primary action, named by its own label.
-    expect(emptyStateActionLabel(renderer)).toBe(
-      i18n.t('securityAgent.repositories.manageAccess')
-    );
+    expect(emptyStateActionLabel(renderer)).toBe(i18n.t('securityAgent.repositories.manageAccess'));
     expect(repoRows(renderer)).toHaveLength(0);
   });
 

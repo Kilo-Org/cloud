@@ -291,11 +291,7 @@ export function ProfileCommandsScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <StateAction
-              label={t('profiles.addCommand')}
-              icon={Plus}
-              onPress={add}
-            />
+            <StateAction label={t('profiles.addCommand')} icon={Plus} onPress={add} />
           </ProfileManageSlot>
         }
       />

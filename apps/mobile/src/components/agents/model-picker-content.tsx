@@ -324,11 +324,7 @@ export function ModelPickerContent() {
             // same recovery the Agents search empty state does, so the only
             // exit from "No matches" is not backspacing the query away.
             deferredSearch.trim() ? (
-              <StateAction
-                label={t('common.clearSearch')}
-                icon={X}
-                onPress={handleClearSearch}
-              />
+              <StateAction label={t('common.clearSearch')} icon={X} onPress={handleClearSearch} />
             ) : undefined
           }
         />

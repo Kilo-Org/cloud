@@ -75,11 +75,7 @@ export function ProfilePickerSheet({
         inset="gutter"
         action={
           onCreateProfile === undefined ? undefined : (
-            <StateAction
-              label={t('profiles.createAction')}
-              icon={Plus}
-              onPress={onCreateProfile}
-            />
+            <StateAction label={t('profiles.createAction')} icon={Plus} onPress={onCreateProfile} />
           )
         }
       />

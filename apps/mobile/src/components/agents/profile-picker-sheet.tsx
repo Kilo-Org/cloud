@@ -154,13 +154,7 @@ export function ProfilePickerSheet({
           icon={Settings2}
           title={t('agentChat.newSession.couldNotLoadEnvironment')}
           description={t('organization.boundary.loadErrorMessage')}
-          action={
-            <StateAction
-              label={t('common.retry')}
-              icon={RotateCcw}
-              onPress={onRetry}
-            />
-          }
+          action={<StateAction label={t('common.retry')} icon={RotateCcw} onPress={onRetry} />}
         />
       </PickerSheet>
     );

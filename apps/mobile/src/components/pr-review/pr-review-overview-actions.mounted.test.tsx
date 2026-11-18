@@ -83,7 +83,10 @@ vi.mock('@/lib/pr-review/merge/use-merge-blocked-reasons', () => ({
 }));
 
 vi.mock('@/components/detail-screen', () => ({ DetailScreenScrollView: 'ScrollView' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/agents/markdown-text', () => ({ MarkdownText: 'MarkdownText' }));
 vi.mock('@/components/pr-review/pr-review-checks-section', () => ({

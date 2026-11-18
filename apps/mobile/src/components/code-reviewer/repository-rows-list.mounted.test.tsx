@@ -20,7 +20,10 @@ vi.mock('react-native', () => ({
 vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
 vi.mock('@/components/ui/icons', () => ({ Search: 'Search', SearchX: 'SearchX', X: 'X' }));
 vi.mock('@/components/repo-toggle-row', () => ({ RepoToggleRow: 'RepoToggleRow' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@shopify/flash-list', async () => {
   // `vi.mock` factories run before the file's imports bind.
   const { createElement: create, forwardRef, useImperativeHandle } = await import('react');

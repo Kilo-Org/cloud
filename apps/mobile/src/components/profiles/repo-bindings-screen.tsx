@@ -197,7 +197,9 @@ export function RepoBindingsScreen({
           title={t('profiles.repoBindings.empty')}
           // The empty state must not name an action the screen withholds: a
           // member cannot add a default, so its state names the role instead.
-          description={canManage ? t('profiles.repoBindings.emptyDescription') : readOnlyDescription}
+          description={
+            canManage ? t('profiles.repoBindings.emptyDescription') : readOnlyDescription
+          }
           action={
             canManage ? (
               <StateAction

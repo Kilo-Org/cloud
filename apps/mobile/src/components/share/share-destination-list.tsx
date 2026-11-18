@@ -209,13 +209,7 @@ export function ShareDestinationList({
         icon={Share2}
         title={t('share.staleTitle')}
         description={state.message}
-        action={
-          <StateAction
-            label={t('common.close')}
-            icon={X}
-            onPress={onDismiss}
-          />
-        }
+        action={<StateAction label={t('common.close')} icon={X} onPress={onDismiss} />}
       />
     );
   } else if (state.kind === 'non-retryable-classification') {

@@ -145,7 +145,10 @@ vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: 'StateSurfaceInsets',
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({
   // The account row is the screen's inline header action; render it so the

@@ -10,7 +10,7 @@ import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 
 /** The bound on the stored-consent read before the card gives up on it. */
-export const STORED_LOAD_TIMEOUT_MS = 15_000;
+const STORED_LOAD_TIMEOUT_MS = 15_000;
 
 /**
  * The consent card's behaviour: the stored-choice load, the primary and

@@ -3,10 +3,7 @@ import { builderAllocationSandboxName } from './builder-identity.js';
 import type { EnvironmentBuildTarget } from './target.js';
 import type { AwsBuilderAllocation } from './aws-build-target.js';
 import type { AwsEnvironmentBuildServices } from './aws-build.js';
-export {
-  builderAllocationSandboxName,
-  builderAllocationSandboxName as vercelBuilderSandboxName,
-} from './builder-identity.js';
+export { builderAllocationSandboxName } from './builder-identity.js';
 import type { CloudflareContainersInstance } from '@kilocode/worker-utils/sandbox-allocation';
 import { hashToSandboxId } from '../sandbox-id.js';
 import type { EnvironmentBuildRunner } from '../shared/environment-build-protocol.js';

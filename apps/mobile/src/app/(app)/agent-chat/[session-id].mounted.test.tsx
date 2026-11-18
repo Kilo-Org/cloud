@@ -136,6 +136,7 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
   DirectionalChevronLeft: 'ChevronLeft',
   DirectionalChevronRight: 'ChevronRight',
 }));
@@ -157,8 +158,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   RotateCcw: 'RotateCcw',
-  ArrowLeft: 'ArrowLeft',
-  ArrowRight: 'ArrowRight',
   AlertCircle: 'AlertCircle',
   ChevronDown: 'ChevronDown',
   Clock: 'Clock',

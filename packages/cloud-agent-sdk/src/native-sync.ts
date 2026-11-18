@@ -1154,6 +1154,9 @@ export class NativeSyncClient {
             ...(typeof body['runID'] === 'string' ? { runID: body['runID'] } : {}),
           };
         if (frame.type === 'remote.state') remoteState = frame;
+        // The frame is retained: acknowledge the cursor before notifying a consumer, so a
+        // throwing listener cannot replay the same sequence for ever.
+        lastSeq = frame.seq;
         publish({
           events,
           session,
@@ -1162,7 +1165,6 @@ export class NativeSyncClient {
           assetURLs,
           pendingSnapshotMessageIDs,
         });
-        lastSeq = frame.seq;
         if (
           frame.type === 'session.moved' ||
           (frame.type.startsWith('session.execution.') &&

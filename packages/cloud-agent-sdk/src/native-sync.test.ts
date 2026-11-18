@@ -1172,6 +1172,36 @@ test('a throwing state listener is not treated as an unreadable frame', async ()
   connection.close();
 });
 
+test('a deterministically throwing state listener advances the cursor instead of replaying the frame', async () => {
+  const { client } = fixture();
+  let observed = 0;
+  const connection = client.connectSession('ses_a', value => {
+    const converted = value.events.length;
+    if (value.connection === 'connected' && converted > observed) {
+      observed = converted;
+      throw new Error('consumer failure');
+    }
+  });
+  await flush();
+  const socket = connectedSocket();
+  socket.frame('hello', hello(), 3);
+  await flush();
+  socket.frame(
+    'session.step.started',
+    { syncPosition: 1, data: { data: { assistantMessageID: 'msg_m1' } } },
+    4,
+    'events'
+  );
+  await flush();
+  await jest.advanceTimersByTimeAsync(2001);
+  await flush();
+  expect(FakeSocket.sockets).toHaveLength(2);
+  connectedSocket(1).frame('hello', hello(), 5);
+  await flush();
+  expect(connectedSocket(1).sent).toContainEqual({ type: 'subscribe', afterSeq: 4 });
+  connection.close();
+});
+
 test('per-frame gap detection stays first-match and additive for changed message references', async () => {
   const canonical: NativeSnapshot = {
     position: 5,

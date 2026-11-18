@@ -40,6 +40,8 @@ vi.mock('@/components/picker-sheet', () => ({
     ),
 }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: ({ label, onPress }: { label: string; onPress: () => void }) =>
+    createElement('StateAction', { label, onPress }),
   EmptyState: (props: { title: string; description: unknown; action?: ReactNode }) =>
     createElement('EmptyState', props, props.action),
 }));
@@ -51,6 +53,7 @@ vi.mock('@/components/ui/text', async () => {
 });
 vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
+  RotateCcw: 'RotateCcw',
   Settings2: 'Settings2',
   SlidersHorizontal: 'SlidersHorizontal',
 }));
@@ -300,8 +303,8 @@ describe('ProfilePickerSheet', () => {
 
     const empty = renderer.root.findByType('EmptyState' as never);
     expect(empty.props.title).toBe("Couldn't load your environment");
-    const retry = renderer.root.findByType('Button' as never);
-    expect(retry.props.accessibilityLabel).toBe('Retry');
+    const retry = renderer.root.findByType('StateAction' as never);
+    expect(retry.props.label).toBe('Retry');
     press(retry);
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(radios(renderer)).toHaveLength(0);
@@ -318,8 +321,8 @@ describe('ProfilePickerSheet', () => {
     expect(empty.props.description).toBe(
       'Create a profile to reuse environment variables, setup commands, and skills across sessions.'
     );
-    const manage = renderer.root.findByType('Button' as never);
-    expect(manage.props.accessibilityLabel).toBe('Manage profiles');
+    const manage = renderer.root.findByType('StateAction' as never);
+    expect(manage.props.label).toBe('Manage profiles');
     press(manage);
     expect(onManageProfiles).toHaveBeenCalledTimes(1);
     expect(radios(renderer)).toHaveLength(0);

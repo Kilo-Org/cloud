@@ -5,14 +5,14 @@ import { useRouter } from 'expo-router';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { SheetHeader } from '@/components/sheet-header';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Fab } from '@/components/ui/fab';
 import { FormField } from '@/components/ui/form-field';
-import { Bell, Inbox, Settings, Sparkles, Trash2 } from '@/components/ui/icons';
+import { Bell, Inbox, Plus, Settings, Sparkles, Trash2 } from '@/components/ui/icons';
 import { Input, INPUT_BOX_SHAPE_CLASS } from '@/components/ui/input';
 import { InputFrame } from '@/components/ui/input-frame';
 import { KvRow } from '@/components/ui/kv-row';
@@ -26,7 +26,6 @@ import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SessionRow } from '@/components/ui/session-row';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 
@@ -363,9 +362,11 @@ export function DesignSystemFixture() {
             description="The state's way out sits under it."
             placement="static"
             action={
-              <Button className={STATE_ACTION_CLASS} variant="outline">
-                <Text>Action</Text>
-              </Button>
+              <StateAction
+                label="Action"
+                icon={Plus}
+                onPress={() => undefined}
+              />
             }
           />
         </Section>

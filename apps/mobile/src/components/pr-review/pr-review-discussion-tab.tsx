@@ -61,7 +61,7 @@
 // (max-lines extraction). Expansion settle bookkeeping stays here.
 
 import { type FlashListRef } from '@shopify/flash-list';
-import { MessageSquarePlus } from '@/components/ui/icons';
+import { FolderOpen, MessageSquarePlus } from '@/components/ui/icons';
 import { type Href, useIsFocused, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -75,9 +75,8 @@ import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-s
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { PrReviewUnavailableActions } from '@/components/pr-review/pr-review-unavailable-actions';
 import { CenteredState } from '@/components/centered-state';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -93,7 +92,6 @@ import {
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { mergeDiscussionListItemsBySortKey } from '@/lib/pr-review/discussion/merge-discussion-list-items';
 import { useMotionPolicy } from '@/lib/a11y/motion';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   expandedForThread,
   expandThread,
@@ -429,14 +427,11 @@ export function PrReviewDiscussionTab({
       }
       action={
         onRequestFiles ? (
-          <Button
-            className={STATE_ACTION_CLASS}
-            variant="outline"
+          <StateAction
+            label={t('prReview.discussion.reviewFiles')}
+            icon={FolderOpen}
             onPress={onRequestFiles}
-            accessibilityLabel={t('prReview.discussion.reviewFiles')}
-          >
-            <Text>{t('prReview.discussion.reviewFiles')}</Text>
-          </Button>
+          />
         ) : null
       }
     />

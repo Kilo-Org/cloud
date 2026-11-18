@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { AgentFormSheet, type AgentSaveFailure } from '@/components/profiles/agent-form-sheet';
 import { AgentRowView, AgentsSkeleton } from '@/components/profiles/profile-agents-row';
 import { agentRows, type AgentSource } from '@/components/profiles/profile-agents-model';
@@ -15,7 +15,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { Bot } from '@/components/ui/icons';
+import { Bot, Plus } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import {
@@ -26,7 +26,6 @@ import {
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { isolateBidiText } from '@/lib/bidi';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
@@ -159,9 +158,11 @@ export function ProfileAgentsScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
-              <Text>{t('profiles.agents.add')}</Text>
-            </Button>
+            <StateAction
+              label={t('profiles.agents.add')}
+              icon={Plus}
+              onPress={handleStartAdd}
+            />
           </ProfileManageSlot>
         }
       />

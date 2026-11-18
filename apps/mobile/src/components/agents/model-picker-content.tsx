@@ -8,13 +8,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { ModelPickerOptionRow } from '@/components/agents/model-selector';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Text } from '@/components/ui/text';
-import { FIELD_CLEAR_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { FIELD_CLEAR_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -325,9 +324,11 @@ export function ModelPickerContent() {
             // same recovery the Agents search empty state does, so the only
             // exit from "No matches" is not backspacing the query away.
             deferredSearch.trim() ? (
-              <Button variant="outline" onPress={handleClearSearch} className={STATE_ACTION_CLASS}>
-                <Text>{t('common.clearSearch')}</Text>
-              </Button>
+              <StateAction
+                label={t('common.clearSearch')}
+                icon={X}
+                onPress={handleClearSearch}
+              />
             ) : undefined
           }
         />

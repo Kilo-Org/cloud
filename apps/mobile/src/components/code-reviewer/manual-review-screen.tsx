@@ -14,7 +14,8 @@ import {
   matchesCodeReviewUrlSuffix,
 } from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
+import { GitHubIcon } from '@/components/icons/github-icon';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
@@ -24,7 +25,6 @@ import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import { canConnectProvider, classifyProviderErrorCode } from '@/lib/code-reviewer-status';
@@ -321,18 +321,16 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           }
           action={
             canConnect ? (
-              // `mt-3 w-full` matches the near-identical PR-review connect gate
-              // (pr-review-connect-gate.tsx) and the Code Reviewer
-              // ProviderConnectCard, so the same Connect GitHub action is styled
-              // the same wherever it appears.
-              <Button
-                className={cn('mt-3 w-full', STATE_ACTION_CLASS)}
+              // The near-identical PR-review connect gate and the Code Reviewer
+              // ProviderConnectCard use the same `StateAction`, so the same
+              // Connect GitHub action looks the same wherever it appears.
+              <StateAction
+                label={t('common.connectGithub')}
+                icon={GitHubIcon}
                 onPress={() => {
                   pushOnce(`/(app)/code-reviewer/${scope}/github` as Href);
                 }}
-              >
-                <Text>{t('common.connectGithub')}</Text>
-              </Button>
+              />
             ) : undefined
           }
         />

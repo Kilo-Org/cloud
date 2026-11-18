@@ -3,16 +3,13 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
-import { EmptyState } from '@/components/empty-state';
-import { Button } from '@/components/ui/button';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { ChoiceRow } from '@/components/ui/choice-row';
-import { SlidersHorizontal } from '@/components/ui/icons';
+import { Plus, SlidersHorizontal } from '@/components/ui/icons';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
-import { Text } from '@/components/ui/text';
 import { type AgentProfileListItem } from '@/lib/hooks/use-agent-profiles';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 type ProfilePickerSheetProps = Readonly<{
   profiles: readonly AgentProfileListItem[];
@@ -78,9 +75,11 @@ export function ProfilePickerSheet({
         inset="gutter"
         action={
           onCreateProfile === undefined ? undefined : (
-            <Button className={STATE_ACTION_CLASS} onPress={onCreateProfile}>
-              <Text>{t('profiles.createAction')}</Text>
-            </Button>
+            <StateAction
+              label={t('profiles.createAction')}
+              icon={Plus}
+              onPress={onCreateProfile}
+            />
           )
         }
       />

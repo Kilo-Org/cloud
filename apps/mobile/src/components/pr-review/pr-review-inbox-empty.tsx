@@ -15,15 +15,12 @@
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { type PrInboxView } from '@/components/pr-review/pr-review-inbox-view';
-import { Button } from '@/components/ui/button';
-import { GitPullRequest } from '@/components/ui/icons';
+import { ArrowRight, GitPullRequest } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 
 const SKELETON_ROW_COUNT = 5;
@@ -127,14 +124,11 @@ function InboxBody({
           // No retry here: the server refuses this organization, so repeating
           // the same read can only be refused again. The way out is the
           // personal scope, which needs no organization membership.
-          <Button
-            className={STATE_ACTION_CLASS}
-            variant="outline"
+          <StateAction
+            label={t('prReview.inbox.continueInPersonal')}
+            icon={ArrowRight}
             onPress={onContinueInPersonal}
-            accessibilityLabel={t('prReview.inbox.continueInPersonal')}
-          >
-            <Text>{t('prReview.inbox.continueInPersonal')}</Text>
-          </Button>
+          />
         }
       />
     );

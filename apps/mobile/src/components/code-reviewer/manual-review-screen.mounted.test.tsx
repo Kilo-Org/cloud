@@ -131,7 +131,10 @@ vi.mock('expo-router', () => ({
   useFocusEffect: () => undefined,
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: 'EmptyState',
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -476,15 +479,14 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
 });
 
 describe('ManualReviewScreen connect provider CTA', () => {
-  it('renders the Connect GitHub action full-width like the PR-review connect gate', async () => {
+  it('renders the Connect GitHub action through the shared state action', async () => {
     status.connected = false;
     const { renderer, unmount } = await renderScreen();
 
     const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
-    const { action } = empty.props as { action: ReactElement<{ className?: string }> };
-    const className = String(action.props.className);
-    expect(className).toContain('w-full');
-    expect(className).toContain('mt-3');
+    const { action } = empty.props as { action: ReactElement<{ label: string }> };
+    expect(action.type).toBe('StateAction');
+    expect(action.props.label).toBe(i18n.t('common.connectGithub'));
 
     unmount();
   });

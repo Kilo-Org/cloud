@@ -3,7 +3,7 @@ import {
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { FolderGit2 } from '@/components/ui/icons';
+import { ExternalLink, FolderGit2 } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { useSettingsSaveFeedback } from '@/components/security-agent/settings-save-feedback';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { classifyListBody } from '@/lib/query/list-body-state';
@@ -20,14 +20,12 @@ import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { QueryError } from '@/components/query-error';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { openAppShellHandoff } from '@/lib/app-shell-handoff';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import {
@@ -288,20 +286,13 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               description={t('securityAgent.repositories.noRepositoriesDescription')}
               iconContainerClassName="h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card dark:border-input dark:bg-secondary"
               action={
-                <Button
-                  className={STATE_ACTION_CLASS}
-                  // Widening the grant is the only way out of this state, and
-                  // the header's Save is quiet while the screen has nothing to
-                  // save. The action therefore carries the filled primary
-                  // style instead of an outlined one that recedes into the
-                  // page beside it.
-                  variant="default"
+                <StateAction
+                  label={t('securityAgent.repositories.manageAccess')}
+                  icon={ExternalLink}
                   onPress={() => {
                     void manageAccess();
                   }}
-                >
-                  <Text>{t('securityAgent.repositories.manageAccess')}</Text>
-                </Button>
+                />
               }
             />
           ) : null}

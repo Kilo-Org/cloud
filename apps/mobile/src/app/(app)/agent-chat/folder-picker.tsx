@@ -6,14 +6,13 @@ import { Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
-import { Button } from '@/components/ui/button';
-import { FolderOpen } from '@/components/ui/icons';
+import { FolderOpen, RotateCcw } from '@/components/ui/icons';
 import { RowChevron } from '@/components/ui/row-chevron';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
-import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DirectoryEntry, useListDirectories } from '@/lib/hooks/use-list-directories';
 import { folderPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
@@ -141,16 +140,13 @@ export default function FolderPickerScreen() {
         title={t('agentChat.folderPicker.retryableTitle')}
         description={t('agentChat.folderPicker.retryableDescription')}
         action={
-          <Button
-            className={STATE_ACTION_CLASS}
-            variant="outline"
+          <StateAction
+            label={t('common.retry')}
+            icon={RotateCcw}
             onPress={() => {
               list(currentState.path);
             }}
-            accessibilityLabel={t('common.retry')}
-          >
-            <Text>{t('common.retry')}</Text>
-          </Button>
+          />
         }
       />
     );

@@ -9,7 +9,7 @@ import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { InvitedMemberRow } from '@/components/organization/invited-member-row';
 import { MemberRow } from '@/components/organization/member-row';
 import {
@@ -19,15 +19,12 @@ import {
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { RowGroup, RowGroupItem } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { SectionHeader } from '@/components/ui/section-header';
-import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { collator } from '@/lib/intl-cache';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
@@ -160,14 +157,13 @@ export function OrganizationMembersScreen() {
       }
       action={
         canInvite ? (
-          <Button
-            className={STATE_ACTION_CLASS}
+          <StateAction
+            label={t('organization.inviteMember.title')}
+            icon={UserPlus}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/organization/invite-member' as Href);
             }}
-          >
-            <Text className="text-primary-foreground">{t('organization.inviteMember.title')}</Text>
-          </Button>
+          />
         ) : undefined
       }
     />

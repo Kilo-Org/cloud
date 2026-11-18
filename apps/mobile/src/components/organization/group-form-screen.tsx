@@ -2,18 +2,16 @@ import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { Users } from '@/components/ui/icons';
+import { ArrowLeft, Users } from '@/components/ui/icons';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { GroupForm } from '@/components/organization/group-form';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { selectOrgListErrorView } from '@/components/organization/org-list-error-view';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
 import { useOrgGroup } from '@/lib/hooks/use-org-groups-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 
@@ -118,14 +116,13 @@ function GroupNotFound() {
         inset="gutter"
         title={t('organization.groups.notFound')}
         action={
-          <Button
-            variant="outline"
+          <StateAction
+            label={t('common.back')}
+            icon={ArrowLeft}
             onPress={() => {
               router.replace(GROUPS_LIST_PATH as Href);
             }}
-          >
-            <Text>{t('common.back')}</Text>
-          </Button>
+          />
         }
       />
     </View>

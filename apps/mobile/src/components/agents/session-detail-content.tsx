@@ -14,7 +14,7 @@ import {
   useRouter,
 } from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
-import { MessageSquare } from '@/components/ui/icons';
+import { MessageSquare, RotateCcw } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
@@ -128,7 +128,7 @@ import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
 import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
 import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
 import { CenteredState } from '@/components/centered-state';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import {
   resolveLoadedCliSessionPresenceId,
   useCliSessionPresence,
@@ -209,7 +209,6 @@ import {
 } from '@/lib/analytics/posthog';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { useMotionPolicy } from '@/lib/a11y/motion';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -3517,19 +3516,16 @@ export function SessionDetailContent({
               />
             }
             action={
-              <Button
-                variant="outline"
-                size="action"
+              <StateAction
+                label={t('common.retry')}
+                icon={RotateCcw}
                 onPress={() => {
                   void manager.loadOlderMessages();
                 }}
                 loading={isLoadingOlderMessages}
                 accessibilityLabel={t('common.retry')}
                 accessibilityHint={t('agentChat.olderMessages.retryHint')}
-                className={STATE_ACTION_CLASS}
-              >
-                <Text>{t('common.retry')}</Text>
-              </Button>
+              />
             }
           />
         );

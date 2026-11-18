@@ -5,13 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { DirectionalLogOut } from '@/components/ui/directional-icons';
-import { Globe, Smartphone, Terminal } from '@/components/ui/icons';
+import { ArrowLeft, Globe, Smartphone, Terminal } from '@/components/ui/icons';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { RowGroup } from '@/components/ui/row-group';
@@ -19,7 +18,6 @@ import { RowIconAction } from '@/components/ui/row-trailing';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
 import { isolateBidiText } from '@/lib/bidi';
 import {
@@ -202,15 +200,13 @@ export function DeviceSessionsScreen() {
         title={t('deviceSessions.noSessions')}
         description={t('deviceSessions.noSessionsDescription')}
         action={
-          <Button
-            variant="outline"
-            className={STATE_ACTION_CLASS}
+          <StateAction
+            label={t('deviceSessions.viewProfile')}
+            icon={ArrowLeft}
             onPress={() => {
               router.back();
             }}
-          >
-            <Text>{t('deviceSessions.viewProfile')}</Text>
-          </Button>
+          />
         }
       />
     );

@@ -426,7 +426,6 @@ const domGetDocumentResponseSchema = z.object({
 });
 const domQuerySelectorAllResponseSchema = z.object({ nodeIds: z.array(z.number()) });
 const injectedNumberSchema = z.number();
-const injectedResultSchema = z.object({ result: z.number() });
 
 const refPattern = /^(?:ref=)?((?:f\d+)?e\d+)$/u;
 const parseRef = (target: string): string | undefined => refPattern.exec(target.trim())?.[1];
@@ -2025,32 +2024,37 @@ export const createBrowserToolSession = ({
     return documentNodeId;
   };
 
-  /** How many elements a selector matches, on the scripting backend where there is no DOM node id. */
-  const countScriptingSelectorMatches = async (selector: string): Promise<number | undefined> => {
+  /**
+   * How many elements a selector matches on the scripting backend, where there is
+   * no DOM node id. Runs through the shared injection helper, so it has the same
+   * timeout as the other action injections and surfaces its real error.
+   */
+  const countScriptingSelectorMatches = async (
+    selector: string
+  ): Promise<
+    | { readonly kind: 'count'; readonly matches: number }
+    | { readonly kind: 'error'; readonly error: string }
+  > => {
     if (scriptingApi === undefined) {
-      return undefined;
+      return { error: 'Page scripting is unavailable in this browser.', kind: 'error' };
     }
 
-    try {
-      const injected = await scriptingApi.executeScript({
-        args: [selector],
-        func: (value: string) => document.querySelectorAll(value).length,
-        target: { tabId },
-        world: 'MAIN',
-      });
-      const first = Array.isArray(injected) ? injected[0] : injected;
-      const direct = injectedNumberSchema.safeParse(first?.result);
+    const result = await evalInTabWithScripting({
+      code: `return document.querySelectorAll(${JSON.stringify(selector)}).length;`,
+      scriptingApi,
+      tabId,
+      timeoutMs: SCRIPTING_ACTION_TIMEOUT_MS,
+    });
 
-      if (direct.success) {
-        return direct.data;
-      }
-
-      const wrapped = injectedResultSchema.safeParse(first?.result);
-
-      return wrapped.success ? wrapped.data.result : undefined;
-    } catch {
-      return undefined;
+    if (!result.ok) {
+      return { error: result.error, kind: 'error' };
     }
+
+    const parsed = injectedNumberSchema.safeParse(result.value);
+
+    return parsed.success
+      ? { kind: 'count', matches: parsed.data }
+      : { error: 'The selector match count could not be read.', kind: 'error' };
   };
 
   const resolveSelector = async (
@@ -2059,9 +2063,15 @@ export const createBrowserToolSession = ({
     if (debuggerApi === undefined) {
       // The scripting path resolves a target by selector; there is no debugger node id, so the tool implementations in `callTool` use `selector` and never `nodeId`. The match count still has to be unique.
       await attach();
-      const matches = await countScriptingSelectorMatches(selector);
+      const counted = await countScriptingSelectorMatches(selector);
 
-      if (matches === undefined || matches === 0) {
+      if (counted.kind === 'error') {
+        throw new Error(counted.error);
+      }
+
+      const { matches } = counted;
+
+      if (matches === 0) {
         return undefined;
       }
 

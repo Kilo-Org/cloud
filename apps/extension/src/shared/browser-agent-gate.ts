@@ -97,10 +97,6 @@ interface TargetFrame {
 }
 
 /**
- * Every element target an act tool accepts: the single-target keys, one target
- * per `browser_fill_form` field, and both ends of a `browser_drag`.
- */
-/**
  * The element references a call carries, without human-readable descriptions:
  * a description may coincide with several elements and must not be resolved.
  */
@@ -128,6 +124,11 @@ const targetReferencesOf = (args: Record<string, unknown>): readonly string[] =>
   return [...new Set(texts)];
 };
 
+/**
+ * Every reference a call could target, including the legacy `ref`/`selector`
+ * keys, for the frame and sensitive checks. A human-readable description is not
+ * a reference and is never resolved.
+ */
 const targetTextsOf = (args: Record<string, unknown>): readonly string[] => {
   const texts: string[] = [];
 

@@ -64,12 +64,12 @@ async function fixture() {
   };
 }
 
-function assistantUpdate(id: string, text: string, parentID?: string) {
+function assistantUpdate(id: string, text: string, parentID?: string, sessionID = kiloSessionId) {
   return {
     type: 'conversation.message.updated',
     properties: {
-      sessionID: kiloSessionId,
-      source,
+      sessionID,
+      source: { ...source, session: { ...source.session, id: sessionID } },
       message: {
         id,
         type: 'assistant',
@@ -104,29 +104,19 @@ it.each([
   ).toEqual([{ text: 'Earlier activity', tools: [] }, answer]);
 });
 
-it('excludes removed native v2 answers from recent callback activity', async () => {
+it('does not inherit a callback parent from another Kilo session', async () => {
   const { queries, publish } = await fixture();
-  publish(assistantUpdate('msg_retained', 'Current answer', userMessageId));
-  const removed = publish(assistantUpdate('msg_removed', 'Removed answer', userMessageId));
-  if (!removed) throw new Error('Expected a persisted assistant message');
+  const entityId = 'message/msg_assistant_2';
+  publish(assistantUpdate('msg_assistant_2', 'Other answer', userMessageId, 'ses_other'));
+  expect(JSON.parse(queries.findByEntityId(entityId)?.payload ?? 'null')).toMatchObject({
+    properties: { sessionID: 'ses_other', parentID: userMessageId },
+  });
 
-  for (const [messageID, removalSessionId] of [
-    ['msg_removed', kiloSessionId],
-    ['msg_retained', 'ses_unrelated'],
-  ]) {
-    queries.insert({
-      sessionId,
-      executionId: '',
-      streamEventType: 'kilocode',
-      payload: JSON.stringify({
-        event: 'message.removed',
-        properties: { messageID, sessionID: removalSessionId },
-      }),
-      timestamp: removed.timestamp + 1,
-    });
-  }
-
+  publish(assistantUpdate('msg_assistant_2', 'Unattributed answer'));
+  const stored = JSON.parse(queries.findByEntityId(entityId)?.payload ?? 'null');
+  expect(stored).toMatchObject({ properties: { sessionID: kiloSessionId } });
+  expect(stored.properties).not.toHaveProperty('parentID');
   expect(
-    queries.getRecentAssistantAnswersForUserMessage(sessionId, kiloSessionId, userMessageId)
-  ).toEqual([{ text: 'Current answer', tools: [] }]);
+    queries.getAssistantAnswerForUserMessage(sessionId, kiloSessionId, userMessageId)
+  ).toBeNull();
 });

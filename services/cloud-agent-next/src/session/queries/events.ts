@@ -442,10 +442,6 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
       parentMessageId: string
     ): AssistantAnswer[] {
       const removals = alias(events, 'message_removals');
-      const messageId = sql<string>`case json_extract(${events.payload}, '$.event')
-        when 'conversation.message.updated' then json_extract(${events.payload}, '$.properties.message.id')
-        when 'message.updated' then json_extract(${events.payload}, '$.properties.info.id')
-      end`;
       const rows = db
         .select()
         .from(events)
@@ -482,7 +478,7 @@ export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStora
                     ),
                     eq(
                       sql<string>`json_extract(${removals.payload}, '$.properties.messageID')`,
-                      messageId
+                      sql<string>`json_extract(${events.payload}, '$.properties.info.id')`
                     ),
                     // Upserts preserve row IDs, so ambiguous timestamp ties favor removal.
                     gte(removals.timestamp, events.timestamp)

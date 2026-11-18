@@ -106,6 +106,7 @@ This is a concrete, selective map from the shared Kilo token entry points. It do
 Core optional markers accepted by the shared schema are documented in `packages/worker-utils/src/kilo-token.ts`: `tokenSource`, `botId`, `internalApiUse`, `createdOnPlatform`, `deviceAuthRequestCode`, `deviceSessionId`, admin flags, and organization claims.
 
 - Confirmed `tokenSource` values: `cloud-agent`, `kilo-chat`, `mcp-catalog`, `internal-bot`.
+- `webhook-trigger` marks the webhook triggers router's sandbox capability mint in `apps/web/src/routers/webhook-triggers-router.ts`.
 - Confirmed `botId` values: `reviewer`, `discord-bot`, `webhook-bot`.
 - `internalApiUse` and `createdOnPlatform` are additional automation markers; `services/security-auto-analysis/src/token.ts` emits `internalApiUse: true` and `createdOnPlatform: 'security-agent'`.
 - No universal signed system marker or reliable system-user-ID convention was confirmed.

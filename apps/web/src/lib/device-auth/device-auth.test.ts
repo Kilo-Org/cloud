@@ -329,19 +329,18 @@ describe('Device Auth', () => {
       const ipAddress = `192.168.1.${(Date.now() * 37) % 254}`;
       await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
 
-      // Five live rows whose remaining life is far shorter than the address
-      // lock wait: they must count as live when the limit is read, but be
-      // expired by the time the request that waited for the lock reads its
-      // clock. The previous code read that clock before the wait and still
-      // counted them.
+      // Five live rows sharing one deadline captured before the loop, so the
+      // guard does not depend on how fast the loop runs: every row is still
+      // live when the waiting request starts. Their remaining life is far
+      // shorter than the lock hold, so by the time the request that waited for
+      // the lock reads its clock every row is past its deadline. The previous
+      // code read that clock before the wait and still counted them.
+      const rowsDeadline = new Date(Date.now() + 2_000).toISOString();
       for (let i = 0; i < 5; i++) {
         const { userCode } = await createDeviceAuthRequest({ ipAddress });
         await db
           .update(device_auth_requests)
-          .set({
-            status: 'pending',
-            expires_at: new Date(Date.now() + 500).toISOString(),
-          })
+          .set({ status: 'pending', expires_at: rowsDeadline })
           .where(eq(device_auth_requests.user_code, userCode));
       }
 
@@ -356,16 +355,16 @@ describe('Device Auth', () => {
         lockHeld.resolve();
         // A real wait, deliberate: the rows expire against Postgres's own
         // clock, which jest fake timers cannot advance. Hold the lock past the
-        // rows' 500 ms life, so the waiting request reads its clock after
+        // rows' 2 s deadline, so the waiting request reads its clock after
         // every row is past its deadline.
-        await new Promise(resolve => setTimeout(resolve, 1_200));
+        await new Promise(resolve => setTimeout(resolve, 2_700));
         await releaseLock.promise;
       });
       await lockHeld.promise;
 
       try {
         // Start the request while the lock is held: it blocks on the lock for
-        // the holder's whole 1.2 s hold, and its clock is read only once the
+        // the holder's whole 2.7 s hold, and its clock is read only once the
         // lock is acquired — after every row is past its deadline — so the
         // five expired rows do not count and the request is admitted.
         const waiting = createDeviceAuthRequest({ ipAddress });

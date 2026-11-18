@@ -209,8 +209,8 @@ export async function createDeviceAuthRequest(params: {
 
         // One instant for both the live-row predicate and the retry advisory,
         // captured after the lock: taking the lock can wait up to
-        // {@link DEVICE_AUTH_PENDING_LOCK_WAIT_MS}, and rows that expire during
-        // that wait must not count as live, nor the advisory promise their time.
+        // DEVICE_AUTH_PENDING_LOCK_WAIT_MS, and rows that expire during that
+        // wait must not count as live, nor the advisory promise their time.
         const now = new Date().toISOString();
 
         const [result] = await tx

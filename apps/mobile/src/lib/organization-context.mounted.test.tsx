@@ -186,19 +186,32 @@ describe('OrganizationProvider default organization', () => {
     expect(publications.some(value => value.loaded && value.id === null)).toBe(true);
   });
 
-  it('resolves to Personal while the list is paused offline, then applies the default when it arrives', async () => {
+  it('resolves the default from a list read that settles while offline, and keeps Personal while the refetch is unreachable', async () => {
     onlineManager.setOnline(false);
     const names = Promise.withResolvers<OrgEntry[]>();
     list.mockReturnValue(names.promise);
     await mount();
-    // A paused list may never fetch: waiting on it would leave the provider
-    // unresolved forever, so the app settles on Personal and stays usable.
-    await waitFor(() => scope().isLoaded);
-    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: null });
-    // Back online the default still resolves from the list.
-    onlineManager.setOnline(true);
+    // The read settles while offline (`SETTLE_WHILE_OFFLINE`, the create flow
+    // awaits it), so the default applies from the promise the read carries —
+    // a reachable edge answers even when the manager misreports offline.
     await act(() => {
       names.resolve([orgA]);
+    });
+    await waitFor(() => scope().organizationId === 'org-a');
+    expect(scope()).toMatchObject({ isLoaded: true, error: null });
+  });
+
+  it('keeps Personal without spinning while an offline list read fails, then applies the default through Retry', async () => {
+    onlineManager.setOnline(false);
+    list.mockRejectedValueOnce(new Error('offline')).mockResolvedValue([orgA]);
+    await mount();
+    await waitFor(() => scope().isLoaded);
+    expect(scope()).toMatchObject({ organizationId: null, isLoaded: true, error: 'restore' });
+    // The failure surfaced a Retry; going back online and retrying resolves
+    // the default from the list.
+    onlineManager.setOnline(true);
+    await act(() => {
+      scope().retry();
     });
     await waitFor(() => scope().organizationId === 'org-a');
     expect(scope()).toMatchObject({ isLoaded: true, error: null });

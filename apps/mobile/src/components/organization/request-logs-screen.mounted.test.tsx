@@ -277,14 +277,24 @@ describe('OrganizationRequestLogsScreen', () => {
     const older = buttons.find(node => node.props.accessibilityLabel === 'Older hour');
     expect(older).toBeDefined();
     // Drive the window to the bound: the step's own guard is exercised in the
-    // stepper test, so go back until the button disables.
-    for (let steps = 0; steps < 365 * 24; steps += 1) {
+    // stepper test, so go back until the button disables. One act per batch of
+    // one thousand steps keeps the update inside React's scheduler and stays
+    // inside the loop rules that ban a bare awaited call per iteration.
+    const BATCH = 1000;
+    for (let batch = 0; batch < (365 * 24) / BATCH; batch += 1) {
       if (older?.props.disabled) {
         break;
       }
-      await act(() => {
-        handlerOf(older!, 'onPress')?.();
-      });
+      for (let step = 0; step < BATCH; step += 1) {
+        if (older?.props.disabled) {
+          break;
+        }
+        act(() => {
+          if (older) {
+            handlerOf(older, 'onPress')?.();
+          }
+        });
+      }
     }
     expect(older?.props.disabled).toBe(true);
 

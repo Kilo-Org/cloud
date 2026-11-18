@@ -72,7 +72,7 @@ vi.mock('@/components/ui/icons', () => ({
   Search: 'Search',
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 // `Button` (the later-page retry CTA) wraps its label in this provider, so the
 // text mock must export the same context the real module does.

@@ -3762,8 +3762,7 @@
     "imagesSectionEmpty": "Žiadne dôveryhodné servery obrázkov",
     "revoke": "Zrušiť dôveru serveru {{host}}",
     "revokeMessage": "Odkazy na tento server budú opäť vyžadovať potvrdenie.",
-    "revokeImageMessage": "Obrázky z tohto servera budú opäť vyžadovať potvrdenie.",
-    "backToPreferences": "Späť na predvoľby"
+    "revokeImageMessage": "Obrázky z tohto servera budú opäť vyžadovať potvrdenie."
   },
   "glanceable": {
     "waiting": "Aktualizujú sa údaje o agentoch",

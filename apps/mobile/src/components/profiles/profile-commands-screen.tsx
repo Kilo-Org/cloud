@@ -3,7 +3,7 @@ import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import {
   addCommand,
   commandRowA11yLabel,
@@ -23,14 +23,13 @@ import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { Terminal } from '@/components/ui/icons';
+import { Terminal, Plus } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileCommands } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 
 type CommandRow = Readonly<{ sequence: number; command: string }>;
@@ -292,9 +291,11 @@ export function ProfileCommandsScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <Button className={STATE_ACTION_CLASS} onPress={add}>
-              <Text>{t('profiles.addCommand')}</Text>
-            </Button>
+            <StateAction
+              label={t('profiles.addCommand')}
+              icon={Plus}
+              onPress={add}
+            />
           </ProfileManageSlot>
         }
       />

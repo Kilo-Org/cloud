@@ -131,6 +131,7 @@ vi.mock('@/components/query-error', async () => {
 vi.mock('@/components/empty-state', async () => {
   const { createElement: h } = await import('react');
   return {
+    StateAction: 'StateAction',
     EmptyState: (props: { title?: string; description?: string }) => h('EmptyState', props),
   };
 });

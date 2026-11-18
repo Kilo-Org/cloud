@@ -49,6 +49,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 // below it; the mock renders both, so the empty report's whole copy is in the
 // tree and a heading assertion means what it says.
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: (props: { title?: string; description?: ReactNode }) =>
     createElement(
       'EmptyState',

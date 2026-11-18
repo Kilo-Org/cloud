@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { type SessionProfilePickerProfile } from '@/components/agents/session-profile-picker-model';
 import { buildProfileSections } from '@/components/profiles/profile-list-model';
@@ -12,12 +12,11 @@ import {
 import { profileOwnerType } from '@/components/profiles/profile-owner-model';
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
-import { Settings2 } from '@/components/ui/icons';
+import { RotateCcw, Settings2 } from '@/components/ui/icons';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type SheetHeaderTopInset } from '@/lib/form-sheet';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 
@@ -156,14 +155,11 @@ export function ProfilePickerSheet({
           title={t('agentChat.newSession.couldNotLoadEnvironment')}
           description={t('organization.boundary.loadErrorMessage')}
           action={
-            <Button
-              variant="outline"
+            <StateAction
+              label={t('common.retry')}
+              icon={RotateCcw}
               onPress={onRetry}
-              accessibilityLabel={t('common.retry')}
-              className={STATE_ACTION_CLASS}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
+            />
           }
         />
       </PickerSheet>
@@ -186,14 +182,11 @@ export function ProfilePickerSheet({
           title={t('profiles.emptyTitle')}
           description={t('profiles.emptyDescription')}
           action={
-            <Button
-              variant="outline"
+            <StateAction
+              label={t('agentChat.newSession.manageProfiles')}
+              icon={Settings2}
               onPress={onManageProfiles}
-              accessibilityLabel={t('agentChat.newSession.manageProfiles')}
-              className={STATE_ACTION_CLASS}
-            >
-              <Text>{t('agentChat.newSession.manageProfiles')}</Text>
-            </Button>
+            />
           }
         />
       </PickerSheet>

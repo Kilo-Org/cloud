@@ -3644,8 +3644,7 @@
     "imagesSectionEmpty": "ຍັງບໍ່ມີໂຮສຮູບທີ່ໄວ້ໃຈໄດ້",
     "revoke": "ຍົກເລີກການໄວ້ໃຈ {{host}}",
     "revokeMessage": "ລິ້ງໄປຫາໂຮສນີ້ຈະຂໍການຢືນຢັນອີກຄັ້ງ.",
-    "revokeImageMessage": "ຮູບຈາກໂຮສນີ້ຈະຂໍການຢືນຢັນອີກຄັ້ງ.",
-    "backToPreferences": "ກັບໄປທີ່ການຕັ້ງຄ່າ"
+    "revokeImageMessage": "ຮູບຈາກໂຮສນີ້ຈະຂໍການຢືນຢັນອີກຄັ້ງ."
   },
   "glanceable": {
     "waiting": "ກຳລັງອັບເດດເອເຈນ",

@@ -3644,8 +3644,7 @@
     "imagesSectionEmpty": "Etibarlı şəkil saytı yoxdur",
     "revoke": "{{host}} üçün etibarı ləğv et",
     "revokeMessage": "Bu hosta olan keçidlər yenidən təsdiq tələb edəcək.",
-    "revokeImageMessage": "Bu hostdan olan şəkillər yenidən təsdiq tələb edəcək.",
-    "backToPreferences": "Parametrlərə qayıt"
+    "revokeImageMessage": "Bu hostdan olan şəkillər yenidən təsdiq tələb edəcək."
   },
   "glanceable": {
     "waiting": "Agentlər yenilənir",

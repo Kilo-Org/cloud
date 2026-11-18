@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { McpServerRowView } from '@/components/profiles/mcp-server-row';
 import { McpFormSheet, type McpSaveFailure } from '@/components/profiles/mcp-form-sheet';
 import {
@@ -19,7 +19,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { Server } from '@/components/ui/icons';
+import { Server, Plus } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
@@ -31,7 +31,6 @@ import {
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { MAX_PROFILE_MCP_SERVERS } from '@/lib/agent-profile-forms';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
@@ -174,9 +173,11 @@ export function ProfileMcpScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
-              <Text>{t('profiles.mcp.add')}</Text>
-            </Button>
+            <StateAction
+              label={t('profiles.mcp.add')}
+              icon={Plus}
+              onPress={handleStartAdd}
+            />
           </ProfileManageSlot>
         }
       />

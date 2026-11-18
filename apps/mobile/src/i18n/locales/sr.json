@@ -3703,8 +3703,7 @@
     "imagesSectionEmpty": "Nema pouzdanih hostova za slike",
     "revoke": "Ukloni {{host}} iz pouzdanih hostova",
     "revokeMessage": "Linkovi ka ovom hostu ponovo će tražiti potvrdu.",
-    "revokeImageMessage": "Slike sa ovog hosta ponovo će tražiti potvrdu.",
-    "backToPreferences": "Nazad na podešavanja"
+    "revokeImageMessage": "Slike sa ovog hosta ponovo će tražiti potvrdu."
   },
   "glanceable": {
     "waiting": "Ažuriranje agenata",

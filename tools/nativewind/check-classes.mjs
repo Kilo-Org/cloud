@@ -167,6 +167,11 @@ const LAYOUT_RULES = [
     advice:
       'a page inset is the 14pt gutter: use SCREEN_GUTTER_CLASS, or the primitive that owns its own inset (SheetHeader, ScreenHeader, the state and row primitives)',
   },
+  {
+    id: 'L13',
+    advice:
+      'fill a state\u2019s action slot with StateAction from @/components/empty-state; a Button there re-decides the state action\u2019s frame, icon spacing and 48pt floor',
+  },
 ];
 
 /** One rule from the table above, by id. */
@@ -976,6 +981,54 @@ function checkSheetHeader(relative, program, text, lineOf) {
   return problems;
 }
 
+/**
+ * A state's `action` slot is one shared control: `StateAction` owns the frame,
+ * the icon spacing and the 48pt state-action floor, so a plain `Button` there
+ * is the second convention the contract removed. The rule reads the `action`
+ * expression, so a Button inside a caller's own wrapper counts too.
+ */
+const STATE_ACTION_TAGS = new Set(['EmptyState', 'QueryError']);
+
+/** The first `Button` element inside one JSX expression, nested wrappers included. */
+function stateActionButton(expression, text) {
+  let found = null;
+  walk(expression, node => {
+    if (found !== null || node.type !== 'JSXOpeningElement') {
+      return;
+    }
+    if (tagName(node, text) === 'Button') {
+      found = node;
+    }
+  });
+  return found;
+}
+
+function checkStateActionButtons(relative, program, text, lineOf) {
+  const problems = [];
+  walk(program, node => {
+    if (node.type !== 'JSXOpeningElement' || !STATE_ACTION_TAGS.has(tagName(node, text))) {
+      return;
+    }
+    for (const attribute of node.attributes) {
+      if (
+        attribute.type !== 'JSXAttribute' ||
+        attribute.name.type !== 'JSXIdentifier' ||
+        attribute.name.name !== 'action'
+      ) {
+        continue;
+      }
+      if (attribute.value === null || attribute.value.type !== 'JSXExpressionContainer') {
+        continue;
+      }
+      const button = stateActionButton(attribute.value.expression, text);
+      if (button !== null) {
+        problems.push(layoutProblem(relative, lineOf(button.start), 'L13', '<Button>'));
+      }
+    }
+  });
+  return problems;
+}
+
 /** Whether a file is one the layout contract exempts. */
 function layoutExempt(path) {
   if (!path.startsWith('apps/mobile/src/')) {
@@ -1028,6 +1081,7 @@ export function checkLayout(relative, program, text, lineOf) {
   problems.push(...checkRowChevrons(relative, program, lineOf));
   problems.push(...checkTitleContent(relative, program, lineOf));
   problems.push(...checkSheetHeader(relative, program, text, lineOf));
+  problems.push(...checkStateActionButtons(relative, program, text, lineOf));
   return problems;
 }
 

@@ -2,7 +2,7 @@ import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { buildProfileSections, isEffectiveDefault } from '@/components/profiles/profile-list-model';
 import { useProfileOwnerLabel } from '@/components/profiles/profile-owner-heading';
 import { profileOrganizationId, profileOwnerType } from '@/components/profiles/profile-owner-model';
@@ -10,7 +10,6 @@ import { selectProfilesListErrorView } from '@/components/profiles/profiles-list
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { IconButton } from '@/components/ui/icon-button';
 import {
@@ -26,10 +25,8 @@ import { RefreshControl } from '@/components/ui/refresh-control';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
-import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 import { type AgentProfileListItem, useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
@@ -177,9 +174,11 @@ export function ProfilesListScreen({
             description={t('profiles.emptyDescription')}
             placement="top"
             action={
-              <Button className={STATE_ACTION_CLASS} onPress={openNewProfile}>
-                <Text>{t('profiles.newProfile')}</Text>
-              </Button>
+              <StateAction
+                label={t('profiles.newProfile')}
+                icon={Plus}
+                onPress={openNewProfile}
+              />
             }
           />
         )}

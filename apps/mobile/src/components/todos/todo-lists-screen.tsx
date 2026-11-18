@@ -7,14 +7,13 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import Sortable, { type SortableGridRenderItemInfo } from 'react-native-sortables';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { ContextControl } from '@/components/context-control';
 import { useLiveSessionContext } from '@/components/home/live-session-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { TodoListRow } from '@/components/todos/todo-list-row';
-import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import { RowChevron } from '@/components/ui/row-chevron';
@@ -26,7 +25,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { cn } from '@/lib/utils';
 import { useSideInsetStyle } from '@/lib/screen-insets';
-import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { todoListPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
@@ -143,9 +142,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
         placement="top"
         inset="gutter"
         action={
-          <Button className={STATE_ACTION_CLASS} variant="outline" onPress={openNewList}>
-            <Text>{t('todos.lists.newList')}</Text>
-          </Button>
+          <StateAction label={t('todos.lists.newList')} icon={Plus} onPress={openNewList} />
         }
       />
     );

@@ -210,6 +210,7 @@ vi.mock('@shopify/flash-list', () => ({
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: ({ title }: { title: string }) => `EMPTY:${title}`,
 }));
 

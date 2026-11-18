@@ -1,5 +1,5 @@
 import { type Href } from 'expo-router';
-import { GitPullRequest } from '@/components/ui/icons';
+import { ArrowRight, GitPullRequest, Settings } from '@/components/ui/icons';
 import { FlashList } from '@shopify/flash-list';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,16 +9,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { type CodeReviewStatus, isCodeReviewStatus } from '@kilocode/app-shared/code-review';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { RowChevron } from '@/components/ui/row-chevron';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { canConnectAnyProvider } from '@/lib/code-reviewer-status';
 import { isPersonal } from '@/lib/code-reviewer-config';
 import { useReviewerScopeTitle } from '@/lib/hooks/use-reviewer-scope-title';
@@ -235,8 +233,13 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
         }
         action={
           offersAction ? (
-            <Button
-              className={STATE_ACTION_CLASS}
+            <StateAction
+              label={
+                hasConnectedProvider
+                  ? t('codeReviewer.reviewList.startManualReview')
+                  : t('codeReviewer.reviewList.configureProvider')
+              }
+              icon={hasConnectedProvider ? ArrowRight : Settings}
               onPress={() => {
                 pushOnce(
                   (hasConnectedProvider
@@ -244,13 +247,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
                     : `/(app)/code-reviewer/${scope}`) as Href
                 );
               }}
-            >
-              <Text>
-                {hasConnectedProvider
-                  ? t('codeReviewer.reviewList.startManualReview')
-                  : t('codeReviewer.reviewList.configureProvider')}
-              </Text>
-            </Button>
+            />
           ) : undefined
         }
       />

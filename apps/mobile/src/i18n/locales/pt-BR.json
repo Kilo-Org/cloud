@@ -3709,8 +3709,7 @@
     "imagesSectionEmpty": "Nenhum domínio confiável de imagens",
     "revoke": "Deixar de confiar em {{host}}",
     "revokeMessage": "Os links para este domínio voltarão a pedir confirmação.",
-    "revokeImageMessage": "As imagens deste domínio voltarão a pedir confirmação.",
-    "backToPreferences": "Voltar às preferências"
+    "revokeImageMessage": "As imagens deste domínio voltarão a pedir confirmação."
   },
   "glanceable": {
     "waiting": "Atualizando agentes",

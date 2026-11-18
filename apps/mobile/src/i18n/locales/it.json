@@ -3703,8 +3703,7 @@
     "imagesSectionEmpty": "Nessun sito attendibile delle immagini",
     "revoke": "Revoca l'attendibilità di {{host}}",
     "revokeMessage": "I link a questo sito chiederanno di nuovo conferma.",
-    "revokeImageMessage": "Le immagini da questo sito chiederanno di nuovo conferma.",
-    "backToPreferences": "Torna alle preferenze"
+    "revokeImageMessage": "Le immagini da questo sito chiederanno di nuovo conferma."
   },
   "glanceable": {
     "waiting": "Aggiornamento degli agenti",

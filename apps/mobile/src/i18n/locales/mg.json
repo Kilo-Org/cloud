@@ -3644,8 +3644,7 @@
     "imagesSectionEmpty": "Tsy misy mpampiantrano sary atokisana",
     "revoke": "Foano ny fitokisana ny {{host}}",
     "revokeMessage": "Hangataka fanamafisana indray ny rohy mankany amin'ity mpampiantrano ity.",
-    "revokeImageMessage": "Hangataka fanamafisana indray ny sary avy amin'ity mpampiantrano ity.",
-    "backToPreferences": "Miverena amin'ny safidy"
+    "revokeImageMessage": "Hangataka fanamafisana indray ny sary avy amin'ity mpampiantrano ity."
   },
   "glanceable": {
     "waiting": "Manavao ny mpanatanteraka",

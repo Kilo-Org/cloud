@@ -1,5 +1,5 @@
 import { type LucideIcon } from '@/components/ui/icons';
-import { type ReactNode } from 'react';
+import { type ComponentType, type ReactNode } from 'react';
 import { type ScrollViewProps, View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
@@ -173,16 +173,25 @@ function EmptyStateBody({
   return content;
 }
 
+/**
+ * The glyph a state's action carries: any icon component that draws at a size
+ * and in a colour. Wider than `LucideIcon` so a brand mark (`GitHubIcon`) can
+ * fill the slot too, while the action still owns the metrics around it.
+ */
+export type StateActionIcon = ComponentType<{ size?: number; color?: string }>;
+
 type StateActionProps = {
   label: string;
   /** The action's cue: `Plus` creates, `RotateCcw` retries, `ArrowLeft` goes back. */
-  icon: LucideIcon;
+  icon: StateActionIcon;
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
   testID?: string;
   /** Overrides the announced name when the visible label is not the whole action. */
   accessibilityLabel?: string;
+  /** Extra context a name cannot carry, e.g. what the retry re-reads. */
+  accessibilityHint?: string;
 };
 
 /**
@@ -200,6 +209,7 @@ export function StateAction({
   disabled,
   testID,
   accessibilityLabel,
+  accessibilityHint,
 }: Readonly<StateActionProps>) {
   const colors = useThemeColors();
   const mutedDisabledInk = useMutedDisabledInk();
@@ -211,6 +221,7 @@ export function StateAction({
       disabled={disabled}
       testID={testID}
       accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={accessibilityHint}
       onPress={onPress}
     >
       <Icon size={16} color={disabled === true ? mutedDisabledInk : colors.primaryForeground} />

@@ -30,6 +30,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 // The empty state's chrome is not this suite's subject: it renders the action
 // the clear region carries, which is the New session entry under test.
 vi.mock('@/components/empty-state', () => ({
+  StateAction: 'StateAction',
   EmptyState: ({ action }: { action?: ReactElement }) => action ?? null,
   StateAction: 'StateAction',
 }));
@@ -43,7 +44,7 @@ function nodesOfType(type: string): TestRenderer.ReactTestInstance[] {
 }
 
 function entry(): TestRenderer.ReactTestInstance {
-  const nodes = nodesOfType('Button');
+  const nodes = nodesOfType('StateAction');
   const node = nodes[0];
   if (nodes.length !== 1 || !node) {
     throw new Error(`Expected one New session action, received ${nodes.length}`);

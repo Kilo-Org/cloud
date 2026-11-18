@@ -3703,8 +3703,7 @@
     "imagesSectionEmpty": "No hi ha servidors d'imatges de confiança",
     "revoke": "Deixa de confiar en {{host}}",
     "revokeMessage": "Els enllaços a aquest servidor tornaran a demanar confirmació.",
-    "revokeImageMessage": "Les imatges d'aquest servidor tornaran a demanar confirmació.",
-    "backToPreferences": "Torna a les preferències"
+    "revokeImageMessage": "Les imatges d'aquest servidor tornaran a demanar confirmació."
   },
   "glanceable": {
     "waiting": "S'estan actualitzant els agents",

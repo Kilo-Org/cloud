@@ -1142,6 +1142,40 @@ test('accepts the page gutter and vertical padding on a CenteredState', () => {
   assert.match(view[0], /\[L12\] "px-6"/);
 });
 
+test('flags a plain Button passed as a state action', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    screen('<EmptyState icon={Inbox} title="Nothing" action={<Button onPress={add}><Text>Add</Text></Button>} />')
+  );
+  assert.equal(found.length, 1);
+  assert.match(found[0], /\[L13\] "<Button>"/);
+  assert.match(found[0], /StateAction/);
+
+  const nested = layoutProblems(
+    SCREEN_FILE,
+    screen('<QueryError message="Failed" action={<View><Button onPress={retry}><Text>Retry</Text></Button></View>} />')
+  );
+  assert.equal(nested.length, 1);
+  assert.match(nested[0], /\[L13\]/);
+});
+
+test('accepts StateAction and wrappers around it in a state action', () => {
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen('<EmptyState icon={Inbox} title="Nothing" action={<StateAction label="Add" icon={Plus} onPress={add} />} />')
+    ),
+    []
+  );
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      screen('<QueryError action={<View className="gap-3"><StateAction label="Retry" icon={RotateCcw} onPress={retry} /></View>} />')
+    ),
+    []
+  );
+});
+
 /**
  * Run the checker's entry point over a fixture root whose sources carry one
  * layout violation, with `baseline` written beside it.

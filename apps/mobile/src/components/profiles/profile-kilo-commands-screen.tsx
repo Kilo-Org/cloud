@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { KiloCommandFormSheet } from '@/components/profiles/kilo-command-form-sheet';
 import { KiloCommandRowView } from '@/components/profiles/kilo-command-row';
 import {
@@ -19,7 +19,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { Terminal } from '@/components/ui/icons';
+import { Terminal, Plus } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { SlashCommandsSkeleton } from '@/components/profiles/slash-commands-skeleton';
 import { ADD_FORM_KEY, useCommandSavePhase } from '@/components/profiles/use-command-save-phase';
@@ -29,7 +29,6 @@ import {
   useAgentProfileKiloCommands,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_KILO_COMMANDS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -176,9 +175,11 @@ export function ProfileKiloCommandsScreen({
         placement="top"
         action={
           <ProfileManageSlot permission={permission}>
-            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
-              <Text>{t('profiles.slashCommands.add')}</Text>
-            </Button>
+            <StateAction
+              label={t('profiles.slashCommands.add')}
+              icon={Plus}
+              onPress={startAdd}
+            />
           </ProfileManageSlot>
         }
       />

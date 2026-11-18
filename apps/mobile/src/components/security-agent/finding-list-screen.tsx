@@ -9,7 +9,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
-import { ShieldCheck, SlidersHorizontal } from '@/components/ui/icons';
+import { ShieldCheck, SlidersHorizontal, X } from '@/components/ui/icons';
 import { useCallback, useMemo, useState } from 'react';
 import { View, type ViewStyle } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
@@ -27,10 +27,8 @@ import {
   FindingRowSkeleton,
 } from '@/components/security-agent/finding-row-skeleton';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   useSecurityAgentConfig,
   useSecurityAgentRepositories,
@@ -248,15 +246,13 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           }
           action={
             filtersActive ? (
-              <Button
-                className={STATE_ACTION_CLASS}
-                variant="outline"
+              <StateAction
+                label={t('common.clearFilters')}
+                icon={X}
                 onPress={() => {
                   router.setParams(toSecurityFindingParams(DEFAULT_SECURITY_FINDING_FILTERS));
                 }}
-              >
-                <Text>{t('common.clearFilters')}</Text>
-              </Button>
+              />
             ) : undefined
           }
         />

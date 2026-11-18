@@ -1,15 +1,14 @@
 /* eslint-disable max-lines -- The dashboard sections share one data contract and navigation scope. */
 import { getAnalysisIncompleteCount } from '@kilocode/app-shared/security-agent';
 import { type Href } from 'expo-router';
-import { FolderGit2, ShieldCheck } from '@/components/ui/icons';
+import { FolderGit2, Settings, ShieldCheck } from '@/components/ui/icons';
 import { DirectionalArrowRight } from '@/components/ui/directional-icons';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { severityCountPhrase } from '@/components/security-agent/severity-count-phrase';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { KvRow } from '@/components/ui/kv-row';
 import { RowGroup } from '@/components/ui/row-group';
@@ -18,7 +17,7 @@ import { Section } from '@/components/ui/section';
 import { SectionHeaderSkeleton } from '@/components/ui/section-header-skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { DENSE_ROW_HIT_SLOP, ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { DENSE_ROW_HIT_SLOP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent, UNMEASURED_VALUE } from '@/lib/format';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
@@ -358,14 +357,12 @@ function RepoHealthSection({
           }
           action={
             emptyGrantAction ? (
-              <Button
-                className={STATE_ACTION_CLASS}
-                variant="default"
+              <StateAction
+                label={emptyGrantAction.label}
+                icon={Settings}
                 loading={emptyGrantAction.pending}
                 onPress={emptyGrantAction.handlePress}
-              >
-                <Text>{emptyGrantAction.label}</Text>
-              </Button>
+              />
             ) : undefined
           }
         />

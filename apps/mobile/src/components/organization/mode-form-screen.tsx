@@ -2,16 +2,14 @@ import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { ModeForm } from '@/components/organization/mode-form';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { selectOrgListErrorView } from '@/components/organization/org-list-error-view';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
-import { SlidersHorizontal } from '@/components/ui/icons';
+import { ArrowLeft, SlidersHorizontal } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
 import { useOrgModes } from '@/lib/hooks/use-org-modes-queries';
 import { useOrgBoundary } from '@/lib/hooks/use-organization-queries';
 
@@ -88,14 +86,13 @@ function ModeNotFound() {
         inset="gutter"
         title={t('organization.modes.notFound')}
         action={
-          <Button
-            variant="outline"
+          <StateAction
+            label={t('common.back')}
+            icon={ArrowLeft}
             onPress={() => {
               router.replace(MODES_LIST_PATH as Href);
             }}
-          >
-            <Text>{t('common.back')}</Text>
-          </Button>
+          />
         }
       />
     </View>

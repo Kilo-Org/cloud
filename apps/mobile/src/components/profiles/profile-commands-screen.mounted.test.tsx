@@ -72,6 +72,7 @@ vi.mock('@/components/empty-state', async () => {
   // helpers must be loaded inside the factory.
   const { createElement } = await import('react');
   return {
+    StateAction: 'StateAction',
     // The real state renders its `action` below the title, so the manage slot's
     // sentence or the manager's CTA reaches the tree the way the screen hands it over.
     EmptyState: (props: { action?: unknown }) =>
@@ -120,7 +121,7 @@ const ROLE_SENTENCE = 'Only organization owners and admins can change organizati
 
 /** Press the add CTA the empty state renders through its `action` prop. */
 function pressEmptyAction(renderer: Awaited<ReturnType<typeof mountScreen>>['renderer']): void {
-  const action = findAll(findOne(renderer.root, 'EmptyState'), 'Button')[0];
+  const action = findAll(findOne(renderer.root, 'EmptyState'), 'StateAction')[0];
   if (!action) {
     throw new Error('the empty state rendered no add CTA');
   }

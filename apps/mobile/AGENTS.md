@@ -270,7 +270,7 @@ One contract, enforced by `pnpm check:classes` (baseline in `tools/nativewind/la
 | States | Loading, empty, error and happy states for every data screen. Every loading placeholder owns the loaded geometry — a row reserves through `RowSkeleton`, a section label through `SectionHeaderSkeleton`, a control through its own frame constant — so the swap to real content cannot move the screen. One placement rule: `center` when the state is the whole surface, `top` only when it sits under intro text or controls. A state's way out is the one action slot, filled with `StateAction` (primary, compact, label-sized, leading icon) at the slot's fixed gap. A state owns the 14pt gutter only when it is its surface's full-bleed content (a `center` state; a `top`/`static` one in a list's empty slot passes `inset="gutter"`); one laid out inside a body or card that already insets draws none, and no caller spells the inset itself. | `RowSkeleton` (`variant="session"` for a flat list; `lines`, `tile`, `trailingControl`, `trailing="switch"`, `stack`), `SectionHeaderSkeleton`, `Skeleton`, `EmptyState` (`inset`, `action`), `StateAction`, `QueryError`, `CenteredState` |
 | Primary action | One per screen. A pinned footer is the shared bar, outside the scroll body; an inline action ends its section. | `ScreenFooter` from `@/components/ui/screen-footer` (`clearance` for the bottom band, `keyboard` for who lifts it) |
 | FAB | One 56pt round primary button, gutter-aligned above the tab bar. | `Fab` from `@/components/ui/fab` |
-| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]`, and none of the bans L1–L12 below the table, outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm check:classes` enforces it |
+| Arbitrary values | No spacing, font-size, line-height, tracking or radius in `[..]`, and none of the bans L1–L13 below the table, outside `components/ui`, the two header components, `@/lib/layout` and `@/lib/a11y/tap-target`. | `pnpm check:classes` enforces it |
 
 `pnpm check:classes` reads every class string (and every `style`/`*Style` object) against `LAYOUT_RULES` in
 `tools/nativewind/check-classes.mjs`, which is the only description of the rules: **L1** an arbitrary spacing,
@@ -282,7 +282,8 @@ object (an inset or a measurement passes); **L7** a chevron imported straight fr
 `RowChevron`; **L8** an arbitrary height, width or size that pins one box; **L9** a row divider drawn as
 `border-b`/`border-t` in `border-border` instead of `border-hair-soft`; **L10** `ScreenHeader` `titleContent`
 outside the three screens that own a title line; **L11** a `Sheet` without a `SheetHeader`; **L12** a horizontal
-padding or margin wider than the 14pt gutter (`px-`/`ps-`/`pe-`/`pl-`/`pr-`/`mx-`/`ms-`/`me-` at 5 and up). A
+`padding or margin wider than the 14pt gutter (`px-`/`ps-`/`pe-`/`pl-`/`pr`/`mx-`/`ms-`/`me-` at 5 and up); **L13** a
+`Button` inside an `EmptyState`/`QueryError` `action` slot instead of `StateAction`. A
 violation the migration has not reached is admitted by `tools/nativewind/layout-baseline.json`, which only shrinks: fix the call
 site and lower its line, never regenerate the baseline over a new violation.
 

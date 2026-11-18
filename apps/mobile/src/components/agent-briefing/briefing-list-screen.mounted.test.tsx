@@ -32,6 +32,13 @@ vi.mock('expo-router', () => ({ useRouter: () => ({ push: requests.push }) }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({
+  StateAction: ({
+    label,
+    onPress,
+  }: {
+    label: string;
+    onPress: () => void;
+  }) => createElement('StateAction', { label, onPress }),
   EmptyState: ({
     action,
     ...props
@@ -100,6 +107,7 @@ const report = {
 function pressSettings(root: ReactTestInstance): void {
   const [button] = [
     ...root.findAllByType('IconButton' as ElementType),
+    ...root.findAllByType('StateAction' as ElementType),
     ...root.findAllByType('Button' as ElementType),
   ];
   if (!button) {
@@ -215,10 +223,10 @@ it('renders the shared empty state with its settings action when no context is e
     .findAllByType('Text' as ElementType)
     .map(node => String(node.props.children));
   expect(texts).toContain('agentBriefing.allContexts');
-  // The empty state's own button is the only settings entry point while it shows.
+  // The empty state's own action is the only settings entry point while it shows.
   const header = mounted.root.findByType('ScreenHeader' as ElementType);
   expect(header.findAllByType('IconButton' as ElementType)).toHaveLength(0);
-  const buttons = mounted.root.findAllByType('Button' as ElementType);
+  const buttons = mounted.root.findAllByType('StateAction' as ElementType);
   expect(buttons).toHaveLength(1);
   pressSettings(mounted.root);
   expect(requests.push).toHaveBeenCalledWith('/(app)/agent-briefing/settings');

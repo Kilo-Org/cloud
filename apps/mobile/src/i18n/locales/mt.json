@@ -3821,8 +3821,7 @@
     "imagesSectionEmpty": "L-ebda ospitant fdat tal-immaġnijiet",
     "revoke": "Irtira l-fiduċja f'{{host}}",
     "revokeMessage": "Linkijiet lejn dan l-ospitant se jerġgħu jitolbu konferma.",
-    "revokeImageMessage": "L-immaġnijiet minn dan l-ospitant se jerġgħu jitolbu konferma.",
-    "backToPreferences": "Lura għall-preferenzi"
+    "revokeImageMessage": "L-immaġnijiet minn dan l-ospitant se jerġgħu jitolbu konferma."
   },
   "glanceable": {
     "waiting": "Qed jiġu aġġornati l-aġenti",

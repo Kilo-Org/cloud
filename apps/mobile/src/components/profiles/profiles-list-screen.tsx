@@ -214,13 +214,17 @@ export function ProfilesListScreen({
                         key={profile.id}
                         icon={ownerIcon(profile)}
                         title={profile.name}
-                        subtitle={subtitle || undefined}
-                        accessibilityLabel={accessibilityLabel}
-                        trailing={
+                        // The default mark sits beside the name, so the row keeps
+                        // its chevron: the destination and the state are two
+                        // different things, and the star had replaced the one cue
+                        // that said the row opens something.
+                        titleBadge={
                           isDefault ? (
-                            <Star size={16} color={colors.primary} fill={colors.primary} />
+                            <Star size={14} color={colors.primary} fill={colors.primary} />
                           ) : undefined
                         }
+                        subtitle={subtitle || undefined}
+                        accessibilityLabel={accessibilityLabel}
                         onPress={() => {
                           openProfile(profile);
                         }}

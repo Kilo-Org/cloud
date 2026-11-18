@@ -2,7 +2,7 @@
 import { type Href } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -17,15 +17,17 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { FileText, Pencil, Trash2 } from '@/components/ui/icons';
+import { FileText, Trash2 } from '@/components/ui/icons';
 import { IconTile } from '@/components/ui/icon-tile';
+import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
+import { RowIconAction } from '@/components/ui/row-trailing';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { NEUTRAL_TINT } from '@/lib/agent-color';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
-import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_INSTRUCTIONS } from '@/lib/agent-profile-forms';
 import { isolateLtrBidiText } from '@/lib/bidi';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -39,7 +41,6 @@ import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { useSheetRowTapGuard } from '@/lib/hooks/use-sheet-row-tap-guard';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { readTrpcErrorField } from '@/lib/trpc-error';
-import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_INSTRUCTIONS: AgentProfileInstructionRow[] = [];
@@ -67,9 +68,10 @@ function hasUsableMessage(error: unknown): boolean {
 
 /**
  * One instruction row: the rules file name in mono, the path it is applied as,
- * the enabled switch, and delete plus edit. Both painted lines are hidden from
- * assistive technology — the path repeats the name — so the switch's label
- * stays the only element a screen reader matches by the file name.
+ * the enabled switch and delete. The content is the edit action, so the row
+ * carries two trailing controls instead of three; both painted lines are hidden
+ * from assistive technology — the path repeats the name — and the content press
+ * and the switch are what a reader reaches.
  */
 function InstructionRow({
   instruction,
@@ -79,44 +81,52 @@ function InstructionRow({
 }: Readonly<InstructionRowProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const trailing: ReactNode[] = [
+    <Switch
+      key="enable"
+      value={instruction.enabled}
+      accessibilityLabel={instruction.name}
+      disabled={onToggle === undefined}
+      onValueChange={onToggle}
+    />,
+  ];
+  if (onDelete !== undefined) {
+    trailing.push(
+      <RowIconAction
+        key="delete"
+        label={t('profiles.instructionDelete', { name: instruction.name })}
+        onPress={onDelete}
+      >
+        <Trash2 size={18} color={colors.mutedForeground} />
+      </RowIconAction>
+    );
+  }
   return (
-    <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
-      <IconTile icon={FileText} tint={NEUTRAL_TINT} />
-      <View className="min-w-0 flex-1 gap-0.5">
-        <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
-          {instruction.name}
-        </Text>
-        <Text variant="caption" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
-          {`.kilocode/rules/${instruction.name}.md`}
-        </Text>
-      </View>
-      <Switch
-        value={instruction.enabled}
-        accessibilityLabel={instruction.name}
-        disabled={onToggle === undefined}
-        onValueChange={onToggle}
-      />
-      {onEdit === undefined ? null : (
-        <Pressable
-          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-          accessibilityRole="button"
-          accessibilityLabel={t('profiles.instructionEdit', { name: instruction.name })}
-          onPress={onEdit}
-        >
-          <Pencil size={18} color={colors.mutedForeground} />
-        </Pressable>
-      )}
-      {onDelete === undefined ? null : (
-        <Pressable
-          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-          accessibilityRole="button"
-          accessibilityLabel={t('profiles.instructionDelete', { name: instruction.name })}
-          onPress={onDelete}
-        >
-          <Trash2 size={18} color={colors.mutedForeground} />
-        </Pressable>
-      )}
-    </View>
+    <RowFrame
+      leading={<IconTile icon={FileText} tint={NEUTRAL_TINT} />}
+      pressTarget="content"
+      onPress={onEdit}
+      contentAccessibilityLabel={
+        onEdit === undefined ? undefined : t('profiles.instructionEdit', { name: instruction.name })
+      }
+      disabled={onEdit === undefined}
+      trailing={{ kind: 'nodes', nodes: trailing }}
+    >
+      <Text variant="mono" numberOfLines={1} {...HIDDEN_LABEL_PROPS}>
+        {instruction.name}
+      </Text>
+      {/* Middle truncation keeps the file name, which is what tells two rules
+          files apart; the folder is the part that repeats on every row. */}
+      <Text
+        variant="caption"
+        className="mt-0.5"
+        numberOfLines={1}
+        ellipsizeMode="middle"
+        {...HIDDEN_LABEL_PROPS}
+      >
+        {`.kilocode/rules/${instruction.name}.md`}
+      </Text>
+    </RowFrame>
   );
 }
 

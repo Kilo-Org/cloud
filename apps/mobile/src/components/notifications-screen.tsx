@@ -283,29 +283,24 @@ function CategoryRow({
   const accessibilityLabel =
     'accessibilityLabelKey' in meta ? t(meta.accessibilityLabelKey) : t(meta.titleKey);
   return (
-    <ConfigureRow
+    <PreferenceRow
       icon={Icon}
       title={title}
       subtitle={subtitle}
-      variant="action"
+      value={displayedValue}
       disabled={isDisabled}
-      trailing={
-        <View className="flex-row items-center gap-2">
-          {isPending && <ActivityIndicator size="small" color={colors.mutedForeground} />}
-          <Switch
-            value={displayedValue}
-            disabled={isDisabled}
-            accessibilityLabel={accessibilityLabel}
-            accessibilityState={{ disabled: isDisabled, busy: isPending }}
-            onValueChange={value => {
-              if (isDisabled) {
-                return;
-              }
-              onChange(value);
-            }}
-          />
-        </View>
-      }
+      busy={isPending}
+      resolveValue={() => readAgentPushPreference(queryClient, queryKey, meta.key)}
+      // The switch cell is the one the LIVE UPDATES and PUSH rows use, so the
+      // three sections share one switch column instead of the category rows
+      // landing a few points nearer the screen edge.
+      accessibilityLabel={accessibilityLabel}
+      onValueChange={value => {
+        if (isDisabled) {
+          return;
+        }
+        onChange(value);
+      }}
     />
   );
 }
@@ -685,7 +680,11 @@ export function NotificationsScreen() {
   } else if (!gateSettled) {
     masterTrailing = <Skeleton className="h-8 w-14 rounded-full" />;
   } else {
-    masterTrailing = (
+    // The switch and the Enable card below are one control, not two: while push
+    // cannot work, the card carries the action, and the switch appears only once
+    // it does. Painting a dead switch beside the card offered the same state
+    // twice (`h-11` greys, 2026-11-18).
+    masterTrailing = notificationsEnabled ? (
       <View className="flex-row items-center gap-2">
         {isMasterBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         <Switch
@@ -702,7 +701,7 @@ export function NotificationsScreen() {
           }}
         />
       </View>
-    );
+    ) : null;
   }
 
   return (

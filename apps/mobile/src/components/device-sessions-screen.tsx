@@ -7,15 +7,15 @@ import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { DirectionalLogOut } from '@/components/ui/directional-icons';
-import { Smartphone } from '@/components/ui/icons';
+import { Globe, Smartphone, Terminal } from '@/components/ui/icons';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { IconButton } from '@/components/ui/icon-button';
 import { RowGroup } from '@/components/ui/row-group';
+import { RowIconAction } from '@/components/ui/row-trailing';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
@@ -41,6 +41,27 @@ type SessionRowProps = {
   onPress: (session: DeviceSession) => void;
 };
 
+/**
+ * The leading tile of each client kind the server classifies: a phone for the
+ * app, a terminal for the CLI and a globe for a browser session.
+ */
+const SESSION_ICON = {
+  app: Smartphone,
+  cli: Terminal,
+  browser: Globe,
+  other: Smartphone,
+} as const;
+
+function sessionIcon(session: DeviceSession): (typeof SESSION_ICON)[keyof typeof SESSION_ICON] {
+  if (session.kind === 'cli') {
+    return SESSION_ICON.cli;
+  }
+  if (session.kind === 'browser') {
+    return SESSION_ICON.browser;
+  }
+  return SESSION_ICON.app;
+}
+
 function SessionRow({ session, disabled, onPress }: SessionRowProps) {
   const colors = useThemeColors();
   const { t, i18n } = useTranslation();
@@ -50,44 +71,53 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
 
   return (
     <ConfigureRow
-      icon={Smartphone}
+      icon={sessionIcon(session)}
       title={device}
+      // The mark sits on the title line, so the subtitle keeps the row's full
+      // width: on the trailing side it took the room the two dates need, and a
+      // compact phone broke the line into three.
+      titleBadge={
+        session.isCurrent ? (
+          /* The badge keeps the light olive in dark mode: the dark accent
+              (#ffdd00) as a full pill glares and pulls focus, so dark swaps
+              in `--selection`, the same hue lifted to stand off the page,
+              with its own label tone. */
+          <View className="rounded-full bg-primary px-2 py-0.5 dark:bg-selection">
+            <Text
+              variant="eyebrow"
+              className="text-primary-foreground dark:text-selection-foreground"
+            >
+              {t('deviceSessions.thisDevice')}
+            </Text>
+          </View>
+        ) : undefined
+      }
       subtitle={t('deviceSessions.signedIn', { signedIn, lastSeen })}
+      // The two dates are one sentence, so a narrow row ends it with an
+      // ellipsis instead of breaking "Last seen" away from its date.
+      subtitleNumberOfLines={2}
       variant="action"
       trailing={
-        <View className="flex-row items-center gap-2">
-          {session.isCurrent && (
-            /* The badge keeps the light olive in dark mode: the dark accent
-                (#ffdd00) as a full pill glares and pulls focus, so dark swaps
-                in `--selection`, the same hue lifted to stand off the page,
-                with its own label tone. */
-            <View className="rounded-full bg-primary px-2 py-0.5 dark:bg-selection">
-              <Text
-                variant="eyebrow"
-                className="text-primary-foreground dark:text-selection-foreground"
-              >
-                {t('deviceSessions.thisDevice')}
-              </Text>
-            </View>
-          )}
-          <IconButton
-            disabled={disabled}
-            accessibilityLabel={
-              session.isCurrent
-                ? t('deviceSessions.signOutThisDevice')
-                : t('deviceSessions.signOutSessionLabel', {
-                    device: isolateBidiText(device),
-                    signedIn,
-                    lastSeen,
-                  })
-            }
-            onPress={() => {
-              onPress(session);
-            }}
-          >
-            <DirectionalLogOut size={16} color={colors.destructive} />
-          </IconButton>
-        </View>
+        <RowIconAction
+          label={
+            session.isCurrent
+              ? t('deviceSessions.signOutThisDevice')
+              : t('deviceSessions.signOutSessionLabel', {
+                  device: isolateBidiText(device),
+                  signedIn,
+                  lastSeen,
+                })
+          }
+          disabled={disabled}
+          onPress={() => {
+            onPress(session);
+          }}
+        >
+          {/* The row keeps the muted ink: a red icon on every row outshouted the
+              session names, and the confirm dialog is where the action turns
+              destructive. */}
+          <DirectionalLogOut size={16} color={colors.mutedForeground} />
+        </RowIconAction>
       }
     />
   );

@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Boxes, GitBranch, Loader2, Plus } from 'lucide-react';
+import { Boxes, GitBranch, Loader2, Plus, SquareDashed, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -23,18 +24,33 @@ import {
   type EnvironmentRepository,
   type EnvironmentSummary,
 } from '@/hooks/useCloudAgentEnvironments';
-import { EnvironmentDetailPane, type EnvironmentEditorPage } from '../EnvironmentDialog';
+import {
+  isOpenEnvironmentSetupRun,
+  useEnvironmentSetupRunsForEnvironment,
+} from '@/hooks/useEnvironmentSetupRuns';
+import {
+  EnvironmentDetailPane,
+  EnvironmentDraftBadge,
+  NewEnvironmentEditor,
+  type EnvironmentEditorPage,
+} from '../EnvironmentDialog';
+import { repositoryKey, repositoryName } from '../environment-repositories';
+
+/** An unsaved environment. It shows as the first list row until it is created or discarded. */
+type EnvironmentDraft = { repositories: EnvironmentRepository[]; version: number };
 
 type EnvironmentsSectionProps = {
   organizationId?: string;
   canManage: boolean;
   active?: boolean;
+  onSetupStarted?: () => void;
 };
 
 export function EnvironmentsSection({
   organizationId,
   canManage,
   active = true,
+  onSetupStarted,
 }: EnvironmentsSectionProps) {
   const query = useCloudAgentEnvironmentsForOwner({ organizationId, enabled: active });
   const repoChoices = useEnvironmentRepositoryChoices(organizationId);
@@ -44,15 +60,14 @@ export function EnvironmentsSection({
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [createRepository, setCreateRepository] = useState<EnvironmentRepository | null>(null);
-  const [createVersion, setCreateVersion] = useState(0);
+  const [draft, setDraft] = useState<EnvironmentDraft | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editorPage, setEditorPage] = useState<EnvironmentEditorPage>('overview');
   const [editorVersion, setEditorVersion] = useState(0);
 
   useEffect(() => {
-    if (!active || createRepository || saving || query.isError) return;
+    if (!active || draft || saving || query.isError) return;
     if (selectedId !== null && environments.some(environment => environment.id === selectedId)) {
       return;
     }
@@ -62,7 +77,7 @@ export function EnvironmentsSection({
       setEditorPage('overview');
       setSelectedId(next);
     }
-  }, [active, createRepository, environments, query.isError, saving, selectedId]);
+  }, [active, draft, environments, query.isError, saving, selectedId]);
 
   const canLeaveEditor = useCallback(() => {
     if (!dirty) return true;
@@ -72,38 +87,51 @@ export function EnvironmentsSection({
 
   const selectEnvironment = (environmentId: string) => {
     if (saving) return;
-    if (environmentId === selectedId && !createRepository) return;
+    if (environmentId === selectedId && !draft) return;
     if (!canLeaveEditor()) return;
     setDirty(false);
     setEditorPage('overview');
-    setCreateRepository(null);
+    setDraft(null);
     setSelectedId(environmentId);
   };
 
-  const openCreate = (choice: EnvironmentRepositoryChoice) => {
+  const openDraft = (choice: EnvironmentRepositoryChoice) => {
     if (saving) return;
     if (!canLeaveEditor()) return;
     setDirty(false);
     setEditorPage('overview');
     setPickerOpen(false);
-    setCreateVersion(version => version + 1);
-    setCreateRepository(choice.repository);
+    setDraft(current => ({
+      repositories: [choice.repository],
+      version: (current?.version ?? 0) + 1,
+    }));
   };
 
-  const cancelCreate = () => {
+  const discardDraft = () => {
     if (saving) return;
     if (!canLeaveEditor()) return;
     setDirty(false);
     setEditorPage('overview');
-    setCreateRepository(null);
+    setDraft(null);
   };
+
+  const changeDraftRepositories = useCallback((repositories: EnvironmentRepository[]) => {
+    setDraft(current => (current ? { ...current, repositories } : current));
+  }, []);
 
   const handleCreated = (environmentId: string) => {
     setSaving(false);
-    if (!createRepository) return;
+    if (!draft) return;
     setDirty(false);
-    setCreateRepository(null);
+    setDraft(null);
     setSelectedId(environmentId);
+  };
+
+  const handleDraftSetupStarted = () => {
+    setSaving(false);
+    setDirty(false);
+    setDraft(null);
+    onSetupStarted?.();
   };
 
   const handleSaved = (environmentId: string) => {
@@ -129,6 +157,15 @@ export function EnvironmentsSection({
     <div className="flex min-h-0 flex-1 flex-col md:flex-row">
       <div className="flex max-h-40 shrink-0 flex-col border-b md:max-h-none md:w-64 md:border-r md:border-b-0 lg:w-72">
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+          {draft && (
+            <div className="border-b py-1">
+              <EnvironmentDraftRow
+                repositories={draft.repositories}
+                disabled={saving}
+                onDiscard={discardDraft}
+              />
+            </div>
+          )}
           {listLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
@@ -141,17 +178,21 @@ export function EnvironmentsSection({
               </Button>
             </div>
           ) : environments.length === 0 ? (
-            <p className="text-muted-foreground px-3 py-6 text-center text-xs">
-              No environments yet.
-            </p>
+            !draft && (
+              <p className="text-muted-foreground px-3 py-6 text-center text-xs">
+                No environments yet.
+              </p>
+            )
           ) : (
             <div className="py-1">
               {environments.map(environment => (
                 <EnvironmentRow
+                  organizationId={organizationId}
+                  active={active}
                   key={environment.id}
                   environment={environment}
                   canManage={canManage}
-                  selected={!createRepository && selectedId === environment.id}
+                  selected={!draft && selectedId === environment.id}
                   disabled={saving}
                   onSelect={() => selectEnvironment(environment.id)}
                 />
@@ -197,7 +238,7 @@ export function EnvironmentsSection({
                             <CommandItem
                               key={`${platform}:${choice.label}`}
                               value={`${platform}:${choice.label}`}
-                              onSelect={() => openCreate(choice)}
+                              onSelect={() => openDraft(choice)}
                               className="flex items-center gap-2"
                             >
                               <GitBranch className="text-muted-foreground size-3.5 shrink-0" />
@@ -218,21 +259,22 @@ export function EnvironmentsSection({
       </div>
 
       <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-        {createRepository ? (
-          <EnvironmentDetailPane
-            key={`new:${repositoryLabel(createRepository)}:${createVersion}`}
-            environmentId={null}
+        {draft ? (
+          <NewEnvironmentEditor
+            key={draft.version}
+            variant="inline"
             organizationId={organizationId}
-            repository={createRepository}
-            repositoryLabel={repositoryLabel(createRepository)}
+            initialRepositories={draft.repositories}
+            onRepositoriesChange={changeDraftRepositories}
             canManage={canManage}
             active={active}
             initialPage={editorPage}
             onPageChange={setEditorPage}
+            onSetupStarted={handleDraftSetupStarted}
             onSavingChange={setSaving}
             onSaved={handleCreated}
             onDeleted={() => undefined}
-            onCancel={cancelCreate}
+            onCancel={discardDraft}
             onDirtyChange={setDirty}
           />
         ) : listLoading ? (
@@ -255,6 +297,7 @@ export function EnvironmentsSection({
             active={active}
             initialPage={editorPage}
             onPageChange={setEditorPage}
+            onSetupStarted={onSetupStarted}
             onSavingChange={setSaving}
             onSaved={handleSaved}
             onDeleted={handleDeleted}
@@ -268,7 +311,7 @@ export function EnvironmentsSection({
             </p>
             <p className="text-muted-foreground max-w-sm text-xs">
               {environments.length === 0
-                ? 'Add one to give a repository setup commands, variables, secrets, a sandbox size, and network access.'
+                ? 'Add one to give a repository setup commands, variables, secrets, a sandbox size.'
                 : 'Choose an environment from the list to view or edit it.'}
             </p>
           </div>
@@ -279,18 +322,27 @@ export function EnvironmentsSection({
 }
 
 function EnvironmentRow({
+  organizationId,
+  active,
   environment,
   canManage,
   selected,
   disabled,
   onSelect,
 }: {
+  organizationId?: string;
+  active: boolean;
   environment: EnvironmentSummary;
   canManage: boolean;
   selected: boolean;
   disabled: boolean;
   onSelect: () => void;
 }) {
+  const setupRuns = useEnvironmentSetupRunsForEnvironment(environment.id, {
+    organizationId,
+    enabled: active,
+  });
+  const setupInProgress = setupRuns.data?.some(run => isOpenEnvironmentSetupRun(run.status));
   const members = environmentMembers(environment);
   return (
     <button
@@ -306,8 +358,15 @@ function EnvironmentRow({
     >
       <Boxes className="mt-0.5 h-3.5 w-3.5 shrink-0" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium" title={environment.name}>
-          {environment.name}
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="truncate text-sm font-medium" title={environment.name}>
+            {environment.name}
+          </span>
+          {setupInProgress && (
+            <Badge variant="outline" className="shrink-0 text-[10px]">
+              Setup in progress
+            </Badge>
+          )}
         </span>
         {members.map(member => (
           <span
@@ -323,6 +382,47 @@ function EnvironmentRow({
   );
 }
 
-function repositoryLabel(repository: EnvironmentRepository): string {
-  return repository.platform === 'gitlab' ? repository.projectPath : repository.fullName;
+function EnvironmentDraftRow({
+  repositories,
+  disabled,
+  onDiscard,
+}: {
+  repositories: EnvironmentRepository[];
+  disabled: boolean;
+  onDiscard: () => void;
+}) {
+  return (
+    <div
+      aria-current="true"
+      className="border-primary/50 bg-accent text-foreground mx-1 flex w-[calc(100%-0.5rem)] items-start gap-2 rounded-md border border-dashed py-1.5 pr-1 pl-2"
+    >
+      <SquareDashed className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="truncate text-sm font-medium">New environment</span>
+          <EnvironmentDraftBadge className="text-[10px]" />
+        </span>
+        {repositories.map(repository => (
+          <span
+            key={repositoryKey(repository)}
+            className="text-muted-foreground block truncate text-xs"
+            title={repositoryName(repository)}
+          >
+            {repositoryName(repository)}
+          </span>
+        ))}
+      </span>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="text-muted-foreground size-6 shrink-0 pointer-coarse:size-11"
+        aria-label="Discard new environment"
+        disabled={disabled}
+        onClick={onDiscard}
+      >
+        <X className="size-3.5" />
+      </Button>
+    </div>
+  );
 }

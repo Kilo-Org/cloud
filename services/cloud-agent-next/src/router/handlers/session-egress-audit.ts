@@ -4,12 +4,12 @@ import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { withDORetry } from '../../utils/do-retry.js';
-import { protectedProcedure } from '../auth.js';
+import { cloudAgentManagedProcedure } from '../auth.js';
 import { GetEgressAuditInput, GetEgressAuditOutput } from '../schemas.js';
 
 export function createSessionEgressAuditHandlers() {
   return {
-    getEgressAudit: protectedProcedure
+    getEgressAudit: cloudAgentManagedProcedure
       .input(GetEgressAuditInput)
       .output(GetEgressAuditOutput)
       .query(({ input, ctx }) =>
@@ -18,6 +18,9 @@ export function createSessionEgressAuditHandlers() {
             env: ctx.env,
             kiloUserId: ctx.userId,
             cloudAgentSessionId: input.cloudAgentSessionId,
+            ...(input.organizationId === undefined
+              ? {}
+              : { expectedOrganizationId: input.organizationId }),
           });
 
           const metadata = await withDORetry(

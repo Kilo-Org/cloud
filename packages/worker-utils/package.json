@@ -26,6 +26,7 @@
     "./compute-member": "./src/compute-member.ts",
     "./cloud-agent-compute": "./src/cloud-agent-compute.ts",
     "./egress-allowlist": "./src/egress-allowlist.ts",
+    "./setup-script": "./src/setup-script.ts",
     "./egress-audit": "./src/egress-audit.ts",
     "./scm-capability-contract": "./src/scm-capability-contract.ts",
     "./sha256": "./src/sha256.ts",
@@ -75,7 +76,8 @@
     "./webhook-trigger-target": "./src/webhook-trigger-target.ts",
     "./organization-usage": "./src/organization-usage.ts",
     "./organization-consumption": "./src/organization-consumption.ts",
-    "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts"
+    "./runtime-model-diagnostics": "./src/runtime-model-diagnostics.ts",
+    "./environment-setup-authority": "./src/environment-setup-authority.ts"
   },
   "scripts": {
     "test": "vitest run",

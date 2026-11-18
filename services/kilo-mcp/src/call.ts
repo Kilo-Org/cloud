@@ -1,4 +1,5 @@
 import { Validator, type OutputUnit, type SchemaDraft } from '@cfworker/json-schema';
+import { ENVIRONMENT_SETUP_PROCEDURE_PREFIX } from '../../../packages/worker-utils/src/environment-setup-authority';
 import { ORGANIZATION_ID_HEADER } from './auth';
 import { isGuardedRow } from './search';
 import {
@@ -355,8 +356,9 @@ export async function forwardCatalogCall(options: {
   auth: ForwardedAuth;
   webBaseUrl: string;
   fetchImpl?: typeof fetch;
+  maxResultBytes?: number;
 }): Promise<{ text: string; truncated: boolean }> {
-  return serializeWithCap(await fetchCatalogCall(options));
+  return serializeWithCap(await fetchCatalogCall(options), options.maxResultBytes);
 }
 
 export async function fetchCatalogCall(options: {
@@ -486,6 +488,7 @@ export async function callCatalogEndpoint(options: {
   auth: ForwardedAuth;
   webBaseUrl: string;
   fetchImpl?: typeof fetch;
+  maxResultBytes?: number;
 }): Promise<{ text: string; truncated: boolean }> {
   const { catalog, path, input, auth } = options;
   const row = catalogRowFor(catalog, path);
@@ -505,7 +508,7 @@ export async function callCatalogEndpoint(options: {
   }
 
   let inputSchema: Record<string, unknown>;
-  if (scopedSchema !== undefined) {
+  if (scopedSchema !== undefined && !path.startsWith(ENVIRONMENT_SETUP_PROCEDURE_PREFIX)) {
     inputSchema = scopedSchema;
   } else {
     if (!row) {
@@ -543,6 +546,7 @@ export async function callCatalogEndpoint(options: {
     auth,
     webBaseUrl: options.webBaseUrl,
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+    ...(options.maxResultBytes ? { maxResultBytes: options.maxResultBytes } : {}),
   });
 }
 

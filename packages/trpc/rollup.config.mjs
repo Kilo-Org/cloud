@@ -42,6 +42,16 @@ const plugins = [
         const subpath = source.slice('@kilocode/web-shared/'.length);
         return resolveDts(path.resolve(tscOut, 'packages/web-shared/src', subpath));
       }
+      if (
+        source === '@kilocode/cloud-agent-profile' ||
+        source.startsWith('@kilocode/cloud-agent-profile/')
+      ) {
+        const subpath =
+          source === '@kilocode/cloud-agent-profile'
+            ? 'index'
+            : source.slice('@kilocode/cloud-agent-profile/'.length);
+        return resolveDts(path.resolve(tscOut, 'packages/cloud-agent-profile/src', subpath));
+      }
       // Resolve @kilocode/db sub-path imports
       if (source === '@kilocode/db' || source.startsWith('@kilocode/db/')) {
         const subpath = source === '@kilocode/db' ? 'index' : source.replace('@kilocode/db/', '');

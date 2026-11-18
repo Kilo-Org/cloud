@@ -989,6 +989,28 @@ export const baseGetSessionNextOutputSchema = z.object({
   // Execution status (grouped for cleaner API)
   execution: executionStatusNextSchema,
 
+  // Setup authority facts read back from a session. Mirrors
+  // cloud-agent-next/router/schemas.ts.
+  environment: z
+    .object({ environmentId: z.string(), configurationRevision: z.number().int() })
+    .optional(),
+  latestPreparation: z
+    .object({
+      status: z.enum(['running', 'completed', 'failed']),
+      startedAt: z.number(),
+      completedAt: z.number().optional(),
+      setupDurationMs: z.number().int().nonnegative().optional(),
+      safeError: z.string().optional(),
+    })
+    .optional(),
+  egress: z
+    .object({
+      mode: z.enum(['unrestricted', 'allowlist']),
+      allowlist: z.array(z.string()).optional(),
+      audit: z.boolean(),
+    })
+    .optional(),
+
   // Lifecycle timestamps
   preparedAt: z.number().optional(),
   initiatedAt: z.number().optional(),

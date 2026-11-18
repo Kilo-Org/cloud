@@ -25,6 +25,8 @@ export function createReviewPublication(input: {
   let state: 'unused' | 'submitted' | 'running' | 'spent' | 'abandoned' = 'unused';
   let signal: PublicationRecoverySignal | null = null;
   let failure: unknown;
+  let failureMessageId: string | undefined;
+  let assistantMessageId: string | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const abort = new AbortController();
   const texts = new Map<string, string>();
@@ -51,8 +53,20 @@ export function createReviewPublication(input: {
         const message = activity.message;
         roles.set(message.id, message.role);
         if (roles.size > 128) roles.delete(roles.keys().next().value ?? '');
-        if (message.role === 'assistant' && messageInfoReportsAssistantError(message))
-          failure = message.error;
+        if (message.role === 'assistant') {
+          // Only the terminal assistant message owns the failure: a later error-free
+          // message supersedes a recovered mid-run error and its retained text.
+          if (message.id !== assistantMessageId) {
+            assistantMessageId = message.id;
+            texts.clear();
+            failure = undefined;
+            failureMessageId = undefined;
+          }
+          if (messageInfoReportsAssistantError(message)) {
+            failure = message.error;
+            failureMessageId = message.id;
+          }
+        }
         return;
       }
       const messageId = activity.type === 'part' ? activity.part.messageId : activity.messageId;
@@ -74,8 +88,10 @@ export function createReviewPublication(input: {
         assistantReportsNoActionableOutput(
           [...texts.values()].map(text => ({ type: 'text', text }))
         )
-      )
+      ) {
         failure = { name: 'MessageOutputLengthError' };
+        failureMessageId = messageId;
+      }
     },
     recover(): boolean {
       if (state === 'submitted' || state === 'running') return true;
@@ -113,5 +129,6 @@ export function createReviewPublication(input: {
       abort.abort();
     },
     failure: () => failure,
+    failureMessageId: () => failureMessageId,
   };
 }

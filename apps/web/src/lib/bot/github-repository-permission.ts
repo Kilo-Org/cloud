@@ -231,6 +231,15 @@ async function lookupRepositoryPermission(
     return { status: 'answered', permission };
   } catch (error) {
     if (error instanceof GitHubRateLimitError) return { status: 'rate_limited', error };
+    // Credentials can be rejected (or rotated) between the attempts: the same
+    // persistent Kilo-side failure applies, so the second attempt must not
+    // report it as a GitHub outage.
+    if (isCredentialRejection(error)) {
+      return {
+        status: 'credential_rejected',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
     return {
       status: 'unreachable',
       error: error instanceof Error ? error.message : String(error),

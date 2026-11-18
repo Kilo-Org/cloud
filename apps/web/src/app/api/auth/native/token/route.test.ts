@@ -1693,6 +1693,54 @@ describe('POST /api/auth/native/token', () => {
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
     });
 
+    it('counts the apple-path ownership mismatch without touching persistence', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+      mockRequireAdmissionPayload.mockReturnValue({
+        platform: 'ios',
+        kind: 'attestation',
+        challenge: 'ch123',
+        payload: 'data',
+        keyId: 'key1',
+      });
+      // The key is bound to another account, so the post-settlement ownership
+      // check refuses this sign-in before any credential is persisted.
+      mockVerifyAdmissionAsync.mockResolvedValue({
+        ok: true,
+        platform: 'ios',
+        keyId: 'key1',
+        publicKey: 'base64pubkey',
+        existingKeyUserId: 'other-user',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          nonce: 'test-nonce',
+          admission: {},
+        })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
+      // Refused before any credential persistence runs.
+      expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
+      expect(mockPersistAttestedKey).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+      // The ownership mismatch keeps its per-event report and is counted.
+      expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_ownership_mismatch');
+      // The refusal lands in the pinned window; the next counted condition
+      // closes it with this refusal as one count on the metric's line.
+      now.mockReturnValue(6_121_000);
+      countAdmissionCondition('native_admission_missing');
+      expect(
+        aggregateLines().filter(line => line.metric === 'native_admission_refused')
+      ).toHaveLength(1);
+    });
+
     // ── Fix 6: attestation key + session in one transaction ────────────
 
     it('uses createDeviceSessionWithAttestedKey when attestation and supportsRefresh', async () => {

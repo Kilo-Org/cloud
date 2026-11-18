@@ -244,13 +244,17 @@ function generatedFiles(
     const presents = diagnostic.presentation === 'picker-sheet';
     const imports = presents
       ? `import React from 'react';\nimport { Redirect, Stack } from 'expo-router';\nimport { Platform } from 'react-native';\nimport { useFormSheetScreenOptions } from '@/lib/form-sheet';\n`
-      : `import React from 'react';\nimport { Redirect } from 'expo-router';\n`;
+      : `import React from 'react';\nimport { View } from 'react-native';\nimport { Redirect } from 'expo-router';\nimport { useSafeAreaInsets } from 'react-native-safe-area-context';\n`;
     const presentation = presents
       ? `  const sheetOptions = useFormSheetScreenOptions();\n  const options =\n    Platform.OS === 'android'\n      ? { ...sheetOptions, sheetAllowedDetents: [0.5] }\n      : sheetOptions;\n`
-      : '';
+      : '  const insets = useSafeAreaInsets();\n';
+    // A painted diagnostic measures against the window origin, so its top text
+    // would draw into the status-bar inset the product screens keep clear; a
+    // hook runs unconditionally first and the pad keeps the component inside
+    // the safe area.
     const screen = presents
       ? `React.createElement(\n      React.Fragment,\n      null,\n      React.createElement(Stack.Screen, { options }),\n      React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}))\n    )`
-      : `React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}))`;
+      : `React.createElement(\n      View,\n      { style: { paddingTop: insets.top } },\n      React.createElement(Component, JSON.parse(${JSON.stringify(JSON.stringify(diagnostic.props))}))\n    )`;
     files.set(
       file,
       `// Temporary generated design-proof diagnostic, not product source.\n${imports}import ComponentBinding from ${JSON.stringify(componentImport)};\nexport default function DesignProofFixture() {\n${presentation}  if (!__DEV__) return React.createElement(Redirect, { href: '/(auth)/login' });\n  return ${screen};\n}\n`.replace(

@@ -247,6 +247,30 @@ test('a picker-sheet diagnostic presents the screen the way the app presents tha
   assert.match(intent, /!initial &&/);
 });
 
+test('a painted diagnostic pads the screen with the top safe-area inset', async t => {
+  const fixture = syntheticRepo(t);
+  const preparation = await prepareProof(fixture);
+  const route = fs.readFileSync(
+    path.join(preparation.base.directory, 'apps/mobile/src/app/(auth)/design-proof-card.tsx'),
+    'utf8'
+  );
+  // The hook runs before the __DEV__ early return so it always runs, and the
+  // component is wrapped in a view whose pad keeps top text clear of the
+  // status-bar inset the safe-area rule measures against.
+  assert.match(route, /import \{ useSafeAreaInsets \} from 'react-native-safe-area-context'/);
+  assert.match(route, /const insets = useSafeAreaInsets\(\);/);
+  const hookAt = route.indexOf('const insets = useSafeAreaInsets();');
+  const earlyAt = route.indexOf('if (!__DEV__) return');
+  assert.ok(
+    hookAt !== -1 && earlyAt !== -1 && hookAt < earlyAt,
+    'hook runs before the early return'
+  );
+  assert.match(
+    route,
+    /React\.createElement\(\n {6}View,\n {6}\{ style: \{ paddingTop: insets\.top \} \},\n {6}React\.createElement\(Component, JSON\.parse\("\{\\"title\\":\\"Diagnostic data\\"\}"\)\)\n {4}\)/u
+  );
+});
+
 test('diagnostic prerequisite must exist on base, never copied from head', async t => {
   const fixture = syntheticRepo(t);
   const component = 'apps/mobile/src/components/head-only.tsx';

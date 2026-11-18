@@ -3,6 +3,7 @@ import {
   AWS_BYOC_TEMPLATE_VERSION,
   AWS_BYOC_PROXY_PROTOCOL_VERSION,
   awsByocConfigurationSchema,
+  isAwsRepositoryPath,
 } from './aws-byoc';
 
 export const awsSetupProviderSchema = z.enum(['aws', 'aws-ecs']);
@@ -32,8 +33,9 @@ export const awsReleaseImageSchema = z
   .object({ imageUri, repositoryArn })
   .strict()
   .superRefine((value, ctx) => {
-    const expected = `${value.repositoryArn.split(':')[4]}.dkr.ecr.us-east-1.amazonaws.com/${value.repositoryArn.split(':repository/')[1]}`;
-    if (value.imageUri.split('@')[0] !== expected)
+    const repository = value.repositoryArn.split(':repository/')[1];
+    const expected = `${value.repositoryArn.split(':')[4]}.dkr.ecr.us-east-1.amazonaws.com/${repository}`;
+    if (!isAwsRepositoryPath(repository) || value.imageUri.split('@')[0] !== expected)
       ctx.addIssue({ code: 'custom', message: 'Invalid AWS image pins' });
   });
 export const awsReleaseCustomerAccountsSchema = z

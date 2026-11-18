@@ -30,6 +30,10 @@ export function OrganizationInvoicesScreen() {
   return (
     <InvoiceListScreen
       title={org.organizationName}
+      // The organization titles the screen, so the eyebrow keeps the list's own
+      // name out of the header's uppercase style. The boundary reserved this
+      // one-line eyebrow while the membership read ran, so the swap to this
+      // header cannot move the list.
       eyebrow={t('organization.invoices.title')}
       // The title keeps the header's default tail ellipsis, so the start of the
       // organization name always stays readable.

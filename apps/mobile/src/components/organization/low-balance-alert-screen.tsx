@@ -69,7 +69,18 @@ export function LowBalanceAlertScreen() {
     );
   }
   if (!isMoneyRole(role)) {
-    return <PermissionDenied description={t('organization.lowBalanceAlert.permissionDenied')} />;
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader
+          title={t('organization.lowBalanceAlert.title')}
+          backFallback={ORGANIZATION_HUB_PATH}
+        />
+        <PermissionDenied
+          description={t('organization.lowBalanceAlert.permissionDenied')}
+          showBack={false}
+        />
+      </View>
+    );
   }
 
   if (orgWithMembers.isError && !orgWithMembers.data) {

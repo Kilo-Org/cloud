@@ -50,8 +50,13 @@ export function ProviderConnectState<T>({
 }>) {
   const { t } = useTranslation();
   const [connecting, setConnecting] = useState(false);
-  const { icon: Icon, actionIcon: ActionIcon, label, title, errorMessage } =
-    PLATFORM_CONFIG[platform];
+  const {
+    icon: Icon,
+    actionIcon: ActionIcon,
+    label,
+    title,
+    errorMessage,
+  } = PLATFORM_CONFIG[platform];
 
   const connect = async () => {
     setConnecting(true);

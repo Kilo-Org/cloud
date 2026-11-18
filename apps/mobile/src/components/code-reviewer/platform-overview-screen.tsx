@@ -164,9 +164,7 @@ export function PlatformOverviewScreen({
           scope={scope}
           platform={platform}
           notice={
-            canConnect
-              ? undefined
-              : t(connectNoticeKey(platform), { platform: capabilities.label })
+            canConnect ? undefined : t(connectNoticeKey(platform), { platform: capabilities.label })
           }
           onConnected={handleConnected}
         />

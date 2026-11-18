@@ -9,6 +9,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { VoiceTestField } from '@/components/voice-test-field';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
@@ -99,35 +100,39 @@ export function VoiceInputSettingsScreen() {
         // dismiss.
         keyboardShouldPersistTaps="handled"
       >
-        <RowGroup leadingTile>
-          <PreferenceRow
-            icon={Mic}
-            title={t('preferences.gatewayTranscription')}
-            subtitle={t('preferences.gatewayTranscriptionSubtitle')}
-            value={gatewayTranscriptionEnabled}
-            disabled={!gatewayTranscriptionLoaded}
-            onValueChange={setGatewayTranscriptionEnabled}
-            resolveValue={getRequestedGatewayTranscriptionEnabled}
-          />
-          <ConfigureRow
-            icon={Cpu}
-            title={t('preferences.transcriptionModel')}
-            subtitle={modelSubtitle}
-            disabled={modelRowDisabled}
-            onPress={() => {
-              pushOnce('/(app)/transcription-model-picker' as Href);
-            }}
-          />
-          <ConfigureRow
-            icon={Globe}
-            title={t('common.language')}
-            subtitle={languageSubtitle}
-            disabled={!languageLoaded}
-            onPress={() => {
-              pushOnce('/(app)/voice-language-picker' as Href);
-            }}
-          />
-        </RowGroup>
+        <Section>
+          <RowGroup leadingTile>
+            <PreferenceRow
+              icon={Mic}
+              title={t('preferences.gatewayTranscription')}
+              value={gatewayTranscriptionEnabled}
+              disabled={!gatewayTranscriptionLoaded}
+              onValueChange={setGatewayTranscriptionEnabled}
+              resolveValue={getRequestedGatewayTranscriptionEnabled}
+            />
+            <ConfigureRow
+              icon={Cpu}
+              title={t('preferences.transcriptionModel')}
+              subtitle={modelSubtitle}
+              disabled={modelRowDisabled}
+              onPress={() => {
+                pushOnce('/(app)/transcription-model-picker' as Href);
+              }}
+            />
+            <ConfigureRow
+              icon={Globe}
+              title={t('common.language')}
+              subtitle={languageSubtitle}
+              disabled={!languageLoaded}
+              onPress={() => {
+                pushOnce('/(app)/voice-language-picker' as Href);
+              }}
+            />
+          </RowGroup>
+          {/* The explanation is the caption the card answers to, so the switch
+              row keeps its two-line budget whatever the language or width. */}
+          <Text variant="caption">{t('preferences.gatewayTranscriptionSubtitle')}</Text>
+        </Section>
         {status === 'unavailable' ? (
           // A stored model the live catalogue dropped is kept (the engine still
           // has an id) but retry cannot restore it, so the enabled row above

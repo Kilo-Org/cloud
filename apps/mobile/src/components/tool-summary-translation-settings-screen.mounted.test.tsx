@@ -135,11 +135,15 @@ describe('ToolSummaryTranslationSettingsScreen', () => {
     expect(findPreferenceRow(renderer).props).toMatchObject({
       icon: 'WandSparkles',
       title: 'Translate summaries',
-      subtitle:
-        'Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.',
       value: false,
       disabled: false,
     });
+    // The explanation is the card's caption, so the switch row keeps its short
+    // subtitle budget and the copy still reads once, under the card.
+    expect(findPreferenceRow(renderer).props.subtitle).toBeUndefined();
+    expect(findTexts(renderer)).toContain(
+      'Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.'
+    );
     expect(findConfigureRow(renderer, 'Model').props).toMatchObject({
       icon: 'Cpu',
       subtitle: 'Auto Small',

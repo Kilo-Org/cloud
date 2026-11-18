@@ -9,6 +9,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
+import { Section } from '@/components/ui/section';
 import { Text } from '@/components/ui/text';
 import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
@@ -98,43 +99,47 @@ export function ToolSummaryTranslationSettingsScreen() {
         contentContainerClassName={SCREEN_BODY_CLASS}
         showsVerticalScrollIndicator={false}
       >
-        <RowGroup leadingTile>
-          <PreferenceRow
-            icon={WandSparkles}
-            title={t('preferences.translateSummaries')}
-            subtitle={t('preferences.toolSummaryTranslationSubtitle')}
-            value={enabled}
-            disabled={!hasLoaded}
-            onValueChange={setEnabled}
-            resolveValue={getRequestedEnabled}
-          />
-          <ConfigureRow
-            icon={Cpu}
-            title={t('common.model')}
-            subtitle={modelSubtitle}
-            disabled={modelRowDisabled}
-            onPress={() => {
-              openModelPicker(pushOnce, {
-                options: models,
-                value: model.id,
-                variant: '',
-                // The translation model carries no reasoning effort: the chosen id
-                // is the whole preference, so the picker offers no effort chips
-                // and a model tap commits and closes in one press.
-                acceptsVariant: false,
-                onSelect: id => {
-                  setModel({
-                    id,
-                    // The stored name stays the catalogue's raw one: the row
-                    // localizes it at render, so a later language change is
-                    // reflected without rewriting the stored preference.
-                    name: models.find(candidate => candidate.id === id)?.name ?? id,
-                  });
-                },
-              });
-            }}
-          />
-        </RowGroup>
+        <Section>
+          <RowGroup leadingTile>
+            <PreferenceRow
+              icon={WandSparkles}
+              title={t('preferences.translateSummaries')}
+              value={enabled}
+              disabled={!hasLoaded}
+              onValueChange={setEnabled}
+              resolveValue={getRequestedEnabled}
+            />
+            <ConfigureRow
+              icon={Cpu}
+              title={t('common.model')}
+              subtitle={modelSubtitle}
+              disabled={modelRowDisabled}
+              onPress={() => {
+                openModelPicker(pushOnce, {
+                  options: models,
+                  value: model.id,
+                  variant: '',
+                  // The translation model carries no reasoning effort: the chosen id
+                  // is the whole preference, so the picker offers no effort chips
+                  // and a model tap commits and closes in one press.
+                  acceptsVariant: false,
+                  onSelect: id => {
+                    setModel({
+                      id,
+                      // The stored name stays the catalogue's raw one: the row
+                      // localizes it at render, so a later language change is
+                      // reflected without rewriting the stored preference.
+                      name: models.find(candidate => candidate.id === id)?.name ?? id,
+                    });
+                  },
+                });
+              }}
+            />
+          </RowGroup>
+          {/* The explanation is the caption the card answers to, so the switch
+              row keeps its two-line budget whatever the language or width. */}
+          <Text variant="caption">{t('preferences.toolSummaryTranslationSubtitle')}</Text>
+        </Section>
         {modelUnavailable ? (
           // The kept model stays in the row above and the picker is the only
           // fix, so this names that one action. It must not reuse the catalogue

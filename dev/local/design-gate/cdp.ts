@@ -1,11 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { InfraError } from './capture';
-import {
-  logSourceFilterDismissExpression,
-  logSourceFilterExpression,
-  logSourceFilterStatsExpression,
-} from './log-source-filter';
+import { logBoxDisableExpression, type LogBoxDisable } from './logbox';
 import { scopeToFocusedRoute } from './route-scope';
 import { parseDump, type ProbeDump } from './tree';
 
@@ -79,24 +75,12 @@ export type ProbeClient = {
     readonly truncated: boolean;
   }>;
   /**
-   * Mutes the styling engine's own "Can't perform a React state update..." log
-   * in the app runtime, decided by the call stack that produced it, and closes
-   * one already painted before the replacement. Idempotent per runtime, so every
-   * readiness wait installs it.
+   * Disables LogBox's UI in the app runtime through every module exporting
+   * `setDisabled`, and answers how many modules exposed it and how many the gate
+   * has disabled. Idempotent per runtime, so every readiness wait calls it after
+   * a reload disables again.
    */
-  installLogSourceFilter?: () => Promise<void>;
-  /**
-   * Closes the engine's warnings LogBox holds now, after an install and before a
-   * capture, and answers how many it closed; 0 when the runtime holds no filter
-   * state yet.
-   */
-  dismissEngineLogs?: () => Promise<number>;
-  /** The filter's counters, or `null` when no runtime ever installed it. */
-  logSourceFilterStats?: () => Promise<{
-    suppressed: number;
-    forwardedGuard: number;
-    dismissed: number;
-  } | null>;
+  disableLogBox?: () => Promise<LogBoxDisable>;
   disconnect: () => void;
 };
 
@@ -499,23 +483,14 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
         })),
       };
     },
-    installLogSourceFilter: async () => {
-      await call(logSourceFilterExpression());
-    },
-    dismissEngineLogs: async () => {
-      const closed = await call(logSourceFilterDismissExpression());
-      return typeof closed === 'number' ? closed : 0;
-    },
-    logSourceFilterStats: async () => {
-      const stats = record(await call(logSourceFilterStatsExpression()));
-      const suppressed = stats?.suppressed;
-      const forwardedGuard = stats?.forwardedGuard;
-      const dismissed = stats?.dismissed;
-      const complete =
-        typeof suppressed === 'number' &&
-        typeof forwardedGuard === 'number' &&
-        typeof dismissed === 'number';
-      return complete ? { suppressed, forwardedGuard, dismissed } : null;
+    disableLogBox: async () => {
+      const payload = record(await call(logBoxDisableExpression()));
+      const exposing = payload?.exposing;
+      const disabled = payload?.disabled;
+      if (typeof exposing !== 'number' || typeof disabled !== 'number') {
+        throw new InfraError('Design gate disableLogBox() returned no module count');
+      }
+      return { exposing, disabled };
     },
     disconnect,
   };

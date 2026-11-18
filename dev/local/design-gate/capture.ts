@@ -12,7 +12,7 @@ import {
 import type { ProbeClient, ProbeSample } from './cdp';
 import type { ElementRef, Finding, RuleId } from './findings';
 import { enterTouchMode } from './input-mode';
-import { checkDevLogOverlay } from './log-source-filter';
+import { checkDevLogOverlay } from './logbox';
 import { envMismatches, isRtlLanguage, mirrorReference, type CellConfig } from './matrix';
 import type { Rgba } from './pixels';
 import { checkMirror, checkScreen, checkShift, normalize } from './rules';
@@ -288,22 +288,22 @@ export async function waitForApp(
   const deadline = clock.now() + timeoutMs;
   let last: ProbeDump | undefined;
   let lastError: unknown;
-  let filterInstalled = false;
+  let logBoxDisabled = false;
   for (;;) {
     try {
       // A probe that has just lost its page waits for it; this wait's own
       // budget caps that, so an absent app still fails within the declared time.
       if (await probe.ready(Math.max(0, deadline - clock.now()))) {
         // Every readiness wait is a fresh app runtime after a reload and the same
-        // runtime after a cell's Activity recreation. The filter is idempotent,
-        // so installing here covers both without the caller tracking reloads. A
-        // filter that cannot install leaves the app running; the screen rule
-        // reports any warning that then paints.
-        const install = probe.installLogSourceFilter;
-        if (!filterInstalled && install !== undefined) {
+        // runtime after a cell's Activity recreation. Disabling LogBox's UI is
+        // idempotent per runtime, so doing it here covers both without the caller
+        // tracking reloads. A runtime that cannot disable it leaves the app
+        // running; the raw dump still reports any toast that then paints.
+        const disable = probe.disableLogBox;
+        if (!logBoxDisabled && disable !== undefined) {
           try {
-            await install();
-            filterInstalled = true;
+            await disable();
+            logBoxDisabled = true;
           } catch {
             // Retried on the next pass, inside this wait's own budget.
           }
@@ -325,37 +325,32 @@ export async function waitForApp(
 }
 
 /**
- * The run log states how much of React's not-yet-mounted warning the gate
- * muted, and where the warning came from: a clean matrix is then evidence of
- * the source filter rather than unexplained silence.
+ * States in the run log what the readiness waits did to the dev overlay: the
+ * gate disables LogBox's UI so no toast or inspector paints over a capture, and
+ * a run whose runtime offered no such module says so here instead of leaving a
+ * clean matrix unexplained.
  */
-async function reportLogSourceFilter(
-  probe: ProbeClient,
-  log: (line: string) => void
-): Promise<void> {
+async function reportLogBox(probe: ProbeClient, log: (line: string) => void): Promise<void> {
   try {
-    const stats = await probe.logSourceFilterStats?.();
-    if (stats === null || stats === undefined) {
-      log('design-gate: log source filter not installed in the app runtime');
+    const result = await probe.disableLogBox?.();
+    if (result === undefined) return;
+    if (result.disabled > 0) {
+      log(
+        `design-gate: disabled the LogBox UI in the app runtime (${result.disabled} of ${result.exposing} module(s) exposing setDisabled)`
+      );
       return;
     }
-    if (stats.dismissed > 0) {
+    if (result.exposing === 0) {
       log(
-        `design-gate: closed ${stats.dismissed} styling-engine not-yet-mounted toast(s) LogBox was holding`
+        'design-gate: no module of the app runtime exposed LogBox setDisabled; a dev toast still painting is reported as a dev-overlay warning'
       );
+      return;
     }
-    if (stats.suppressed > 0) {
-      log(
-        `design-gate: muted ${stats.suppressed} styling-engine not-yet-mounted log(s) (react-native-css useNativeCss/styleEffect)`
-      );
-    }
-    if (stats.forwardedGuard > 0) {
-      log(
-        `design-gate: ${stats.forwardedGuard} not-yet-mounted log(s) came from app code and were kept`
-      );
-    }
+    log(
+      `design-gate: ${result.exposing} module(s) exposed LogBox setDisabled but none accepted the switch; a dev toast still painting is reported as a dev-overlay warning`
+    );
   } catch (error) {
-    log(`design-gate: log source filter stats unavailable: ${String(error)}`);
+    log(`design-gate: LogBox disable unavailable: ${String(error)}`);
   }
 }
 
@@ -651,11 +646,6 @@ async function captureScreen(ctx: CaptureContext, cell: string, target: Target, 
   // correct capture look like two different screens. A screen that never holds
   // still keeps its mismatch instead of becoming a pass.
   const waitForQuiet = async (): Promise<boolean> => {
-    try {
-      await ctx.probe.dismissEngineLogs?.();
-    } catch {
-      // The next readiness wait retries inside its own budget.
-    }
     const held = await waitForStableLayout(
       ctx.probe,
       ctx.clock,
@@ -1147,7 +1137,7 @@ export async function runMatrix(
       }
     }
     beforeRestore(outcome);
-    await reportLogSourceFilter(ctx.probe, ctx.log);
+    await reportLogBox(ctx.probe, ctx.log);
   } finally {
     unregisterCleanup?.();
     restoreErrors = await restoreState();

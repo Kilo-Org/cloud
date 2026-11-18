@@ -1,5 +1,6 @@
 import type { WorkerDb } from '@kilocode/db/client';
 import type {
+  EnvironmentBuildInput,
   EnvironmentReference,
   EnvironmentRepositoryIdentity,
 } from '@kilocode/cloud-agent-profile';
@@ -173,7 +174,9 @@ function allowedByocOwner(
 /**
  * Resolve the saved environment, repository and context allocation once, then
  * validate the provider it names. A missing saved choice falls back to the
- * native builder exactly as before.
+ * native builder exactly as before. The environment's saved allowlist skips
+ * the same saved defaults as a session of this environment, so the build and
+ * the session resolve the same provider.
  */
 export async function resolveEnvironmentBuildTarget(args: {
   env: Env;
@@ -182,6 +185,7 @@ export async function resolveEnvironmentBuildTarget(args: {
   repoFullName: string | undefined;
   commands: readonly string[];
   sandboxAllocation: string | null;
+  egressMode: EnvironmentBuildInput['egressMode'];
 }): Promise<BuildTargetResolution> {
   const { env, reference } = args;
   const repository = selectionRepository(reference, args.repoFullName);
@@ -196,6 +200,7 @@ export async function resolveEnvironmentBuildTarget(args: {
     repositoryType: repository.identity.platform,
     ...(args.sandboxAllocation ? { environmentAllocation: args.sandboxAllocation } : {}),
     ...(target ? { target } : {}),
+    ...(args.egressMode === 'allowlist' ? { runtime: { egressMode: 'allowlist' } } : {}),
   });
 
   if (allocation !== undefined && getSandboxAllocationProvider(allocation) === 'vercel') {

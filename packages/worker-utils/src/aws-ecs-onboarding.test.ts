@@ -46,6 +46,7 @@ describe('independent ECS onboarding contract', () => {
     'mutable-runtime',
     'foreign-runtime',
     'foreign-publisher',
+    'traversal-runtime',
     'duplicate-account',
     'unapproved-account',
   ])('rejects %s', change => {
@@ -66,6 +67,13 @@ describe('independent ECS onboarding contract', () => {
         publisher,
         '888888888888'
       );
+    }
+    if (change === 'traversal-runtime') {
+      value.release.runtime.imageUri = value.release.runtime.imageUri.replace(
+        '/runtime@',
+        '/runtime/../foreign@'
+      );
+      value.release.runtime.repositoryArn += '/../foreign';
     }
     if (change === 'duplicate-account') value.release.customerAccounts.push(value.accountId);
     if (change === 'unapproved-account') value.accountId = '888888888888';

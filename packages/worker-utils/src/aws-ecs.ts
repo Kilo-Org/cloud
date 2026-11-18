@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { awsByocConfigurationSchema, awsProxyPinSchema } from './aws-byoc';
+import { awsByocConfigurationSchema, awsProxyPinSchema, isAwsRepositoryPath } from './aws-byoc';
 
 export const AWS_ECS_BYOC_TEMPLATE_VERSION = 1;
 export const AWS_ECS_BYOC_ENVELOPE_SCHEME = 'byoc-aws-ecs-configuration-rsa-aes-256-gcm';
@@ -53,7 +53,7 @@ export const awsEcsResourceConfigurationSchema = z
     const repository = value.runtimeImage
       .replace(/^\d{12}\.dkr\.ecr\.us-east-1\.amazonaws\.com\//, '')
       .split('@')[0];
-    if (!repository || repository.split('/').some(part => !part || part === '.' || part === '..')) {
+    if (!repository || !isAwsRepositoryPath(repository)) {
       context.addIssue({
         code: 'custom',
         path: ['runtimeImage'],

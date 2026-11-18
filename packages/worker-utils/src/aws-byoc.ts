@@ -7,6 +7,11 @@ export const AWS_BYOC_ENVELOPE_SCHEME = 'byoc-aws-configuration-rsa-aes-256-gcm'
 export const AWS_BYOC_ENVELOPE_KEY_ID = 'agent-env-vars-v1';
 export const AWS_MICROVM_MAXIMUM_DURATION_SECONDS = 28_800;
 
+/** Each repository path segment is named; empty, `.` and `..` segments never name a repository. */
+export function isAwsRepositoryPath(path: string): boolean {
+  return path.split('/').every(part => part !== '' && part !== '.' && part !== '..');
+}
+
 export const awsProxyPinSchema = z
   .object({
     generation: z.uuid(),

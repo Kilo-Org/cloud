@@ -3985,6 +3985,26 @@ describe('GitHub review publication recovery', () => {
           nativeRuntimeId: 'rt',
           runtimeKey: runtimeKey(spec),
         });
+        h.manager.observeActivity({
+          activity: {
+            type: 'part',
+            part: {
+              sessionId: KILO_SESSION,
+              messageId: errored.id,
+              id: 'prt_failed_publication',
+              kind: 'tool',
+              tool: {
+                callId: 'call_failed_publication',
+                name: 'code_review_publish_review_summary',
+                status: 'error',
+                interactive: false,
+                error: 'unverified: publication not confirmed',
+              },
+            },
+          },
+          nativeRuntimeId: 'rt',
+          runtimeKey: runtimeKey(spec),
+        });
       }
       if (lateActivity === 'older text delta') {
         h.manager.observeActivity({
@@ -4038,26 +4058,40 @@ describe('GitHub review publication recovery', () => {
     ]);
   });
 
-  it('keeps v1 finalization completing when a later error-free message supersedes the error', async () => {
+  it('keeps v1 finalization completing after an older completion-only error update', async () => {
     const h = createHarness({ nativeDrain: false });
     const spec = reviewSpec();
     h.registerRoute(spec);
     h.manager.submit(SESSION_ID, promptPayload('m1'));
     await settle();
+    const errored = {
+      sessionID: KILO_SESSION,
+      id: 'msg_failed',
+      role: 'assistant',
+      error: {
+        name: 'APIError',
+        data: { statusCode: 503, message: 'Assistant service is unavailable' },
+      },
+    };
+    h.manager.observeKiloEvent(
+      kiloEvent('message.updated', { info: { ...errored, time: { created: 1 } } })
+    );
     h.manager.observeKiloEvent(
       kiloEvent('message.updated', {
         info: {
           sessionID: KILO_SESSION,
-          id: 'msg_failed',
+          id: 'msg_assistant',
           role: 'assistant',
-          error: {
-            name: 'APIError',
-            data: { statusCode: 503, message: 'Assistant service is unavailable' },
-          },
+          time: { created: 2 },
         },
       })
     );
-    publish(h.manager, '{"verified":true,"commentId":99}');
+    h.manager.observeKiloEvent(
+      publicationPart({ status: 'completed', output: '{"verified":true,"commentId":99}' })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('message.updated', { info: { ...errored, time: { completed: 3 } } })
+    );
     h.manager.observeKiloEvent(completedKiloTurn());
     await settle();
     expect(h.client(spec).prompts).toHaveLength(1);

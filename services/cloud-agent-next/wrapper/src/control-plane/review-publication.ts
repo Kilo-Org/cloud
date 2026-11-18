@@ -6,7 +6,7 @@ import {
   type PublicationRecoverySignal,
 } from '../publication-recovery.js';
 import type { GitHubReviewTarget } from '../../../src/shared/github-review-target.js';
-import type { HarnessActivity } from './harness-activity.js';
+import type { ActivityMessage, HarnessActivity } from './harness-activity.js';
 
 export const REVIEW_PUBLICATION_RECOVERY_SUBMIT_TIMEOUT_MS = 15_000;
 
@@ -30,7 +30,7 @@ export function createReviewPublication(input: {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const abort = new AbortController();
   const texts = new Map<string, string>();
-  const roles = new Map<string, string>();
+  const messages = new Map<string, { role: ActivityMessage['role']; created?: number }>();
 
   function clearTimer() {
     if (timer !== undefined) input.scheduler.clearTimeout(timer);
@@ -51,10 +51,13 @@ export function createReviewPublication(input: {
       if (state === 'abandoned') return;
       if (activity.type === 'message') {
         const message = activity.message;
-        roles.set(message.id, message.role);
-        if (roles.size > 128) roles.delete(roles.keys().next().value ?? '');
+        const created = messages.get(message.id)?.created ?? message.time?.created;
+        messages.set(message.id, { role: message.role, created });
+        if (messages.size > 128) {
+          const oldest = messages.keys().next();
+          if (!oldest.done) messages.delete(oldest.value);
+        }
         if (message.role === 'assistant') {
-          const created = message.time?.created;
           if (message.id !== assistantMessage?.id) {
             if (
               created !== undefined &&
@@ -78,8 +81,8 @@ export function createReviewPublication(input: {
         return;
       }
       const messageId = activity.type === 'part' ? activity.part.messageId : activity.messageId;
-      if (roles.get(messageId) !== 'assistant') return;
-      if (activity.type === 'part' && activity.part.tool) {
+      if (messages.get(messageId)?.role !== 'assistant') return;
+      if (signal?.kind !== 'verified' && activity.type === 'part' && activity.part.tool) {
         const result = classifyPublicationToolPart(activity.part.tool);
         if (result) signal = result;
       }

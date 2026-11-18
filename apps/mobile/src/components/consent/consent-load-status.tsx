@@ -16,7 +16,7 @@ export type ConsentLoadStatus =
   | { readonly status: 'idle' }
   | { readonly status: 'loading' }
   | { readonly status: 'ready' }
-  | { readonly status: 'failed' };
+  | { readonly status: 'failed'; readonly message: string };
 
 type ConsentLoadStatusLineProps = {
   /** The load phase. */
@@ -48,37 +48,27 @@ export function ConsentLoadStatusLine({ load, error, onRetry, t }: ConsentLoadSt
     );
   }
   if (load.status === 'failed') {
-    // Retry belongs to the load attempt: it re-runs the stored read, so it
-    // stays beside the copy only while that copy is still the load failure.
-    // A later action's failure (a failed sign-out, a failed optional-save)
-    // owns the slot with no Retry — retrying the read there would clear a
-    // failure it did not produce while the real problem is still live.
-    const showsLoadFailure = error === null || error === 'consent.couldNotLoadConsentSettings';
+    // The load failure lives in the union; the action-error slot is a
+    // separate channel. The newest failure wins the copy: `error` carries a
+    // later action's failure (a failed sign-out, a failed optional-save)
+    // and hides the load copy while it is live, but Retry — the affordance
+    // that re-runs the read that blocks the primary — stays rendered for
+    // the whole `failed` phase, so the card can always reach `ready` again.
     return (
       <View className="flex-row items-center justify-center gap-1">
-        {/* The load failure seeds `error` with the load key, but a later
-            action on the failed card can write its own key (Decline's failed
-            sign-out, a failed optional-save). The latest error wins: the load
-            error is only the default this state starts from, and a hardcoded
-            copy would hide the real failure. */}
-        <AccessibleStatus
-          message={t(error ?? 'consent.couldNotLoadConsentSettings')}
-          className="text-sm"
-        />
-        {showsLoadFailure ? (
-          <Pressable
-            onPress={onRetry}
-            hitSlop={LINE_ACTION_HIT_SLOP}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.retry')}
-            // The shared line-action box: its `-my-[7px]` keeps the row one
-            // line tall, so a failed load grows the reserved slot by nothing
-            // and the actions below it never move.
-            className={`${LINE_ACTION_BOX_CLASS} flex-row items-center gap-1 px-1 active:opacity-70`}
-          >
-            <Text className="text-sm font-semibold text-primary">{t('common.retry')}</Text>
-          </Pressable>
-        ) : null}
+        <AccessibleStatus message={t(error ?? load.message)} className="text-sm" />
+        <Pressable
+          onPress={onRetry}
+          hitSlop={LINE_ACTION_HIT_SLOP}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.retry')}
+          // The shared line-action box: its `-my-[7px]` keeps the row one
+          // line tall, so a failed load grows the reserved slot by nothing
+          // and the actions below it never move.
+          className={`${LINE_ACTION_BOX_CLASS} flex-row items-center gap-1 px-1 active:opacity-70`}
+        >
+          <Text className="text-sm font-semibold text-primary">{t('common.retry')}</Text>
+        </Pressable>
       </View>
     );
   }

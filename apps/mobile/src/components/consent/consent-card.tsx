@@ -7,7 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConsentRequiredRows } from '@/components/consent/consent-required-rows';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { ConsentPolicySentence } from '@/components/consent/consent-policy-sentence';
-import { ConsentLoadStatusLine } from '@/components/consent/consent-load-status';
+import {
+  type ConsentLoadStatus,
+  ConsentLoadStatusLine,
+} from '@/components/consent/consent-load-status';
 import { useConsentCardState } from '@/components/consent/use-consent-card-state';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,6 +44,24 @@ type ConsentCardProps = {
  * header's cap (see `tour-font-scale`).
  */
 export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.4;
+
+/**
+ * Whether the optional switch holds the same-size placeholder.
+ *
+ * The placeholder covers every render with a resolved account and no stored
+ * answer: `loading` is the read in flight, and `idle` is the render between
+ * the account arriving and the load effect committing `loading` — one the
+ * test renderer cannot observe, because its `act` flushes effects. Only
+ * `ready` and `failed` have observed the stored record (or its refusal), so
+ * only they may paint a choice. No account means nothing to load: the switch
+ * renders as before and its toggle path reports the account error.
+ */
+export function optionalIsPending(hasAccount: boolean, load: ConsentLoadStatus): boolean {
+  if (!hasAccount) {
+    return false;
+  }
+  return load.status === 'loading' || load.status === 'idle';
+}
 
 /**
  * The data-sharing consent surface ("Before we get started" onboarding, and
@@ -82,17 +103,10 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const footerStyle = {
     paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
   };
-  // The switch must not present a state before the stored value has loaded:
-  // until loaded, the switch slot holds a same-size placeholder, so the card
-  // never claims a choice the user has not made and a tap cannot flip the
-  // wrong way (the full reasoning sits on the load state in
-  // `useConsentCardState`). A resolved account with the phase not yet moved
-  // past `idle` (the render between the account arriving and the load effect
-  // committing `loading`) is exactly that un-loaded window, so it holds the
-  // placeholder too. With no userId there is nothing to load: the switch
-  // renders as before.
-  const optionalControlPending =
-    storedLoad.status === 'loading' || (userId !== undefined && storedLoad.status === 'idle');
+  // The switch must not present a state before the stored value has loaded;
+  // `optionalIsPending` owns the rule (its doc carries the reasoning and the
+  // cases).
+  const optionalControlPending = optionalIsPending(userId !== undefined, storedLoad);
 
   return (
     <View className="flex-1 bg-background" style={rootStyle}>

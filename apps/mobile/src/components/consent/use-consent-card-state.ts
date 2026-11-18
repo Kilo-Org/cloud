@@ -36,9 +36,11 @@ export function useConsentCardState(mode: ConsentMode) {
   const { signOut, token } = useAuth();
   const { userId } = useCurrentUserId({ enabled: token != null });
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
-  // The catalogue key, not the copy: the card translates it at render, so the
-  // line follows an applied language instead of keeping the words of the
-  // language the action failed under.
+  // The catalogue key of the latest ACTION failure, not the copy: the card
+  // translates it at render, so the line follows an applied language instead
+  // of keeping the words of the language the action failed under. The load
+  // phase keeps its own failure inside `storedLoad` (`failed.message`), so
+  // the two can sit beside each other and neither overwrites the other.
   const [error, setError] = useState<string | null>(null);
   // Onboarding pre-selects optional telemetry; review mode starts off. The
   // stored value loads over either default, so a stored decline never flashes
@@ -75,18 +77,14 @@ export function useConsentCardState(mode: ConsentMode) {
     }
     // The first settle of one attempt — bound or read — clears `active` and
     // publishes; a read that settles after its own bound, after unmount, or
-    // after a Retry re-run publishes nothing.
+    // after a Retry re-run publishes nothing. Every transition touches only
+    // the load phase; the action-error slot is not the load's to write.
     let active = true;
     setStoredLoad({ status: 'loading' });
     const timeout = setTimeout(() => {
       if (active) {
         active = false;
-        setStoredLoad({ status: 'failed' });
-        // The bound publishes only while no newer failure owns the slot: a
-        // Decline inside the window that failed its sign-out already wrote
-        // the copy the person is reading, and overwriting it would hide the
-        // newest failure behind the older attempt's default.
-        setError(current => current ?? 'consent.couldNotLoadConsentSettings');
+        setStoredLoad({ status: 'failed', message: 'consent.couldNotLoadConsentSettings' });
       }
     }, STORED_LOAD_TIMEOUT_MS);
     // eslint-disable-next-line promise/prefer-await-to-then, promise/always-return -- async/await would allow the promise to settle after unmount.
@@ -105,7 +103,6 @@ export function useConsentCardState(mode: ConsentMode) {
           loadedRef.current = true;
         }
         setStoredLoad({ status: 'ready' });
-        setError(null);
       },
       () => {
         if (!active) {
@@ -113,11 +110,10 @@ export function useConsentCardState(mode: ConsentMode) {
         }
         active = false;
         clearTimeout(timeout);
-        // The error names the unreliability, so the switch may show its
-        // default; the primary stays disabled: an accept here would write
-        // the default over a stored decision the read could not see.
-        setStoredLoad({ status: 'failed' });
-        setError('consent.couldNotLoadConsentSettings');
+        // The failure copy names the unreliability, so the switch may show
+        // its default; the primary stays disabled: an accept here would
+        // write the default over a stored decision the read could not see.
+        setStoredLoad({ status: 'failed', message: 'consent.couldNotLoadConsentSettings' });
       }
     );
     return () => {

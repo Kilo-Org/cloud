@@ -281,11 +281,15 @@ export function NotificationHistoryScreen() {
           // One row that scrolls sideways: every chip keeps its whole face and
           // the row's own gutter sits at both ends, so the last chip is never
           // clipped by the screen edge and no chip wraps onto a line of its own.
+          // A horizontal scroller grows into the column's free height unless it
+          // is told not to, which stretched every chip down to the empty state;
+          // `grow-0` keeps it one chip tall, and `mb-3` matches the skeleton row.
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             accessibilityRole="tablist"
-            contentContainerClassName="gap-2 px-4"
+            className="mb-3 grow-0"
+            contentContainerClassName="items-center gap-2 px-4"
           >
             {filters.map(filter => (
               <FilterChip

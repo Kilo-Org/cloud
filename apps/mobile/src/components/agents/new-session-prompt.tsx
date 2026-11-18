@@ -30,7 +30,6 @@ import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-s
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { InputFrame } from '@/components/ui/input-frame';
 import { RemainingCharactersCounter } from '@/components/ui/remaining-characters-counter';
-import { Text } from '@/components/ui/text';
 import {
   type ComposerSelection,
   pasteTextIntoComposer,

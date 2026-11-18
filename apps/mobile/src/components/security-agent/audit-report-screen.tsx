@@ -261,9 +261,7 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
   // name, and the findings view names it in its own first line.
   const report = query.data?.status === 'ok' ? query.data.report : undefined;
   const ownerSubtitle =
-    !query.isError && report && report.findings.length === 0
-      ? report.owner.displayName
-      : undefined;
+    !query.isError && report?.findings.length === 0 ? report.owner.displayName : undefined;
   // The org procedure is `organizationBillingProcedure`, which rejects
   // viewers without the owner/billing_manager role. That denial is
   // non-retryable: retrying cannot change the viewer's role.

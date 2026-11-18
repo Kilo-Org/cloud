@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import type { LayoutChangeEvent } from 'react-native';
+import { type LayoutChangeEvent } from 'react-native';
 
 import {
   MODE_TOOL_GROUPS,

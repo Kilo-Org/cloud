@@ -763,11 +763,13 @@ describe('SpendAlertsScreen push agreement', () => {
     // The audit reads the control's laid-out node and `hitSlop` never widens
     // it, so assert the box the installed Tailwind and react-native-css
     // compilers emit for the classes, not a hand-written utility map.
-    for (const row of rows) {
+    const frames = await Promise.all(
+      rows.map(row => compiledLengthDp(row.props.className as string, 'minHeight'))
+    );
+    for (const [index, row] of rows.entries()) {
       expect(row.props.hitSlop).toBeUndefined();
-      const frame = await compiledLengthDp(row.props.className as string, 'minHeight');
-      expect(frame).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
-      expect(frame).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+      expect(frames[index]).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+      expect(frames[index]).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
     }
   });
 });

@@ -47,16 +47,20 @@ describe('SessionPermanentError recovery', () => {
     const renderer = mountCard();
     const actions = renderer.root.findAll(node => String(node.type) === 'StateAction');
     expect(actions).toHaveLength(1);
-    expect(actions[0]?.props.label).toBe(i18n.t('agentChat.session.backToSessions'));
+    const [action] = actions;
+    if (!action) {
+      throw new Error('the card rendered no action');
+    }
+    expect(action.props.label).toBe(i18n.t('agentChat.session.backToSessions'));
 
     act(() => {
-      (actions[0]?.props.onPress as () => void)();
+      (action.props.onPress as () => void)();
     });
     expect(router.dismissTo).toHaveBeenCalledWith(AGENTS_SESSIONS_INDEX_HREF);
   });
 
   it('leaves the retry slot to the denial a retry can clear', () => {
-    const retry = vi.fn();
+    const retry = vi.fn<() => void>();
     const renderer = mountCard(retry);
     expect(renderer.root.findAll(node => String(node.type) === 'StateAction')).toHaveLength(0);
     const error = renderer.root.findByType(QueryError);

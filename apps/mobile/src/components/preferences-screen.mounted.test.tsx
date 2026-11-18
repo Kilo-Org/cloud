@@ -75,9 +75,7 @@ describe('PreferencesScreen hub', () => {
     // line on the row it names.
     expect(row(renderer, 'Voice input').props).toMatchObject({ icon: 'Mic' });
     expect(
-      renderer.root
-        .findAll(node => node.type === 'Text')
-        .map(node => node.props.children)
+      renderer.root.findAll(node => String(node.type) === 'Text').map(node => node.props.children)
     ).toContain(i18n.t('preferences.gatewayTranscriptionSubtitle'));
     expect(row(renderer, 'Translate tool summaries').props).toMatchObject({
       icon: 'WandSparkles',

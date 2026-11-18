@@ -16,7 +16,7 @@ import {
   testProfile,
   type TestProfileDetail,
 } from '@/components/profiles/profile-overview-screen.test-helpers';
-import { act } from '@/test/renderer';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
@@ -126,6 +126,16 @@ vi.mock('@/components/ui/icons', () => ({
   Trash2: 'Trash2',
 }));
 
+/** The count each settings row paints in its trailing value cell, null when it shows none. */
+function rowCounts(root: ReactTestInstance): (string | null)[] {
+  return findAll(root, 'ConfigureRow')
+    .filter(node => node.props.title !== 'Import config')
+    .map(node => {
+      const value = node.props.trailing?.props?.children?.[0] as { props?: { text?: string } };
+      return value?.props?.text ?? null;
+    });
+}
+
 describe('ProfileOverviewScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -200,8 +210,11 @@ describe('ProfileOverviewScreen', () => {
       'Old description'
     );
     // The seven sections in the web editor's order, then the Import config row.
+    // A count is a trailing value, and a section with nothing in it shows no
+    // number at all.
+    expect(rowCounts(renderer.root)).toEqual(['1', '2', null, null, '1', null, null]);
     const subtitles = rowSubtitles(renderer.root);
-    expect(subtitles.slice(0, 7)).toEqual(['1', '2', '0', '0', '1', '0', '0']);
+    expect(subtitles.slice(0, 7)).toEqual(Array.from({ length: 7 }, () => undefined));
     expect(subtitles[7]).toBe('Paste a config and review its changes');
 
     act(() => {
@@ -222,13 +235,13 @@ describe('ProfileOverviewScreen', () => {
     expect(h.success).toHaveBeenCalledWith('Updated');
   });
 
-  it('empty: an empty profile still renders all seven rows with zero counts', async () => {
+  it('empty: an empty profile still renders all seven rows, with no count beside them', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
 
     const { renderer } = await mountScreen();
 
-    expect(rowSubtitles(renderer.root).slice(0, 7)).toEqual(Array.from({ length: 7 }, () => '0'));
+    expect(rowCounts(renderer.root)).toEqual(Array.from({ length: 7 }, () => null));
     expect(findRow(renderer.root, 'Import config')).toBeDefined();
   });
 

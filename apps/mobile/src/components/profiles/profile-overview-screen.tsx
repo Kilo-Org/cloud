@@ -38,7 +38,9 @@ import {
   Trash2,
 } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
+import { RowChevron } from '@/components/ui/row-chevron';
 import { RowGroup } from '@/components/ui/row-group';
+import { RowValue } from '@/components/ui/row-value';
 import { Section } from '@/components/ui/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -318,7 +320,17 @@ export function ProfileOverviewScreen({
                     key={row.key}
                     icon={SECTION_ICONS[row.key]}
                     title={t(row.titleKey)}
-                    subtitle={String(row.count)}
+                    // The count is a value, so it takes the trailing cell beside
+                    // the chevron; a section with nothing in it shows no number
+                    // rather than a bare zero under its name.
+                    trailing={
+                      <View className="flex-row items-center gap-2">
+                        {row.count > 0 ? (
+                          <RowValue text={String(row.count)} face="numeric" tone="muted" />
+                        ) : null}
+                        <RowChevron />
+                      </View>
+                    }
                     onPress={() => {
                       router.push(SECTION_PATHS[row.key](profileId, organizationId, stack));
                     }}

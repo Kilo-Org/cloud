@@ -15,6 +15,7 @@ import {
 import { QueryError } from '@/components/query-error';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Link2, Trash2 } from '@/components/ui/icons';
+import { ROW_FRAME_CLASS } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Section } from '@/components/ui/section';
@@ -113,7 +114,16 @@ export function ProfileRepoPinsSection({
       />
     );
   } else if (pinned.length === 0) {
-    body = <Text variant="caption">{t('profiles.repoBindings.pinnedEmpty')}</Text>;
+    // An empty section still draws its card: the message sits in the row the
+    // first pin would take, so the surface reads as a group with nothing in it
+    // rather than two loose lines between the cards around it.
+    body = (
+      <RowGroup>
+        <View className={ROW_FRAME_CLASS}>
+          <Text variant="caption">{t('profiles.repoBindings.pinnedEmpty')}</Text>
+        </View>
+      </RowGroup>
+    );
   } else {
     body = (
       <RowGroup>

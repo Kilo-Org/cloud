@@ -156,6 +156,9 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
     }
     inFlight.current = true;
     setSaving(true);
+    // A new write supersedes the last confirmation, so a failure can never
+    // paint beside a stale "Saved".
+    setSaved(false);
     const version = draftVersion.current;
     saveMutation.mutate(input, {
       onSuccess: () => {

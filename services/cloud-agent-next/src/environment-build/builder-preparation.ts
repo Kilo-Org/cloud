@@ -5,6 +5,7 @@ import type {
 import { ScmCapabilityIssueError } from '../scm-broker/failure.js';
 import type { BuilderGitSource, resolveBuilderGitSource } from './access.js';
 import { AwsBuildInactiveError } from './aws-build-context.js';
+import { BuilderStateInvalidError, BuilderTargetMismatchError } from './builder-errors.js';
 import type { AwsEnvironmentBuildServices } from './aws-build.js';
 import { buildInputMembers, environmentBuildRunnerInput } from './build-input.js';
 import { buildNetworkSecretEnvironment } from './network-secrets.js';
@@ -68,6 +69,8 @@ export function createBuilderPreparation(deps: PreparationDeps): BuilderPreparat
           if (error instanceof AwsBuildInactiveError) return { refused: 'gone' };
           if (error instanceof ScmCapabilityIssueError && error.kind === 'denied')
             return { refused: 'repository_unauthorized' };
+          if (error instanceof BuilderStateInvalidError || error instanceof BuilderTargetMismatchError)
+            return { refused: 'input_unavailable', detail: error.message };
           return { refused: 'unavailable' };
         }
       }

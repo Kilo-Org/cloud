@@ -140,6 +140,26 @@ describe('authorizeGitHubRepository', () => {
     expect(fetchPermission).toHaveBeenCalledTimes(1);
   });
 
+  test('rejected App credentials are reported as a configuration failure, not as temporary', async () => {
+    const fetchPermission = createFetchPermission('write');
+    fetchPermission.mockRejectedValue({ status: 401, message: 'Bad credentials' });
+
+    const result = await authorizeGitHubRepository({
+      platformIntegration: createIntegration(),
+      repository: 'acme/bad-credentials',
+      actorLogin: 'octocat',
+      fetchPermission,
+    });
+
+    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error('expected a refusal');
+    expect(result.markdown).toContain('`acme/bad-credentials`');
+    expect(result.markdown).toContain('credentials were rejected');
+    expect(result.markdown).not.toContain('temporary');
+    expect(result.markdown).not.toContain('write access');
+    expect(fetchPermission).toHaveBeenCalledTimes(1);
+  });
+
   test('a permission lookup that fails once is retried and allowed', async () => {
     const fetchPermission = createFetchPermission('write');
     fetchPermission.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce('write');

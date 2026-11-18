@@ -125,6 +125,19 @@ function transientAccessRequiredMarkdown(repository: string | null): string {
 }
 
 /**
+ * The App's GitHub credentials were rejected, which is a persistent Kilo-side
+ * configuration failure: retrying cannot clear it, so the copy points at the
+ * owner instead of promising a retry.
+ */
+function credentialRejectedMarkdown(repository: string): string {
+  return (
+    `I couldn't check \`${repository}\` because my GitHub App credentials were rejected, so I ` +
+    "didn't start any work. This is a configuration problem on my side, not something you can " +
+    'fix — an owner needs to correct the GitHub App credentials, then you can mention me again.'
+  );
+}
+
+/**
  * The permission check was rate limited. The retry window stretches as long as
  * GitHub's rate-limit window (up to an hour), so the copy names it instead of
  * overpromising a moment.
@@ -163,12 +176,24 @@ type WriteAccessResult =
   | 'denied'
   | 'transient'
   | 'rate_limited'
-  | 'installation_unavailable';
+  | 'installation_unavailable'
+  | 'credential_rejected';
 
 type PermissionLookup =
   | { status: 'answered'; permission: CollaboratorPermission | null }
   | { status: 'unreachable'; error: string }
-  | { status: 'rate_limited'; error: GitHubRateLimitError };
+  | { status: 'rate_limited'; error: GitHubRateLimitError }
+  | { status: 'credential_rejected'; error: string };
+
+/**
+ * The adapter rethrows a GitHub 401 as a Kilo-side configuration failure: the
+ * App credentials were rejected, so neither a retry nor a user-side remedy can
+ * clear it. Anything with a 401 status and a message field matches the shape
+ * the mint and the lookup rethrow.
+ */
+function isCredentialRejection(error: unknown): error is { status: 401; message?: string } {
+  return typeof error === 'object' && error !== null && 'status' in error && error.status === 401;
+}
 
 /**
  * Asks GitHub for the collaborator permission at most twice: a single thrown
@@ -177,7 +202,9 @@ type PermissionLookup =
  * only thrown failures take the second attempt. Two thrown failures in a row
  * mean GitHub stayed unreachable. A typed rate-limit failure is not retried:
  * another request before `resetAt` cannot succeed and extends GitHub's
- * penalty, so that attempt ends the lookup.
+ * penalty, so that attempt ends the lookup. A rejected App credential (401) is
+ * not retried either: the second request cannot succeed, and the failure is
+ * Kilo-side configuration, not an outage.
  */
 async function lookupRepositoryPermission(
   permissionInput: GitHubRepositoryPermissionInput,
@@ -188,6 +215,15 @@ async function lookupRepositoryPermission(
     return { status: 'answered', permission };
   } catch (error) {
     if (error instanceof GitHubRateLimitError) return { status: 'rate_limited', error };
+    // A 401 from the adapter means the App credentials were rejected. The
+    // second request cannot succeed, so the lookup ends here instead of
+    // burning the retry budget on a persistent configuration failure.
+    if (isCredentialRejection(error)) {
+      return {
+        status: 'credential_rejected',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
   // Retry once for a thrown failure; a null answer never reaches here.
   try {
@@ -262,6 +298,14 @@ async function hasRepositoryWriteAccess(params: {
     });
     return 'rate_limited';
   }
+  if (lookup.status === 'credential_rejected') {
+    console.warn('[KiloBot] GitHub rejected the App credentials during the access check:', {
+      repository: params.repository,
+      platformIntegrationId: params.platformIntegrationId,
+      error: lookup.error,
+    });
+    return 'credential_rejected';
+  }
 
   const { permission } = lookup;
   return permission === 'admin' || permission === 'maintain' || permission === 'write'
@@ -318,6 +362,9 @@ export async function authorizeGitHubRepository(params: {
   }
   if (writeAccess === 'installation_unavailable') {
     return { allowed: false, markdown: installationUnavailableMarkdown(repository) };
+  }
+  if (writeAccess === 'credential_rejected') {
+    return { allowed: false, markdown: credentialRejectedMarkdown(repository) };
   }
   if (writeAccess === 'rate_limited') {
     return { allowed: false, markdown: rateLimitedAccessRequiredMarkdown(repository) };

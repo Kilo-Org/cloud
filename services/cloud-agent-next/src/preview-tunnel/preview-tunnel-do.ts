@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { logger } from '../logger.js';
 import { isValidPreviewPort } from '../preview/host.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
+import { withDORetry } from '../utils/do-retry.js';
 import {
   PREVIEW_MARKER_ALLOCATION_HEADER,
   PREVIEW_MARKER_PORT_HEADER,
@@ -198,8 +199,11 @@ export class PreviewTunnel extends DurableObject<Env> {
   private requestTunnel(): Promise<PreviewTunnelDemandResult> {
     const identity = this.identity;
     if (identity === null) return Promise.resolve('not_ready');
-    return getSandboxControlStub(this.env, identity.sandboxId).requestPreviewTunnel(
-      identity.allocationId
+    // A repeated demand only replaces the tunnel, so a retry is safe.
+    return withDORetry(
+      () => getSandboxControlStub(this.env, identity.sandboxId),
+      stub => stub.requestPreviewTunnel(identity.allocationId),
+      'requestPreviewTunnel'
     );
   }
 

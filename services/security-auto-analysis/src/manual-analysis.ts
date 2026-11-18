@@ -14,6 +14,7 @@ import {
   security_findings,
 } from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import { resolveRuntimeEnvironment } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { and, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
@@ -271,7 +272,7 @@ export async function processManualAnalysisStart(params: {
     const authToken = await generateControlToken(
       actor,
       nextAuthSecret,
-      params.env.ENVIRONMENT === 'production' ? 'production' : 'development',
+      resolveRuntimeEnvironment(params.env.ENVIRONMENT),
       params.env.SHARED_RESOURCE_TOKENS_ENABLED,
       owner.type === 'org' ? owner.id : undefined
     );

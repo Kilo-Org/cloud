@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isAllowedEgressUrl } from './egress-allowlist';
-import { buildEgressAuditRequest } from './egress-audit';
+import { buildEgressAuditRequest, EgressAuditRequestSchema } from './egress-audit';
 import { cleanEgressHeaders } from './egress-http';
 import { redactSensitiveHeaders } from './redact-headers';
 
@@ -39,6 +39,19 @@ describe('shared egress transport decisions', () => {
     });
     expect(JSON.stringify(record)).not.toContain('private');
     expect(JSON.stringify(record)).not.toContain('do-not-retain');
+  });
+  it('keeps request rows readable by the previous strict audit reader', () => {
+    const record = buildEgressAuditRequest({
+      requestId: '11111111-1111-4111-8111-111111111111',
+      allocationRef: 'allocation-1',
+      timestamp: '2026-11-15T00:00:00.000Z',
+      method: 'GET',
+      url: new URL('https://example.com/'),
+      decision: 'allowed',
+    });
+    // The previous release parses stored rows with `.strict()` and has no `scope` key.
+    const previousReader = EgressAuditRequestSchema.omit({ scope: true }).strict();
+    expect(previousReader.safeParse(record).success).toBe(true);
   });
 });
 

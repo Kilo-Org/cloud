@@ -4,7 +4,8 @@ export const EgressAuditRequestSchema = z.object({
   requestId: z.string().uuid().toLowerCase(),
   allocationRef: z.string().min(1).max(512),
   timestamp: z.string().datetime(),
-  // Absent on historical rows; do not infer request coverage from an old record.
+  // Absent means request scope. Request rows omit it so a reader on the previous
+  // release, which parses rows strictly, still accepts them after a revert deploy.
   scope: z.enum(['request', 'connection']).optional(),
   method: z
     .string()
@@ -54,7 +55,7 @@ export function buildEgressAuditRequest(input: {
     requestId: input.requestId,
     allocationRef: input.allocationRef,
     timestamp: input.timestamp,
-    scope: input.scope ?? 'request',
+    ...(input.scope === 'connection' ? { scope: 'connection' } : {}),
     method: input.method.slice(0, 32),
     hostname: input.url.hostname.slice(0, 253).replace(/[^a-zA-Z0-9._:[\]-]/g, '_'),
     protocol: input.url.protocol,

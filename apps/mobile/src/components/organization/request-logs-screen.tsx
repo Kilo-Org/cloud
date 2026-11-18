@@ -54,9 +54,10 @@ const REQUEST_LOG_LIMIT = 100;
  * The procedure refuses a start time more than `REQUEST_LOGS_START_TIME_MAX_AGE_DAYS`
  * (365, apps/web) before its own clock, which runs later than this screen's
  * mount-time anchor. The stepper keeps an hour of margin, so the oldest window
- * it opens still names a start time the server accepts.
+ * it opens still names a start time the server accepts. Exported for the
+ * mounted suite, which drives the stepper to this bound.
  */
-const HISTORY_DAYS = 365;
+export const HISTORY_DAYS = 365;
 
 /** Whether a window ending at `windowEndMs` is inside the procedure's age bound. */
 export function canStepOlderTo(windowEndMs: number, anchorMs: number): boolean {

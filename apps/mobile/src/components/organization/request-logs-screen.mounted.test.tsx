@@ -14,7 +14,7 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { i18n } from '@/i18n';
-import { canStepOlderTo, OrganizationRequestLogsScreen } from './request-logs-screen';
+import { canStepOlderTo, HISTORY_DAYS, OrganizationRequestLogsScreen } from './request-logs-screen';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -276,16 +276,17 @@ describe('OrganizationRequestLogsScreen', () => {
     const buttons = renderer.root.findAllByType('Button');
     const older = buttons.find(node => node.props.accessibilityLabel === 'Older hour');
     expect(older).toBeDefined();
-    // Drive the window to the bound: the step's own guard is exercised in the
-    // stepper test, so go back until the button disables. One act per batch of
-    // one thousand steps keeps the update inside React's scheduler and stays
-    // inside the loop rules that ban a bare awaited call per iteration.
+    // Drive the window to the bound one step at a time: the oldest reachable
+    // window end is one hour inside the age bound, so the loop needs the
+    // full history of hours. Each act flushes one batch of updates through
+    // React's scheduler.
     const BATCH = 1000;
-    for (let batch = 0; batch < (365 * 24) / BATCH; batch += 1) {
+    const maxSteps = HISTORY_DAYS * 24;
+    for (let steps = 0; steps < maxSteps; steps += BATCH) {
       if (older?.props.disabled) {
         break;
       }
-      for (let step = 0; step < BATCH; step += 1) {
+      for (let step = 0; step < BATCH && steps + step < maxSteps; step += 1) {
         if (older?.props.disabled) {
           break;
         }

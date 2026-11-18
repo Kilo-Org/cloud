@@ -3608,7 +3608,7 @@
       "newer": "Vėlesnė valanda",
       "truncated": "Šią valandą užklausų buvo daugiau, nei rodoma sąraše.",
       "emptyTitle": "Šią valandą užklausų nėra",
-      "emptyDescription": "Norėdami pamatyti ankstesnes užklausas, naudokite „Ankstesnė valanda\".",
+      "emptyDescription": "Norėdami pamatyti ankstesnes užklausas, naudokite „Ankstesnė valanda“.",
       "loadError": "Nepavyko įkelti užklausų žurnalų.",
       "permissionDenied": "Organizacijos užklausų žurnalus gali skaityti tik jos savininkas, administratorius arba atsiskaitymų valdytojas.",
       "tokens": "Įvestis {{input}} · išvestis {{output}}",

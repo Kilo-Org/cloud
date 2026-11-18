@@ -4,6 +4,12 @@
  * (`apps/mobile/src/lib/security-agent-ledger.ts`, `markerKeyFor`) maps them by
  * exact string match onto localized catalog copy. Rewording either side breaks
  * that mapping, so this module is the single source both apps import.
+ *
+ * The exact-match contract covers more markers than this module pins: the
+ * ledger's other duplicated literals (`SECURITY_SERVICE_UNAVAILABLE_MESSAGE`,
+ * the ledger marker sentences in `shared-handlers.ts`) keep their own web and
+ * mobile copies. Moving them here is the same one-module-one-test pattern; this
+ * module pins the two sentences the remediation work changed.
  */
 
 /**

@@ -23,9 +23,6 @@ type SecurityWorkerResponse = {
   error?: string;
 };
 
-// Mirrored by the mobile security mutation classifier: a stable non-retryable
-// code, not the generic 500 the classifier treats as retryable transport. The
-// sentence itself is shared with the mobile ledger (stable-error-messages).
 /**
  * Posts a security-sync Worker command and classifies the outcome for the
  * operation ledger: `BAD_GATEWAY` is ambiguous transport (the Worker may still
@@ -44,6 +41,11 @@ export async function postSecurityWorkerCommand(params: {
   body: Record<string, unknown>;
 }): Promise<AcceptedSecurityWorkerCommand> {
   if (!SECURITY_SYNC_WORKER_URL || !INTERNAL_API_SECRET) {
+    // Mirrored by the mobile security mutation classifier: a stable
+    // non-retryable code (PRECONDITION_FAILED), not the generic 500 the
+    // classifier treats as retryable transport. The sentence is the shared
+    // SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE, which the mobile ledger maps
+    // by exact match (stable-error-messages).
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
       message: SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,

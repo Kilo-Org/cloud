@@ -2,6 +2,7 @@ import { createAwsBuildEndpoints } from '../../../src/environment-build/aws-buil
 import { createBuilderPreparation } from '../../../src/environment-build/builder-preparation.js';
 import { env, runInDurableObject } from 'cloudflare:test';
 import type { EnvironmentReference } from '@kilocode/cloud-agent-profile';
+import { sandboxAllocationSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import type { Env } from '../../../src/types.js';
 import type { EnvironmentBuild } from '../../../src/environment-build/environment-build-do.js';
 import {
@@ -118,7 +119,7 @@ export async function awsBuildHarness(transport: Awaited<ReturnType<typeof awsBu
             resolveAwsEnvironmentBuildTarget(
               fakeEnv,
               input.reference,
-              transport.provider === 'aws' ? 'aws-microvm-8g' : 'aws-ecs-8g'
+              sandboxAllocationSchema.parse(input.sandboxAllocation)
             ),
           gitSource: async () => ({
             ok: true,

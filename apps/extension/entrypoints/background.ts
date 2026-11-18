@@ -154,7 +154,7 @@ const getBrowserRuntime = ({
     // A tab opened from a tab in a session's group joins that session (D9).
     tabsApi.onCreated?.addListener(tab => {
       if (tab.id !== undefined) {
-        runtime.noteTabCreated(tab.id, tab.openerTabId);
+        void runtime.noteTabCreated(tab.id, tab.openerTabId);
       }
     });
   }

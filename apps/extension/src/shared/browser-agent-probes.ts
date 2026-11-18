@@ -28,7 +28,7 @@ const executionContextSchema = z.object({ executionContextId: z.number().optiona
  * (racing navigation) yields `undefined` and the caller treats its probe as
  * empty rather than failing the tool.
  */
-const frameExecutionContext = async (
+export const frameExecutionContext = async (
   session: Pick<BrowserToolPageSession, 'send'>,
   frameId: string
 ): Promise<number | undefined> => {
@@ -327,14 +327,16 @@ const decodeSensitiveProbe = (value: unknown): BrowserSensitiveProbe => {
  * target still types into whatever the page has focused.
  */
 const focusedProbePayloadSchema = z.object({
-  index: z.number().optional(),
   kind: z.enum(['cross-origin', 'probe']),
+  path: z.array(z.number()).optional(),
 });
 
 export interface FocusedSensitiveProbe {
-  /** True when the focus chain entered an iframe whose document the page cannot read. */
-  readonly crossOriginFrame?: { readonly index?: number | undefined } | undefined;
+  /** The iframe path (one index per level) when the focus chain entered a frame the page cannot read. */
+  readonly crossOriginFrame?: { readonly path: readonly number[] } | undefined;
   readonly probe: BrowserSensitiveProbe;
+  /** True when the probe itself could not run; the caller must treat the press as sensitive. */
+  readonly unknown?: boolean | undefined;
 }
 
 export const readSensitiveProbeForFocusedElement = async (
@@ -346,21 +348,23 @@ export const readSensitiveProbeForFocusedElement = async (
       frameId === undefined ? undefined : await frameExecutionContext(session, frameId);
 
     if (contextId === undefined) {
-      return { probe: { fields: [], paymentFormSubmit: false } };
+      return { probe: { fields: [], paymentFormSubmit: false }, unknown: true };
     }
 
     // Same-origin frames are followed through activeElement; a cross-origin frame's document is unreadable here, so the caller resolves that frame and fails closed.
     const expression = `(() => {
-      var element = document.activeElement;
-      var depth = 0;
+      var doc = document;
+      var element = doc.activeElement;
+      var path = [];
       while (element && (element.tagName === 'IFRAME' || element.tagName === 'FRAME')) {
-        var doc = null;
-        try { doc = element.contentDocument; } catch (error) { doc = null; }
-        if (!doc) {
-          var frames = Array.prototype.slice.call(document.querySelectorAll('iframe, frame'));
-          return JSON.stringify({ kind: 'cross-origin', index: frames.indexOf(element) });
+        var frames = Array.prototype.slice.call(doc.querySelectorAll('iframe, frame'));
+        path.push(frames.indexOf(element));
+        var child = null;
+        try { child = element.contentDocument; } catch (error) { child = null; }
+        if (!child) {
+          return JSON.stringify({ kind: 'cross-origin', path: path });
         }
-        depth += 1;
+        doc = child;
         element = doc.activeElement;
       }
       var probe = element ? (${SENSITIVE_TARGET_PROBE_FUNCTION}).call(element) : JSON.stringify({ fields: [], paymentFormSubmit: false });
@@ -375,25 +379,25 @@ export const readSensitiveProbeForFocusedElement = async (
     );
 
     if (!raw.success) {
-      return { probe: { fields: [], paymentFormSubmit: false } };
+      return { probe: { fields: [], paymentFormSubmit: false }, unknown: true };
     }
 
     const payload = focusedProbePayloadSchema.safeParse(JSON.parse(raw.data));
 
     if (!payload.success) {
-      return { probe: { fields: [], paymentFormSubmit: false } };
+      return { probe: { fields: [], paymentFormSubmit: false }, unknown: true };
     }
 
     if (payload.data.kind === 'cross-origin') {
       return {
-        crossOriginFrame: { index: payload.data.index },
+        crossOriginFrame: { path: payload.data.path ?? [] },
         probe: { fields: [], paymentFormSubmit: false },
       };
     }
 
     return { probe: decodeSensitiveProbe(raw.data) };
   } catch {
-    return { probe: { fields: [], paymentFormSubmit: false } };
+    return { probe: { fields: [], paymentFormSubmit: false }, unknown: true };
   }
 };
 
@@ -405,7 +409,7 @@ export const readSensitiveProbeForFocusedElement = async (
 export const readSensitiveProbeForTarget = async (
   session: ProbeSession,
   target: string | undefined
-): Promise<BrowserSensitiveProbe> => {
+): Promise<BrowserSensitiveProbe | undefined> => {
   if (target === undefined || target === '') {
     return { fields: [], paymentFormSubmit: false };
   }
@@ -414,7 +418,7 @@ export const readSensitiveProbeForTarget = async (
     const resolved = await session.resolveTarget(target);
 
     if (resolved === undefined) {
-      return { fields: [], paymentFormSubmit: false };
+      return undefined;
     }
 
     // Resolve the node inside the frame's isolated world: page script can shadow
@@ -424,7 +428,7 @@ export const readSensitiveProbeForTarget = async (
       frameId === undefined ? undefined : await frameExecutionContext(session, frameId);
 
     if (frameId === undefined || executionContextId === undefined) {
-      return { fields: [], paymentFormSubmit: false };
+      return undefined;
     }
 
     const resolvedNode = resolveObjectSchema.safeParse(
@@ -438,7 +442,7 @@ export const readSensitiveProbeForTarget = async (
     const objectId = resolvedNode.success ? resolvedNode.data.object?.objectId : undefined;
 
     if (objectId === undefined) {
-      return { fields: [], paymentFormSubmit: false };
+      return undefined;
     }
 
     const probe = await session.send('Runtime.callFunctionOn', {
@@ -452,13 +456,13 @@ export const readSensitiveProbeForTarget = async (
     );
 
     if (!raw.success) {
-      return { fields: [], paymentFormSubmit: false };
+      return undefined;
     }
 
     const payload = sensitiveProbePayloadSchema.safeParse(JSON.parse(raw.data));
 
     if (!payload.success) {
-      return { fields: [], paymentFormSubmit: false };
+      return undefined;
     }
 
     return {
@@ -466,7 +470,7 @@ export const readSensitiveProbeForTarget = async (
       paymentFormSubmit: payload.data.paymentFormSubmit === true,
     };
   } catch {
-    return { fields: [], paymentFormSubmit: false };
+    return undefined;
   }
 };
 

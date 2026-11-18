@@ -134,7 +134,7 @@ export interface BrowserRuntime {
   /** Ends a session: its group collapses, turns grey and becomes `Kilo · ended`. */
   readonly closeSession: (input: BrowserSessionRef) => Promise<void>;
   /** Records a tab the browser opened from one of a session's tabs, so the session may use it. */
-  readonly noteTabCreated: (tabId: number, openerTabId: number | undefined) => void;
+  readonly noteTabCreated: (tabId: number, openerTabId: number | undefined) => Promise<void>;
   /** Drops the caller's ref registries for good; the tab sessions and leases stay alive for others. */
   readonly disposeCaller: (caller: BrowserCaller) => number;
   /** Tab closed or left the extension's reach: drop the session, its lease and its override. */
@@ -589,7 +589,7 @@ export const createBrowserRuntime = ({
     return leases.releaseCaller(caller);
   };
 
-  const noteTabCreated = (tabId: number, openerTabId: number | undefined): void => {
+  const noteTabCreated = async (tabId: number, openerTabId: number | undefined): Promise<void> => {
     if (openerTabId === undefined) {
       return;
     }
@@ -606,7 +606,11 @@ export const createBrowserRuntime = ({
 
     if (groupId !== undefined) {
       groups.noteTabAdded(tabId, groupId);
+      return;
     }
+
+    // No group yet: this tab creates it, titled and coloured like a shared tab.
+    await groups.shareActiveTab({ sessionHandle: openerSession, tabId });
   };
 
   return {

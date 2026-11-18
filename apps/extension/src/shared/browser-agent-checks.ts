@@ -179,6 +179,7 @@ export const SENSITIVE_REASON = {
   oneTimeCode: 'typing a one-time code',
   password: 'typing a password',
   paymentField: 'typing into a payment field',
+  unknownField: 'typing into a field that could not be inspected',
 } as const;
 
 /** The tool families whose act calls can be sensitive; read-only tools never are. */

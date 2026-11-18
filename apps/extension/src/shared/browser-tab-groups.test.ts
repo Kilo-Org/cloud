@@ -75,6 +75,11 @@ describe('browser tab groups', () => {
       controller.shareActiveTab({ sessionHandle: 's1', tabId: 8 })
     ).resolves.toStrictEqual({ groupId: 12, tabId: 8 });
     expect(update).toHaveBeenCalledWith(12, { color: 'grey', title: 'Kilo · Report' });
+    // Nothing ever groups zero tabs: an empty call would make this reject.
+    const groupedTabCounts = group.mock.calls.map(([options]) => options.tabIds.length);
+
+    expect(groupedTabCounts).toStrictEqual([1]);
+    expect(controller.tabsForSession('s1')).toStrictEqual([8]);
     warn.mockRestore();
   });
 

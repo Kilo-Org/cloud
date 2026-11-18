@@ -21,6 +21,7 @@ import type {
 import { mainFrameOf, readAgentFrameTree } from './browser-agent-frames';
 import type { BrowserAgentFrame } from './browser-agent-frames';
 import {
+  frameExecutionContext,
   readSensitiveProbeForFocusedElement,
   readSensitiveProbeForTarget,
   sensitiveTargetsOf,
@@ -164,61 +165,111 @@ const targetFrameOf = async (
     : { frame: frame.parentId !== undefined, origin: frame.origin };
 };
 
-const documentRootSchema = z.object({ root: z.object({ nodeId: z.number() }) });
-const querySelectorAllSchema = z.object({ nodeIds: z.array(z.number()) });
 const nodeDescriptionSchema = z.object({
   node: z.object({ backendNodeId: z.number().optional() }).optional(),
 });
 const frameOwnerSchema = z.object({ backendNodeId: z.number().optional() });
 
+const evaluateObjectSchema = z.object({
+  result: z.object({ objectId: z.string().optional() }).optional(),
+});
+
+/** One frame's owner backendNodeId, or undefined when the frame's owner cannot be read. */
+const frameOwnerBackendNodeId = async (
+  session: GateSession,
+  frameId: string
+): Promise<number | undefined> => {
+  try {
+    const owner = frameOwnerSchema.safeParse(await session.send('DOM.getFrameOwner', { frameId }));
+
+    return owner.success ? owner.data.backendNodeId : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** The iframe element at `index` in a frame's own document, as a backendNodeId. */
+const frameChildBackendNodeId = async (
+  session: GateSession,
+  frameId: string,
+  index: number
+): Promise<number | undefined> => {
+  try {
+    const contextId = await frameExecutionContext(session, frameId);
+
+    if (contextId === undefined) {
+      return undefined;
+    }
+
+    const evaluated = evaluateObjectSchema.safeParse(
+      await session.send('Runtime.evaluate', {
+        contextId,
+        expression: `document.querySelectorAll('iframe, frame')[${String(index)}] ?? null`,
+        returnByValue: false,
+      })
+    );
+    const objectId = evaluated.success ? evaluated.data.result?.objectId : undefined;
+
+    if (objectId === undefined) {
+      return undefined;
+    }
+
+    const described = nodeDescriptionSchema.safeParse(
+      await session.send('DOM.describeNode', { objectId })
+    );
+
+    return described.success ? described.data.node?.backendNodeId : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * The origin of the iframe the focus chain entered but could not read. The page
- * reports the iframe's index in document order; CDP maps that element to the
- * frame owner, whose origin comes from the frame tree. Anything unresolved is
- * the opaque origin, so the press is refused rather than guessed.
+ * reports one index per frame level; CDP walks the owner chain down from the
+ * main frame, matching each level's iframe element against the frame tree. A
+ * level that cannot be resolved yields the opaque origin, so the press is
+ * refused rather than guessed.
  */
 const crossOriginFrameOrigin = async (
   session: GateSession,
   frames: readonly BrowserAgentFrame[],
-  index: number | undefined
+  path: readonly number[]
 ): Promise<string> => {
-  try {
-    const document = documentRootSchema.safeParse(
-      await session.send('DOM.getDocument', { depth: 0 })
-    );
-    const root = document.success ? document.data.root.nodeId : undefined;
-    const elements = querySelectorAllSchema.safeParse(
-      await session.send('DOM.querySelectorAll', { nodeId: root, selector: 'iframe, frame' })
-    );
-    const nodeId = elements.success ? elements.data.nodeIds[index ?? 0] : undefined;
+  const childFrames = frames.filter(frame => frame.parentId !== undefined);
+  // Every frame's owner is read once per level; a failing owner only loses its own frame.
+  const owners = new Map(
+    await Promise.all(
+      childFrames.map(async (frame): Promise<[string, number | undefined]> => [
+        frame.id,
+        await frameOwnerBackendNodeId(session, frame.id),
+      ])
+    )
+  );
+  let currentFrame = frames.find(frame => frame.parentId === undefined)?.id;
 
-    if (nodeId === undefined) {
+  for (const index of path) {
+    if (currentFrame === undefined) {
       return OPAQUE_ORIGIN;
     }
 
-    const described = nodeDescriptionSchema.safeParse(
-      await session.send('DOM.describeNode', { nodeId })
-    );
-    const backendNodeId = described.success ? described.data.node?.backendNodeId : undefined;
+    // eslint-disable-next-line no-await-in-loop -- each level needs the previous level's frame
+    const backendNodeId = await frameChildBackendNodeId(session, currentFrame, index);
 
     if (backendNodeId === undefined) {
       return OPAQUE_ORIGIN;
     }
 
-    const children = frames.filter(frame => frame.parentId !== undefined);
-    const owners = await Promise.all(
-      children.map(child => session.send('DOM.getFrameOwner', { frameId: child.id }))
-    );
-    const match = children.find((_child, position) => {
-      const owner = frameOwnerSchema.safeParse(owners[position]);
+    const match = childFrames.find(frame => owners.get(frame.id) === backendNodeId);
 
-      return owner.success && owner.data.backendNodeId === backendNodeId;
-    });
+    if (match === undefined) {
+      return OPAQUE_ORIGIN;
+    }
 
-    return match?.origin ?? OPAQUE_ORIGIN;
-  } catch {
-    return OPAQUE_ORIGIN;
+    currentFrame = match.id;
   }
+
+  return frames.find(frame => frame.id === currentFrame)?.origin ?? OPAQUE_ORIGIN;
 };
 
 /** The origin a navigate is headed for; a `browser_navigate_back` has no URL to read. */
@@ -270,10 +321,14 @@ const sensitiveStepFor = async (input: {
       const frameOrigin = await crossOriginFrameOrigin(
         input.session,
         input.frames,
-        focused.crossOriginFrame.index
+        focused.crossOriginFrame.path
       );
 
       return { origin: frameOrigin, reason: `typing into a field inside ${frameOrigin}` };
+    }
+
+    if (focused.unknown === true) {
+      return { origin: input.origin, reason: SENSITIVE_REASON.unknownField };
     }
 
     const reason = firstReasonOf(focused.probe);
@@ -284,6 +339,12 @@ const sensitiveStepFor = async (input: {
   for (const target of targets) {
     // eslint-disable-next-line no-await-in-loop -- one probe per targeted element, in argument order
     const probe = await readSensitiveProbeForTarget(input.session, target);
+
+    if (probe === undefined) {
+      // A target that cannot be resolved or classified is assumed sensitive.
+      return { element: target, origin: input.origin, reason: SENSITIVE_REASON.unknownField };
+    }
+
     const reason = firstReasonOf(probe);
 
     if (reason !== undefined) {

@@ -322,6 +322,17 @@ const createGroups = () => {
   return { controller, updates };
 };
 
+/** The first grouping attempt fails (so a share leaves no group), later ones succeed. */
+const failFirstGroupCall = (): (() => Promise<number>) => {
+  let calls = 0;
+
+  return () => {
+    calls += 1;
+
+    return calls === 1 ? Promise.reject(new Error('group failed')) : Promise.resolve(42);
+  };
+};
+
 const readGrant = { class: 'read' as const, origin: MAIN_ORIGIN };
 const actGrant = { class: 'act' as const, origin: MAIN_ORIGIN };
 
@@ -628,10 +639,40 @@ describe('agent browser calls', () => {
     });
     await runtime.shareActiveTab({ sessionHandle: 'session-1' });
 
-    runtime.noteTabCreated(8, TAB_ID);
-    runtime.noteTabCreated(9, 999);
+    await runtime.noteTabCreated(8, TAB_ID);
+    await runtime.noteTabCreated(9, 999);
 
     expect(controller.tabsForSession('session-1')).toStrictEqual([TAB_ID, 8]);
+  });
+
+  it('creates the session group with a tab opened before any tab was shared', async () => {
+    const updates: { readonly groupId: number; readonly props: Record<string, unknown> }[] = [];
+    const controller = createBrowserTabGroupController({
+      api: {
+        group: failFirstGroupCall(),
+        tabQuery: async () => [{ active: true, id: TAB_ID }],
+        update: async (groupId, props) => {
+          updates.push({ groupId, props });
+        },
+      },
+    });
+    const { runtime } = createHarness(controller);
+
+    await runtime.openSession({
+      controllerId: 'controller-1',
+      sessionHandle: 'session-1',
+      title: 'Work',
+    });
+    await runtime.shareActiveTab({ sessionHandle: 'session-1' });
+
+    expect(controller.listSessions()[0]?.groupId).toBeUndefined();
+
+    await runtime.noteTabCreated(8, TAB_ID);
+
+    // The opened tab created the group, titled and coloured like a shared tab.
+    expect(controller.tabsForSession('session-1')).toStrictEqual([TAB_ID, 8]);
+    expect(controller.listSessions()[0]?.groupId).toBe(42);
+    expect(updates).toContainEqual({ groupId: 42, props: { color: 'grey', title: 'Kilo · Work' } });
   });
 
   it('ends the group as `Kilo · ended` and stops targeting its tabs', async () => {

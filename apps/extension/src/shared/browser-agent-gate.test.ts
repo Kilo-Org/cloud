@@ -58,6 +58,16 @@ const createSession = (
     readonly describeNodeFails?: boolean;
     readonly focusedProbe?: Record<string, unknown>;
     readonly focusedProbeKind?: 'cross-origin' | 'probe';
+    readonly focusedPath?: readonly number[];
+    readonly frameOwnerFailsFor?: readonly string[];
+    readonly nestedPathBackendIds?: readonly number[];
+    readonly nestedFrames?: readonly {
+      readonly frameId: string;
+      readonly ownerBackendNodeId: number;
+      readonly parentId?: string;
+      readonly securityOrigin: string;
+      readonly url: string;
+    }[];
     readonly frameIdForBackendNode?: (backendNodeId: number) => string;
     readonly mainUrl?: string;
     readonly probe?: Record<string, unknown>;
@@ -65,6 +75,8 @@ const createSession = (
     readonly targetFrameId?: string;
   } = {}
 ): FakeGateSession => {
+  let describeObjectCalls = 0;
+
   const handlers: Record<string, CdpHandler> = {
     'DOM.describeNode': params => {
       if (options.describeNodeFails === true) {
@@ -73,6 +85,13 @@ const createSession = (
 
       if (params?.['nodeId'] !== undefined) {
         return { node: { backendNodeId: 40 } };
+      }
+
+      if (params?.['objectId'] !== undefined) {
+        const backendNodeId = options.nestedPathBackendIds?.[describeObjectCalls] ?? 40;
+        describeObjectCalls += 1;
+
+        return { node: { backendNodeId } };
       }
 
       const backendNodeId = params?.['backendNodeId'];
@@ -84,7 +103,19 @@ const createSession = (
       return { node: { frameId } };
     },
     'DOM.getDocument': () => ({ root: { nodeId: 1 } }),
-    'DOM.getFrameOwner': () => ({ backendNodeId: 40 }),
+    'DOM.getFrameOwner': params => {
+      const requested = params?.['frameId'];
+      const frameId = typeof requested === 'string' ? requested : '';
+
+      if (options.frameOwnerFailsFor?.includes(frameId) === true) {
+        throw new Error(`no owner for ${frameId}`);
+      }
+
+      return {
+        backendNodeId:
+          options.nestedFrames?.find(frame => frame.frameId === frameId)?.ownerBackendNodeId ?? 40,
+      };
+    },
     'DOM.querySelectorAll': () => ({ nodeIds: [30] }),
     'DOM.resolveNode': params => {
       const id = params?.['backendNodeId'] ?? params?.['nodeId'];
@@ -92,7 +123,39 @@ const createSession = (
       return { object: { objectId: `obj-${String(id)}` } };
     },
     'Page.createIsolatedWorld': () => ({ executionContextId: 9 }),
-    'Page.getFrameTree': () => frameTree(options.mainUrl ?? MAIN_URL),
+    'Page.getFrameTree': () => {
+      const nested = options.nestedFrames;
+
+      if (nested === undefined) {
+        return frameTree(options.mainUrl ?? MAIN_URL);
+      }
+
+      return {
+        frameTree: {
+          childFrames: nested
+            .filter(frame => frame.parentId === undefined)
+            .map(frame => ({
+              childFrames: nested
+                .filter(child => child.parentId === frame.frameId)
+                .map(child => ({
+                  frame: {
+                    id: child.frameId,
+                    parentId: frame.frameId,
+                    securityOrigin: child.securityOrigin,
+                    url: child.url,
+                  },
+                })),
+              frame: {
+                id: frame.frameId,
+                parentId: frame.parentId ?? 'main',
+                securityOrigin: frame.securityOrigin,
+                url: frame.url,
+              },
+            })),
+          frame: { id: 'main', securityOrigin: 'https://app.example.com', url: MAIN_URL },
+        },
+      };
+    },
     'Runtime.callFunctionOn': params => {
       const objectId = params?.['objectId'];
       const probeForObject =
@@ -108,9 +171,11 @@ const createSession = (
     },
     'Runtime.evaluate': () => ({
       result: {
+        objectId: 'obj-iframe',
         value: JSON.stringify({
           kind: options.focusedProbeKind ?? 'probe',
           ...(options.focusedProbe ?? { fields: [], paymentFormSubmit: false }),
+          ...(options.focusedPath === undefined ? {} : { path: options.focusedPath }),
         }),
       },
     }),
@@ -486,7 +551,7 @@ describe('sensitive steps', () => {
   });
 
   it('fails closed when the focus chain enters a cross-origin frame', async () => {
-    const session = createSession({ focusedProbeKind: 'cross-origin' });
+    const session = createSession({ focusedPath: [0], focusedProbeKind: 'cross-origin' });
     const refusedGrant = await run({
       args: { key: 'Enter' },
       authorized: [{ class: 'act', origin: 'https://app.example.com' }],
@@ -509,6 +574,95 @@ describe('sensitive steps', () => {
     expect(sensitiveOf(refusedStep)).toStrictEqual({
       origin: 'https://pay.example.com',
       reason: 'typing into a field inside https://pay.example.com',
+    });
+  });
+
+  it('counts a target it cannot probe as sensitive', async () => {
+    const result = await run({
+      args: { element: 'zz' },
+      toolName: 'browser_click',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [
+        {
+          class: 'sensitive',
+          origin: 'https://app.example.com',
+          reason: SENSITIVE_REASON.unknownField,
+        },
+      ],
+      kind: 'needs_permission',
+    });
+    expect(sensitiveOf(result)).toStrictEqual({
+      element: 'zz',
+      origin: 'https://app.example.com',
+      reason: SENSITIVE_REASON.unknownField,
+    });
+  });
+
+  it('resolves a nested cross-origin frame from its per-level path', async () => {
+    const result = await run({
+      args: { key: 'Enter' },
+      authorized: [{ class: 'act', origin: 'https://app.example.com' }],
+      session: createSession({
+        focusedPath: [0, 0],
+        focusedProbeKind: 'cross-origin',
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 40,
+            securityOrigin: 'https://pay.example.com',
+            url: 'https://pay.example.com/widget',
+          },
+          {
+            frameId: 'f2',
+            ownerBackendNodeId: 41,
+            parentId: 'f1',
+            securityOrigin: 'https://inner.example.org',
+            url: 'https://inner.example.org/form',
+          },
+        ],
+        nestedPathBackendIds: [40, 41],
+      }),
+      toolName: 'browser_press_key',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [{ class: 'act', frame: true, origin: 'https://inner.example.org' }],
+      kind: 'needs_permission',
+    });
+  });
+
+  it('keeps the other frames\u2019 origins when one owner lookup fails', async () => {
+    const result = await run({
+      args: { key: 'Enter' },
+      authorized: [{ class: 'act', origin: 'https://app.example.com' }],
+      session: createSession({
+        focusedPath: [0],
+        focusedProbeKind: 'cross-origin',
+        frameOwnerFailsFor: ['f1'],
+        nestedFrames: [
+          {
+            frameId: 'f1',
+            ownerBackendNodeId: 50,
+            securityOrigin: 'https://broken.example.com',
+            url: 'https://broken.example.com/',
+          },
+          {
+            frameId: 'f2',
+            ownerBackendNodeId: 41,
+            securityOrigin: 'https://other.example.com',
+            url: 'https://other.example.com/form',
+          },
+        ],
+        nestedPathBackendIds: [41],
+      }),
+      toolName: 'browser_press_key',
+    });
+
+    expect(failureOf(result)).toStrictEqual({
+      items: [{ class: 'act', frame: true, origin: 'https://other.example.com' }],
+      kind: 'needs_permission',
     });
   });
 

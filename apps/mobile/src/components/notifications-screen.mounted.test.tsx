@@ -1019,6 +1019,20 @@ describe('NotificationsScreen enable flow', () => {
     )[0];
   }
 
+  it('keeps the CTA on a 44 dp frame so Android measures a real touch target', async () => {
+    const { renderer, unmount } = await renderScreen();
+    try {
+      await waitFor(() => enableCta(renderer.root) !== undefined, 200);
+      const frame = enableCta(renderer.root)?.props.className;
+
+      // The design gate measures this Pressable's own rect: `py-2.5` around a
+      // 17.5 dp line rendered 35 dp, so the frame carries the floor itself.
+      expect(frame).toContain('min-h-[44px]');
+    } finally {
+      unmount();
+    }
+  });
+
   it('requests the permission once for two taps in the same tick', async () => {
     const { renderer, unmount } = await renderScreen();
     try {

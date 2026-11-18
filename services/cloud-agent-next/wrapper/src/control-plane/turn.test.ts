@@ -4752,6 +4752,49 @@ describe('native session outcome transitions', () => {
 });
 
 describe('completion ownership and transport bounds', () => {
+  it.each(['late cancellation', 'retry without auto-commit'] as const)(
+    'handles %s after quiet-drain expiry',
+    async scenario => {
+      const stopped = Promise.withResolvers<boolean>();
+      const h = createHarness();
+      const spec = routeSpec();
+      h.registerRoute(spec);
+      const client = h.client(spec);
+      client.setAbortImpl(() => stopped.promise);
+      client.setAutomaticDrainMarker(false);
+      client.setDrainImpl(() => new Promise(() => undefined));
+      h.setExecutionTree(KILO_SESSION, []);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      h.fireTimeout(SESSION_TIMERS.noProgressMs);
+      await settle();
+      expect(outcomeFrames(h.frames)).toMatchObject([
+        { status: 'failed', reason: 'completion_quiet_drain', lastMessageId: 'm1' },
+      ]);
+
+      if (scenario === 'late cancellation') {
+        h.manager.observeKiloEvent(
+          kiloEvent('session.error', {
+            sessionID: KILO_SESSION,
+            error: { name: 'MessageAbortedError' },
+          })
+        );
+        expect(eventFrames(h.frames).filter(event => event.type === 'session.error')).toEqual([]);
+        stopped.resolve(true);
+      } else {
+        h.manager.submit(SESSION_ID, promptPayload('m2'));
+        await settle();
+        expect(client.prompts).toHaveLength(1);
+        stopped.resolve(true);
+        await settle();
+        expect(client.prompts).toHaveLength(2);
+      }
+      h.manager.shutdown();
+    }
+  );
+
   it.each(['http', 'marker'] as const)(
     'bounds %s-only confirmation with exactly three paired attempts',
     async half => {

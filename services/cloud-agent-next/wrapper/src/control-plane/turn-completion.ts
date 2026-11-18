@@ -74,7 +74,7 @@ type CompletionInput = {
   quietDrainMs: number;
   reserveDelivery(barrier: Promise<void>): void;
   submitPublication(client: Harness, signal: AbortSignal): Promise<void>;
-  interruptAndFinalize(client: Harness): void;
+  interruptAndFinalize(client: Harness, nativeRuntimeId: string): void;
   autoCommit: (client: Harness, signal: AbortSignal) => Promise<void>;
   condense: (client: Harness, signal: AbortSignal) => Promise<void>;
   finalizing(): void;
@@ -366,7 +366,7 @@ export function createTurnCompletion(input: CompletionInput) {
           if (drained.state === 'failed') {
             input.warn(`Session completion was not confirmed: ${drained.reason}`);
             if (drained.kind === 'quiet_drain') {
-              input.interruptAndFinalize(request.client);
+              input.interruptAndFinalize(request.client, request.nativeRuntimeId);
               input.outcome('failed', 'completion_quiet_drain');
             } else input.outcome('failed', 'completion_unconfirmed');
             return;

@@ -1146,11 +1146,13 @@ the legacy profile restrictions.
   releases dispatch through an uncertain abort. Only known cleanup interruption signals are suppressed.
   Successful cleanup releases the barrier and re-arms confirmation from the original eligible close
   when no newer intake exists.
-- Native deadline and quiet-drain failures are reported immediately. When the interrupted batch opted into
-  auto-commit, the wrapper then waits for confirmed cancellation, a ready queue and an idle root before committing
-  and pushing with the normal repository and branch rules. Condense does not run. This cleanup has
-  a three-minute budget, keeps the heartbeat active, and parks later prompts without consuming their
-  delivery deadline. Stop, session release, wrapper shutdown and worktree deletion cancel it.
+- Native deadline and quiet-drain failures are reported immediately. The wrapper parks later prompts
+  while interruption is pending, even without auto-commit, and suppresses cancellation errors from
+  that runtime until a new root turn opens. With auto-commit enabled, the wrapper commits and pushes
+  only after confirmed cancellation, a ready queue and an idle root, using the normal repository and
+  branch rules. Condense does not run. This cleanup has a three-minute budget, keeps the heartbeat
+  active, and does not consume the parked prompts' delivery deadline. Stop, session release, wrapper
+  shutdown and worktree deletion cancel it.
   Cancellation failure or a root that is still running skips cleanup with a warning; abrupt sandbox
   loss cannot guarantee a commit or push. Cleanup never changes the failed outcome.
 

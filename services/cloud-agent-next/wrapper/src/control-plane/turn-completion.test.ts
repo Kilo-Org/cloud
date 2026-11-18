@@ -4,6 +4,8 @@ import type { Harness } from './harness.js';
 import type { PendingPrompt, TurnKiloRuntime } from './turn.js';
 import { createTurnCompletion } from './turn-completion.js';
 
+const QUIET_DRAIN_MS = 20 * 60_000;
+
 async function settle() {
   for (let i = 0; i < 30; i++) await Promise.resolve();
 }
@@ -13,6 +15,7 @@ function fixture(drain: NonNullable<Harness['drainSession']>) {
   const outcomes: Array<{ status: string; reason?: string }> = [];
   const diagnostics: string[] = [];
   const warnings: string[] = [];
+  const interrupts: Array<{ client: Harness; nativeRuntimeId: string }> = [];
   let active = true;
   let finalizations = 0;
   let executions: number[] | undefined = [];
@@ -66,11 +69,11 @@ function fixture(drain: NonNullable<Harness['drainSession']>) {
       setInterval,
       clearInterval,
     },
-    quietDrainMs: 20 * 60_000,
+    quietDrainMs: QUIET_DRAIN_MS,
     reserveDelivery() {},
     submitPublication: async () => {},
-    interruptAndFinalize() {
-      throw new Error('Unexpected quiet drain interruption');
+    interruptAndFinalize(client, nativeRuntimeId) {
+      interrupts.push({ client, nativeRuntimeId });
     },
     autoCommit: async () => {},
     condense: async () => {},
@@ -89,6 +92,8 @@ function fixture(drain: NonNullable<Harness['drainSession']>) {
   });
   return {
     completion,
+    client,
+    interrupts,
     outcomes,
     diagnostics,
     warnings,
@@ -113,6 +118,19 @@ function socketFailure() {
 }
 
 describe('completed assistant turn drain', () => {
+  it('interrupts the native client on quiet expiry without retrying the drain', async () => {
+    const h = fixture(() => new Promise(() => undefined));
+    h.completion.request('runtime');
+    await settle();
+    h.fire(QUIET_DRAIN_MS);
+    await settle();
+    expect(h.interrupts).toEqual([{ client: h.client, nativeRuntimeId: 'runtime' }]);
+    expect(h.outcomes).toEqual([{ status: 'failed', reason: 'completion_quiet_drain' }]);
+    expect(h.tokens).toHaveLength(1);
+    expect(h.finalizations()).toBe(0);
+    h.completion.dispose();
+  });
+
   it('diagnoses a transient socket failure and completes only after a fresh paired retry', async () => {
     let attempts = 0;
     const h = fixture(async () => {
@@ -160,6 +178,7 @@ describe('completed assistant turn drain', () => {
     expect(h.finalizations()).toBe(0);
     expect(h.tokens).toHaveLength(3);
     expect(h.warnings).toHaveLength(1);
+    expect(h.interrupts).toEqual([]);
     h.completion.dispose();
   });
 

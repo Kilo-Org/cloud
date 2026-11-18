@@ -181,7 +181,7 @@ type TurnRoute = {
   automaticPermissions: Set<string>;
   automaticQuestions: Set<string>;
   /** Suppresses cancellation aftershocks until this route starts another native execution. */
-  deadlineRuntimeId?: string;
+  interruptedRuntimeId?: string;
 };
 
 type QueueState = 'ready' | 'queue' | 'unavailable';
@@ -533,7 +533,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
           turn.submitting = turn.submitting.then(() => barrier);
         },
         submitPublication,
-        interruptAndFinalize: client => {
+        interruptAndFinalize: (client, nativeRuntimeId) => {
+          route.interruptedRuntimeId = nativeRuntimeId;
           void finalizeInterruptedTurn(turn, abortKilo(route, client));
         },
         autoCommit: (client, signal) => runAutoCommitStep(turn, client, signal),
@@ -929,7 +930,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
   }
 
   async function finalizeInterruptedTurn(turn: Turn, stopped: Promise<boolean>): Promise<void> {
-    if (!turn.prompts.some(entry => entry.payload.finalization?.autoCommit)) return;
+    const autoCommit = turn.prompts.some(entry => entry.payload.finalization?.autoCommit);
     const { sessionId, runtimeKey: key, kiloSessionId } = turn.route;
     if (interruptedFinalizations.has(sessionId)) return;
     const abort = new AbortController();
@@ -939,11 +940,13 @@ export function createTurnManager(deps: TurnManagerDeps) {
     const onAbort = () => cancelled.reject(abort.signal.reason);
     abort.signal.addEventListener('abort', onAbort, { once: true });
     const timer = scheduler.setTimeout(
-      () => abort.abort(new Error('interruption auto-commit timed out')),
+      () => abort.abort(new Error('interrupted turn cleanup timed out')),
       DEFAULT_CONDENSE_TIMEOUT_MS
     );
     try {
-      if (!(await Promise.race([stopped, cancelled.promise]))) {
+      const confirmed = await Promise.race([stopped, cancelled.promise]);
+      if (!autoCommit) return;
+      if (!confirmed) {
         emitWarning(sessionId, 'Auto-commit skipped: agent cancellation was not confirmed');
         return;
       }
@@ -959,7 +962,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
       }
       await runAutoCommitStep(turn, runtime.client, abort.signal);
     } catch {
-      emitWarning(sessionId, 'Auto-commit after interruption was cancelled or failed');
+      if (autoCommit)
+        emitWarning(sessionId, 'Auto-commit after interruption was cancelled or failed');
     } finally {
       scheduler.clearTimeout(timer);
       abort.signal.removeEventListener('abort', onAbort);
@@ -1295,10 +1299,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
       eventSessionId === root &&
       deps.runtimes.get(route.runtimeKey)?.sessionState(root)?.activity !== 'stopping'
     )
-      route.deadlineRuntimeId = undefined;
+      route.interruptedRuntimeId = undefined;
     if (
       event.type === 'session.error' &&
-      route.deadlineRuntimeId === event.nativeRuntimeId &&
+      route.interruptedRuntimeId === event.nativeRuntimeId &&
       isAssistantInterrupt(event.properties.error)
     )
       return false;
@@ -1765,7 +1769,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         ...(route ? { sessionId: route.sessionId, rootKiloSessionId: route.kiloSessionId } : {}),
       });
       if (!route || route.runtimeKey !== key) return;
-      route.deadlineRuntimeId = identity.nativeRuntimeId;
+      route.interruptedRuntimeId = identity.nativeRuntimeId;
       const turn = turns.get(route.sessionId);
       // A stall in Kilo's model retry loop fails as the assistant failure Kilo was
       // retrying (for example a rate limit), not as a platform no-progress failure.

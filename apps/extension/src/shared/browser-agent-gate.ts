@@ -18,8 +18,13 @@ import type {
   BrowserPermissionItem,
   StepTokenBinding,
 } from './browser-agent-checks';
-import { frameWithOwnerNode, mainFrameOf, readAgentFrameTree } from './browser-agent-frames';
-import type { BrowserAgentFrame } from './browser-agent-frames';
+import {
+  frameWithOwnerNode,
+  mainFrameOf,
+  readAgentFrames,
+  readAgentFrameTree,
+} from './browser-agent-frames';
+import type { AgentFrameInventory, BrowserAgentFrame } from './browser-agent-frames';
 import {
   classifyFocusedElement,
   classifyTargetElement,
@@ -497,10 +502,10 @@ const sensitiveStepFor = async (input: {
 };
 
 const pageUrlFor = async (
-  session: GateSession,
-  frame: { readonly frame: boolean; readonly origin: string } | undefined
+  frame: { readonly frame: boolean; readonly origin: string } | undefined,
+  readFrames: () => Promise<AgentFrameInventory>
 ): Promise<string | undefined> => {
-  const frames = await readAgentFrameTree(session);
+  const { frames } = await readFrames();
   const main = mainFrameOf(frames);
 
   if (frame !== undefined && frame.frame) {
@@ -518,6 +523,8 @@ export interface AgentPreflightInput {
   readonly args: Record<string, unknown>;
   /** The pairs the CLI already approved for this session. */
   readonly authorized: readonly BrowserGrant[];
+  /** The call's shared frame inventory, so the preflight and the tool read one tree. */
+  readonly readFrames?: (() => Promise<AgentFrameInventory>) | undefined;
   /** Validates a token against this exact call and burns it; provided by the runtime's store. */
   readonly consumeStepToken: (token: string, binding: StepTokenBinding) => boolean;
   readonly session: GateSession;
@@ -536,7 +543,8 @@ export interface AgentPreflightInput {
  */
 export const preflightAgentCall = async (input: AgentPreflightInput): Promise<AgentPreflight> => {
   const grantClass = toolGrantClass(input.toolName);
-  const frames = await readAgentFrameTree(input.session);
+  const readFrames = input.readFrames ?? (() => readAgentFrames(input.session));
+  const { frames } = await readFrames();
   const mainOrigin = mainFrameOf(frames)?.origin ?? OPAQUE_ORIGIN;
 
   // `browser_tabs` is one tool over four actions: list filters per tab and select/close are checked by the handler against the group and `act`; only `new` navigates, so it needs the destination's `navigate` grant here.
@@ -630,7 +638,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     return { class: grantClass, ok: true, origin, targetOriginFrame };
   }
 
-  const pageUrl = await pageUrlFor(input.session, targetFrame);
+  const pageUrl = await pageUrlFor(targetFrame, readFrames);
   const sensitive = await sensitiveStepFor({
     args: input.args,
     authorized: input.authorized,

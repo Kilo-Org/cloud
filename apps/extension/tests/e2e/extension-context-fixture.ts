@@ -107,7 +107,13 @@ export const startFixtureServer = async ({
   };
 };
 
-export const launchExtensionContext = async (): Promise<{
+export const launchExtensionContext = async (
+  /**
+   * A spec that asserts on files the browser accepted passes its own directory,
+   * so "no file landed" is a real directory read rather than a Playwright event.
+   */
+  options: { readonly downloadsPath?: string | undefined } = {}
+): Promise<{
   context: BrowserContext;
   extensionId: string;
   /** `/flags` and `/decide/` URLs that hit the stub (must stay empty with flags disabled). */
@@ -129,6 +135,7 @@ export const launchExtensionContext = async (): Promise<{
       `--load-extension=${extensionPath}`,
       ...EXTENSION_E2E_LAUNCH_ARGS,
     ],
+    ...(options.downloadsPath === undefined ? {} : { downloadsPath: options.downloadsPath }),
     ...(executablePath === undefined ? { channel } : { executablePath }),
     headless: !isHeaded,
     ignoreDefaultArgs: ['--enable-automation'],

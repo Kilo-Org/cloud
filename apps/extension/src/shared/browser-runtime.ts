@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- One runtime owns the serial chain, leases, tab groups and the agent gate; splitting it would scatter the per-tab ordering contract. */
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
+  canStartDownload,
   createStepTokenStore,
   hashBrowserToolArguments,
   NEEDS_PERMISSION_ERROR,
@@ -12,10 +13,11 @@ import type { BrowserGrant, BrowserPermissionItem, StepTokenStore } from './brow
 import { postAgentNavigate, preflightAgentCall, takeStartedDownloads } from './browser-agent-gate';
 import type { BrowserSensitiveStep } from './browser-agent-gate';
 import {
+  createAgentFrameReader,
   enableAgentFrameAutoAttach,
-  readAgentFrameTree,
   withheldFramesOf,
 } from './browser-agent-frames';
+import type { AgentFrameInventory } from './browser-agent-frames';
 import { createBrowserTabGroupController } from './browser-tab-groups';
 import type {
   BrowserOpenSessionInput,
@@ -117,8 +119,26 @@ export interface BrowserSessionTabResult {
   readonly url: string;
 }
 
+/** One download the browser created, as `chrome.downloads.onCreated` reports it. */
+export interface BrowserDownloadItem {
+  readonly id: number;
+}
+
+/** The slice of `chrome.downloads` the agent's download guard uses. */
+export interface BrowserDownloadsApi {
+  readonly cancel: (downloadId: number) => Promise<void>;
+  /** Drops the item from the downloads shelf; cancelling already deletes the file. */
+  readonly erase?: ((query: { readonly id: number }) => Promise<void>) | undefined;
+  readonly onCreated: {
+    readonly addListener: (listener: (item: BrowserDownloadItem) => void) => void;
+    readonly removeListener: (listener: (item: BrowserDownloadItem) => void) => void;
+  };
+}
+
 export interface BrowserRuntimeDeps {
   readonly debuggerApi: ChromeDebuggerApi | undefined;
+  /** `chrome.downloads`: the guard that cancels an unapproved download's file. */
+  readonly downloadsApi?: BrowserDownloadsApi | undefined;
   readonly leases: TabLeaseRegistry;
   /** The clock sensitive step tokens expire against; defaults to `Date.now`. */
   readonly now?: (() => number) | undefined;
@@ -189,6 +209,30 @@ export interface BrowserRuntime {
 const TAB_COMMIT_TIMEOUT_MS = 10_000;
 const TAB_COMMIT_POLL_MS = 50;
 
+/**
+ * How long the download guard keeps listening after an `act` call's last command.
+ * The browser creates a download before that command returns in practice, so
+ * this only covers a response whose headers arrive late.
+ */
+const DOWNLOAD_GUARD_SETTLE_MS = 120;
+
+/** Cancels one download and drops it from the shelf; a completion race changes nothing, the file is gone. */
+const discardDownload = async (api: BrowserDownloadsApi, downloadId: number): Promise<void> => {
+  try {
+    await api.cancel(downloadId);
+    await api.erase?.({ id: downloadId });
+  } catch {
+    // The download finished or vanished first; there is no file left to protect.
+  }
+};
+
+const after = (milliseconds: number): Promise<void> => {
+  const { promise, resolve } = Promise.withResolvers<void>();
+  setTimeout(resolve, milliseconds);
+
+  return promise;
+};
+
 const disposeBrowserToolSession = async (
   sessions: Map<number, BrowserToolSession>,
   tabId: number
@@ -214,6 +258,7 @@ const disposeBrowserToolSession = async (
  */
 export const createBrowserRuntime = ({
   debuggerApi,
+  downloadsApi,
   leases,
   now,
   scriptingApi,
@@ -385,10 +430,11 @@ export const createBrowserRuntime = ({
   };
 
   /**
-   * Cancels downloads a call was not approved to start. `Page.setDownloadBehavior`
-   * is the page-target spelling of the browser-level method, so it works through
-   * the tab's one debugger attachment; the guard is best effort — a browser that
-   * refuses it keeps its default behaviour and the call proceeds.
+   * Asks the tab's target to refuse downloads, the deprecated page-level spelling
+   * of the browser method. `chrome.debugger` refuses it — it is classified as a
+   * browser-level command, which a tab attachment may not send — so this is
+   * defence in depth for a target that does honour it; `armDownloadGuard` is the
+   * guard that always runs.
    */
   const setDownloadBehavior = async (
     session: BrowserToolSession,
@@ -399,6 +445,41 @@ export const createBrowserRuntime = ({
     } catch {
       // A target that rejects the deprecated method keeps the browser default.
     }
+  };
+
+  /**
+   * Cancels the downloads one guarded `act` call starts, through `chrome.downloads`:
+   * the browser names a download when it creates it — before the call's own
+   * command returns — so cancelling deletes a file that never had approval.
+   * The listener is armed for the call and disarmed after a bounded settle; a
+   * download the browser creates later than that is outside the window.
+   */
+  const armDownloadGuard = () => {
+    const api = downloadsApi;
+    const created: number[] = [];
+    const firstDownload = Promise.withResolvers<void>();
+    const listener = (item: { readonly id: number }): void => {
+      created.push(item.id);
+      firstDownload.resolve();
+
+      // A file this call was not approved to start is deleted before anyone can read it.
+      if (api !== undefined) {
+        void discardDownload(api, item.id);
+      }
+    };
+
+    api?.onCreated.addListener(listener);
+
+    return {
+      settle: async () => {
+        if (api !== undefined) {
+          await Promise.race([firstDownload.promise, after(DOWNLOAD_GUARD_SETTLE_MS)]);
+          api.onCreated.removeListener(listener);
+        }
+
+        return created.length;
+      },
+    };
   };
 
   // Tabs whose flattened frame auto-attach is on, so out-of-process iframes are reachable for scoping.
@@ -417,10 +498,10 @@ export const createBrowserRuntime = ({
   };
 
   const withheldOriginsFor = async (
-    session: BrowserToolSession,
+    readFrames: () => Promise<AgentFrameInventory>,
     authorized: readonly BrowserGrant[]
   ): Promise<readonly string[]> => {
-    const frames = await readAgentFrameTree(session);
+    const { frames } = await readFrames();
     const readable = authorized.filter(grant => grant.class === 'read').map(grant => grant.origin);
 
     return withheldFramesOf(frames, readable).map(frame => frame.origin);
@@ -516,6 +597,9 @@ export const createBrowserRuntime = ({
             }
           : tabSession;
 
+      // One frame read per call: the grant check, the tool (a screenshot masks from the same tree) and the withheld report share it.
+      const readFrames = createAgentFrameReader(session);
+
       try {
         const agentContext = caller.kind === 'agent' ? (agent ?? { authorized: [] }) : undefined;
         const argsRecord = parseToolArguments(toolArguments);
@@ -591,8 +675,11 @@ export const createBrowserRuntime = ({
           agentContext !== undefined &&
           preflight !== undefined &&
           preflight.class === 'act' &&
+          canStartDownload(toolName) &&
           preflight.sensitiveToken === undefined &&
           !downloadApproved;
+
+        const downloadGuard = guardDownloads ? armDownloadGuard() : undefined;
 
         if (guardDownloads) {
           await setDownloadBehavior(session, 'deny');
@@ -631,6 +718,7 @@ export const createBrowserRuntime = ({
                     },
                     noteTabCreated,
                   }),
+              readFrames,
               ...(options?.now === undefined ? {} : { now: options.now }),
               ...(options?.webMcpDiscover === undefined
                 ? {}
@@ -655,6 +743,14 @@ export const createBrowserRuntime = ({
           return { kind: 'result', result: { error: TAB_TAKEN_ERROR, ok: false } };
         }
 
+        // A download the guard saw: the browser named it through `chrome.downloads` before cancelling it.
+        const guardedDownloads = downloadGuard === undefined ? 0 : await downloadGuard.settle();
+
+        // A taken-over call drops its late result: the page belongs to the panel now.
+        if (taken) {
+          return { kind: 'result', result: { error: TAB_TAKEN_ERROR, ok: false } };
+        }
+
         const settled = result ?? { error: 'The browser tool returned no result.', ok: false };
 
         if (preflight !== undefined && preflight.class === 'navigate') {
@@ -665,7 +761,8 @@ export const createBrowserRuntime = ({
           }
         }
 
-        if (guardDownloads && takeStartedDownloads(session) > 0) {
+        // The tab's own target may also have reported one (`Page.downloadWillBegin`), where that is allowed.
+        if (guardDownloads && takeStartedDownloads(session) + guardedDownloads > 0) {
           const origin = preflight?.ok ? preflight.origin : '';
           const reason = SENSITIVE_REASON.download;
 
@@ -681,10 +778,14 @@ export const createBrowserRuntime = ({
           return { kind: 'result', result: settled };
         }
 
+        // A read never navigates, so its tree is the one the preflight saw; an act or navigate call may have replaced it, and a stale list would under-report.
+        const withheldReader =
+          preflight?.class === 'read' ? readFrames : createAgentFrameReader(session);
+
         return {
           kind: 'result',
           result: settled,
-          withheldFrames: await withheldOriginsFor(session, agentContext.authorized),
+          withheldFrames: await withheldOriginsFor(withheldReader, agentContext.authorized),
         };
       } finally {
         inFlight.delete(tabId);

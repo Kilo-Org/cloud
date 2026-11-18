@@ -21,7 +21,12 @@ import type {
 import { ambiguousSelectorError } from './browser-agent-checks';
 import type { EvalTabResult } from './tab-debugger';
 import type { BrowserConsoleMessage, BrowserNetworkRequest } from './browser-tool-session';
-import type { AgentReadScope, WithheldFrame } from './browser-agent-frames';
+import type {
+  AgentFrameInventory,
+  AgentReadScope,
+  AgentScreenshotGeometry,
+  WithheldFrame,
+} from './browser-agent-frames';
 import {
   captureAgentSnapshotView,
   filterAgentConsoleMessages,
@@ -30,6 +35,7 @@ import {
   readAgentFrames,
   readAgentFrameTree,
   readAgentScreenshotGeometry,
+  readFrameOwners,
   readSensitiveFieldBoxes,
   readWithheldFrameBoxes,
   withheldFramesOf,
@@ -81,6 +87,8 @@ export interface BrowserReadToolOptions {
    * A panel or workflow caller has no scope and keeps today's behaviour.
    */
   readonly agentScope?: AgentReadScope | undefined;
+  /** The call's shared frame inventory, so the grant check, the mask and the withheld report read one tree. */
+  readonly readFrames?: (() => Promise<AgentFrameInventory>) | undefined;
   /** The masker used on agent screenshots; tests inject one instead of an OffscreenCanvas. */
   readonly maskScreenshot?: (input: ScreenshotMaskInput) => Promise<ScreenshotMaskResult>;
   readonly now?: () => number;
@@ -693,6 +701,8 @@ const maskAgentScreenshot = async (
     readonly clipScale?: number | undefined;
     readonly dataUrl: string;
     readonly fullPage: boolean;
+    /** Geometry the caller already read for the capture (a device-scale clip), so the mask does not ask again. */
+    readonly geometry?: AgentScreenshotGeometry | undefined;
     readonly mediaType: string;
   }
 ): Promise<
@@ -702,7 +712,12 @@ const maskAgentScreenshot = async (
     return { dataUrl: input.dataUrl, mediaType: input.mediaType };
   }
 
-  const inventory = await readAgentFrames(deps.session);
+  const readFrames = deps.readFrames ?? (() => readAgentFrames(deps.session));
+  const { geometry: measured } = input;
+  const [inventory, geometry] = await Promise.all([
+    readFrames(),
+    measured ?? readAgentScreenshotGeometry(deps.session),
+  ]);
 
   if (!inventory.complete) {
     // An unread frame list cannot be masked: blacking out nothing would ship the very pixels scoping exists to hide.
@@ -714,22 +729,30 @@ const maskAgentScreenshot = async (
 
   const { frames } = inventory;
   const withheld = withheldFramesOf(frames, deps.agentScope.readableOrigins);
-  const geometry = await readAgentScreenshotGeometry(deps.session);
+  // One owner read per child frame, shared by both box readers.
+  const owners =
+    withheld.length === 0
+      ? undefined
+      : await readFrameOwners(
+          deps.session,
+          frames.filter(frame => frame.parentId !== undefined).map(frame => frame.id)
+        );
   // `DOM.getBoxModel` quads are viewport-relative; adding the page's scroll puts every box in document space, the space an element clip and a full-page capture both use.
-  const maskedRegions = await readWithheldFrameBoxes(deps.session, frames, withheld, {
-    offset: geometry.scroll,
-  });
+  const [maskedRegions, fields] = await Promise.all([
+    readWithheldFrameBoxes(deps.session, frames, withheld, {
+      offset: geometry.scroll,
+      ...(owners === undefined ? {} : { owners }),
+    }),
+    readSensitiveFieldBoxes(deps.session, frames, deps.agentScope.readableOrigins, {
+      childSessions: inventory.childSessions,
+      offset: geometry.scroll,
+      ...(owners === undefined ? {} : { owners }),
+    }),
+  ]);
 
   if ('error' in maskedRegions) {
     return { error: maskedRegions.error };
   }
-
-  const fields = await readSensitiveFieldBoxes(
-    deps.session,
-    frames,
-    deps.agentScope.readableOrigins,
-    { childSessions: inventory.childSessions, offset: geometry.scroll }
-  );
 
   if ('error' in fields) {
     return { error: fields.error };
@@ -923,17 +946,16 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
       : await readElementClip(deps.session, target, {
           failClosedOnGeometryError: deps.agentScope !== undefined,
         });
+  // The mask needs the tab's scroll position and scale, and a device-pixel element capture needs the scale too: one read serves both.
+  const geometry =
+    deps.agentScope === undefined ? undefined : await readAgentScreenshotGeometry(deps.session);
   // A device-pixel element capture renders the clip at the tab's device pixel ratio; the mask boxes move with it.
-  let clipScale = 1;
-
-  if (clip !== undefined && scale === 'device') {
-    const geometry = await readAgentScreenshotGeometry(deps.session);
-
-    clipScale = geometry.scale;
-  }
+  const clipScale = clip !== undefined && scale === 'device' ? (geometry?.scale ?? 1) : 1;
 
   const response = await deps.session.send('Page.captureScreenshot', {
     format: type,
+    // The surface is the tab's own compositor output; a viewport capture never extends past it.
+    fromSurface: true,
     ...(clip === undefined ? {} : { clip: { ...clip, scale: clipScale } }),
     ...(fullPage === true ? { captureBeyondViewport: true } : {}),
   });
@@ -953,6 +975,7 @@ const browserTakeScreenshotHandler: BrowserReadActionHandler = async (arguments_
         }),
     dataUrl: `data:${mediaType};base64,${shot.data.data}`,
     fullPage: fullPage === true,
+    ...(geometry === undefined ? {} : { geometry }),
     mediaType,
   });
 

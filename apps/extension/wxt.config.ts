@@ -45,8 +45,17 @@ export default defineConfig({
     optional_permissions: ['nativeMessaging'],
     permissions:
       browser === 'firefox'
-        ? ['alarms', 'contextMenus', 'identity', 'scripting', 'storage', 'tabs']
-        : ['alarms', 'contextMenus', 'debugger', 'identity', 'scripting', 'storage', 'tabGroups'],
+        ? ['alarms', 'contextMenus', 'downloads', 'identity', 'scripting', 'storage', 'tabs']
+        : [
+            'alarms',
+            'contextMenus',
+            'debugger',
+            'downloads',
+            'identity',
+            'scripting',
+            'storage',
+            'tabGroups',
+          ],
   }),
   modules: ['@wxt-dev/module-react'],
   vite: () => ({

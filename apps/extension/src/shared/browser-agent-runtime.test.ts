@@ -6,7 +6,7 @@ import { createBrowserTabGroupController } from './browser-tab-groups';
 import type { BrowserTabGroupController } from './browser-tab-groups';
 import { createTabLeaseRegistry } from './browser-tab-leases';
 import { createBrowserRuntime } from './browser-runtime';
-import type { BrowserToolRunOutcome } from './browser-runtime';
+import type { BrowserDownloadsApi, BrowserToolRunOutcome } from './browser-runtime';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
   NEEDS_PERMISSION_ERROR,
@@ -299,8 +299,48 @@ const createTabsApi = (): BrowserTabsApi => {
   };
 };
 
+/** `chrome.downloads` as the runtime sees it: the single `onCreated` stream and the cancel that deletes the file. */
+const createFakeDownloads = () => {
+  const listeners: ((item: { readonly id: number }) => void)[] = [];
+  const cancelled: number[] = [];
+  const erased: number[] = [];
+  const api: BrowserDownloadsApi = {
+    cancel: async downloadId => {
+      cancelled.push(downloadId);
+    },
+    erase: async query => {
+      erased.push(query.id);
+    },
+    onCreated: {
+      addListener: listener => {
+        listeners.push(listener);
+      },
+      removeListener: listener => {
+        const index = listeners.indexOf(listener);
+
+        if (index !== -1) {
+          listeners.splice(index, 1);
+        }
+      },
+    },
+  };
+
+  return {
+    api,
+    cancelled,
+    emit: (downloadId: number) => {
+      for (const listener of listeners) {
+        listener({ id: downloadId });
+      }
+    },
+    erased,
+    live: () => listeners.length,
+  };
+};
+
 const createHarness = async (
   options: {
+    readonly downloadsApi?: BrowserDownloadsApi | undefined;
     readonly share?: boolean;
     readonly tabGroups?: BrowserTabGroupController;
   } = {}
@@ -309,6 +349,7 @@ const createHarness = async (
   const leases = createTabLeaseRegistry({});
   const runtime = createBrowserRuntime({
     debuggerApi: cdp.api,
+    ...(options.downloadsApi === undefined ? {} : { downloadsApi: options.downloadsApi }),
     leases,
     scriptingApi: undefined,
     ...(options.tabGroups === undefined ? {} : { tabGroups: options.tabGroups }),
@@ -550,6 +591,54 @@ describe('agent browser calls', () => {
     expect(cdp.downloadsRestored()).toBe(1);
 
     expect(expectStepToken(outcome)).toBeDefined();
+  });
+
+  it('cancels the file through chrome.downloads, which a tab target cannot do itself', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let emitting = true;
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        // A click is a press and a release; the browser names the download once, while the command is still in flight.
+        if (emitting) {
+          emitting = false;
+          downloads.emit(41);
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    const refused = await click([]);
+
+    expect(refused).toMatchObject({
+      afterAction: true,
+      items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
+      kind: 'needs_permission',
+    });
+    // The unapproved file is deleted, and the listener does not outlive the call.
+    expect([downloads.cancelled, downloads.erased, downloads.live()]).toStrictEqual([
+      [41],
+      [41],
+      0,
+    ]);
+
+    const approved = await click([expectStepToken(refused)]);
+
+    // The approval keeps its download: nothing is cancelled on the unguarded run.
+    expect(approved.kind).toBe('result');
+    const { cancelled } = downloads;
+    expect(cancelled).toStrictEqual([41]);
   });
 
   it('runs a download call unguarded once with the approval token, then burns it', async () => {

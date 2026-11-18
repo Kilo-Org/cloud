@@ -72,6 +72,23 @@ const CLASS_BY_TOOL: ReadonlyMap<string, BrowserGrantClass> = new Map([
 export const toolGrantClass = (toolName: string): BrowserGrantClass =>
   CLASS_BY_TOOL.get(toolName) ?? 'act';
 
+/**
+ * The act tools whose page action can start a download: a click, a dropped or
+ * dragged item, a key press (Enter on a focused link), and the two tools that
+ * run model-authored code. A tab action, a resize or a dialog answer cannot,
+ * so they pay no guard window.
+ */
+const DOWNLOAD_CAPABLE_TOOLS: ReadonlySet<string> = new Set([
+  'browser_click',
+  'browser_drag',
+  'browser_drop',
+  'browser_evaluate',
+  'browser_press_key',
+  'browser_run_code_unsafe',
+]);
+
+export const canStartDownload = (toolName: string): boolean => DOWNLOAD_CAPABLE_TOOLS.has(toolName);
+
 const DEFAULT_PORTS = { 'http:': '80', 'https:': '443' } as const;
 
 const parseUrl = (url: string): URL | undefined => {

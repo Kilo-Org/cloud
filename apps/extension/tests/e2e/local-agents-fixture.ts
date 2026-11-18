@@ -42,6 +42,8 @@ const toolResultSchema = z.object({
 
 export type LocalAgentToolResponse =
   | {
+      /** True when the page already ran: the CLI may only re-send after a human approves. */
+      readonly afterAction?: boolean | undefined;
       readonly code: number;
       readonly items?: readonly Record<string, unknown>[] | undefined;
       readonly kind: 'error';
@@ -60,7 +62,9 @@ export type LocalAgentSession = {
   readonly callTool: (
     name: string,
     args: Record<string, unknown>,
-    authorized: readonly Record<string, unknown>[]
+    authorized: readonly Record<string, unknown>[],
+    /** Step tokens a human approved: the retry of a `needs_permission` call. */
+    sensitive?: readonly string[]
   ) => Promise<LocalAgentToolResponse>;
   readonly controllerId: string;
   readonly sessionHandle: string;
@@ -77,7 +81,8 @@ const rpcOf = async (hub: FakeHub, id: number) => {
   await expect
     .poll(
       () => hub.frames.some(frame => frame['type'] === 'rpc' && rpcMessage(frame)?.['id'] === id),
-      { timeout: 20_000 }
+      // A 5 ms poll keeps the harness out of the latency it measures; the default backs off to 100 ms.
+      { intervals: [5], timeout: 20_000 }
     )
     .toBe(true);
 
@@ -254,6 +259,7 @@ const responseOf = (message: Record<string, unknown>): LocalAgentToolResponse =>
       message: error.message,
       ...(items.success ? { items: items.data } : {}),
       ...(stepToken.success ? { stepToken: stepToken.data } : {}),
+      ...(data['afterAction'] === true ? { afterAction: true } : {}),
     };
   }
 
@@ -316,7 +322,7 @@ export const openPairedAgentSession = async ({
   let nextId = 10;
 
   return {
-    callTool: async (name, args, authorized) => {
+    callTool: async (name, args, authorized, sensitive) => {
       nextId += 1;
 
       return responseOf(
@@ -324,6 +330,7 @@ export const openPairedAgentSession = async ({
           arguments: args,
           authorized,
           name,
+          ...(sensitive === undefined || sensitive.length === 0 ? {} : { sensitive }),
           sessionHandle,
         })
       );

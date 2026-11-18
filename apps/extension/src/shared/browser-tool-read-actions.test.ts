@@ -402,7 +402,11 @@ describe('browser_take_screenshot', () => {
 
     expect(commands).toContainEqual({
       method: 'Page.captureScreenshot',
-      params: { clip: { height: 200, scale: 2, width: 400, x: 40, y: 120 }, format: 'png' },
+      params: {
+        clip: { height: 200, scale: 2, width: 400, x: 40, y: 120 },
+        format: 'png',
+        fromSurface: true,
+      },
     });
     expect(inputs[0]?.scale).toBe(2);
   });
@@ -473,7 +477,11 @@ describe('browser_take_screenshot', () => {
 
     expect(commands).toContainEqual({
       method: 'Page.captureScreenshot',
-      params: { clip: { height: 200, scale: 1, width: 400, x: 140, y: 170 }, format: 'png' },
+      params: {
+        clip: { height: 200, scale: 1, width: 400, x: 140, y: 170 },
+        format: 'png',
+        fromSurface: true,
+      },
     });
     expect(inputs[0]?.boxes).toStrictEqual([{ height: 200, left: 0, top: 0, width: 400 }]);
   });
@@ -534,7 +542,7 @@ describe('browser_take_screenshot', () => {
     });
     expect(commands).toContainEqual({
       method: 'Page.captureScreenshot',
-      params: { format: 'png' },
+      params: { format: 'png', fromSurface: true },
     });
   });
 
@@ -544,7 +552,7 @@ describe('browser_take_screenshot', () => {
 
     expect(commands).toContainEqual({
       method: 'Page.captureScreenshot',
-      params: { captureBeyondViewport: true, format: 'png' },
+      params: { captureBeyondViewport: true, format: 'png', fromSurface: true },
     });
   });
 
@@ -557,7 +565,11 @@ describe('browser_take_screenshot', () => {
     expect(result.ok).toBe(true);
     expect(commands).toContainEqual({
       method: 'Page.captureScreenshot',
-      params: { clip: { height: 10, scale: 1, width: 10, x: 3, y: 4 }, format: 'png' },
+      params: {
+        clip: { height: 10, scale: 1, width: 10, x: 3, y: 4 },
+        format: 'png',
+        fromSurface: true,
+      },
     });
   });
 

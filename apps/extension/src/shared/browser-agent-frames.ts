@@ -222,6 +222,23 @@ export const readAgentFrameTree = async (
 };
 
 /**
+ * One call's frame inventory. A screenshot's grant check, its mask and its
+ * withheld-origins report all need the same tree, and the tree can change
+ * between them, so the call reads it once and shares the answer.
+ */
+export const createAgentFrameReader = (
+  session: AgentFrameSession
+): (() => Promise<AgentFrameInventory>) => {
+  let pending: Promise<AgentFrameInventory> | undefined = undefined;
+
+  return () => {
+    pending ??= readAgentFrames(session);
+
+    return pending;
+  };
+};
+
+/**
  * Enables flattened auto-attach so out-of-process iframes are reachable from
  * the tab's one debugger attachment. Best effort: an older protocol without
  * the method keeps the same-document behaviour instead of failing the call.
@@ -977,16 +994,22 @@ export const readWithheldFrameBoxes = async (
   session: Pick<BrowserToolPageSession, 'send'>,
   frames: readonly BrowserAgentFrame[],
   withheld: readonly WithheldFrame[],
-  options: { readonly offset?: { readonly x: number; readonly y: number } } = {}
+  options: {
+    readonly offset?: { readonly x: number; readonly y: number };
+    /** Owners the caller already read for this frame list; a screenshot reads them once for every box it paints. */
+    readonly owners?: ReadonlyMap<string, number> | undefined;
+  } = {}
 ): Promise<{ readonly boxes: readonly ScreenshotBox[] } | { readonly error: string }> => {
   if (withheld.length === 0) {
     return { boxes: [] };
   }
 
-  const owners = await readFrameOwners(
-    session,
-    frames.filter(frame => frame.parentId !== undefined).map(frame => frame.id)
-  );
+  const owners =
+    options.owners ??
+    (await readFrameOwners(
+      session,
+      frames.filter(frame => frame.parentId !== undefined).map(frame => frame.id)
+    ));
   const boxes: ScreenshotBox[] = [];
   const offset = options.offset ?? { x: 0, y: 0 };
 
@@ -1240,6 +1263,8 @@ export const readSensitiveFieldBoxes = async (
     readonly offset?: { readonly x: number; readonly y: number };
     /** Flattened child session per out-of-process iframe, so its own document is probed. */
     readonly childSessions?: ReadonlyMap<string, string>;
+    /** Owners the caller already read for this frame list, so a screenshot reads them once. */
+    readonly owners?: ReadonlyMap<string, number> | undefined;
   } = {}
 ): Promise<{ readonly boxes: readonly ScreenshotBox[] } | { readonly error: string }> => {
   const readable = frames.filter(frame =>
@@ -1250,10 +1275,12 @@ export const readSensitiveFieldBoxes = async (
     return { boxes: [] };
   }
 
-  const owners = await readFrameOwners(
-    session,
-    frames.filter(frame => frame.parentId !== undefined).map(frame => frame.id)
-  );
+  const owners =
+    options.owners ??
+    (await readFrameOwners(
+      session,
+      frames.filter(frame => frame.parentId !== undefined).map(frame => frame.id)
+    ));
   const offset = options.offset ?? { x: 0, y: 0 };
   const boxes: ScreenshotBox[] = [];
 

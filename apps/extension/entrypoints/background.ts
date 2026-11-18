@@ -6,7 +6,7 @@ import { savePendingAgentMemoryDraft } from '@/src/shared/agent-memories-storage
 import type { WebMcpToolCallEvent } from '@/src/shared/agent-conversation';
 import type { BrowserToolDispatchOptions } from '@/src/shared/browser-tool-dispatch';
 import { createBrowserRuntime } from '@/src/shared/browser-runtime';
-import type { BrowserRuntime } from '@/src/shared/browser-runtime';
+import type { BrowserDownloadsApi, BrowserRuntime } from '@/src/shared/browser-runtime';
 import { createBrowserTabGroupController } from '@/src/shared/browser-tab-groups';
 import type { BrowserTabGroupsApi } from '@/src/shared/browser-tab-groups';
 import {
@@ -128,11 +128,14 @@ type NativeTabsApi = BrowserTabsApi & Pick<BrowserTabGroupsApi, 'group'>;
 
 export const getBrowserRuntime = ({
   debuggerApi,
+  downloadsApi,
   scriptingApi,
   tabGroupsApi,
   tabsApi,
 }: {
   readonly debuggerApi: ChromeDebuggerApi | undefined;
+  /** `chrome.downloads`: the guard that cancels a download an unapproved call started. */
+  readonly downloadsApi?: BrowserDownloadsApi | undefined;
   readonly scriptingApi: BrowserScriptingApi | undefined;
   /** Absent on Firefox or without the `tabGroups` permission: sessions track their tabs by id. */
   readonly tabGroupsApi?: BrowserTabGroupsApi | undefined;
@@ -146,6 +149,7 @@ export const getBrowserRuntime = ({
 
   const runtime = createBrowserRuntime({
     debuggerApi,
+    ...(downloadsApi === undefined ? {} : { downloadsApi }),
     leases: createTabLeaseRegistry({
       persistence: createStorageSessionLeasePersistence(storage),
     }),
@@ -248,12 +252,14 @@ const webMcpDispatchOptions = (
 
 export const handleTabDebuggerRequest = async ({
   debuggerApi,
+  downloadsApi,
   request,
   scriptingApi,
   tabGroupsApi,
   tabsApi,
 }: {
   debuggerApi: ChromeDebuggerApi | undefined;
+  downloadsApi?: BrowserDownloadsApi | undefined;
   request: TabDebuggerRequest;
   scriptingApi: BrowserScriptingApi | undefined;
   tabGroupsApi?: BrowserTabGroupsApi | undefined;
@@ -261,7 +267,7 @@ export const handleTabDebuggerRequest = async ({
 }): Promise<TabDebuggerResponse> => {
   // One runtime per tabs API, and the same tab-group surface for the panel and the agent bridge.
   const runtimeFor = (tabs: NativeTabsApi): BrowserRuntime =>
-    getBrowserRuntime({ debuggerApi, scriptingApi, tabGroupsApi, tabsApi: tabs });
+    getBrowserRuntime({ debuggerApi, downloadsApi, scriptingApi, tabGroupsApi, tabsApi: tabs });
 
   try {
     if (request.type === LIST_INSPECTABLE_TABS_MESSAGE) {
@@ -532,6 +538,7 @@ export default defineBackground(() => {
       chrome?: {
         contextMenus?: NativeContextMenusApi;
         debugger?: ChromeDebuggerApi;
+        downloads?: BrowserDownloadsApi;
         runtime?: ChromeRuntimeApi;
         scripting?: BrowserScriptingApi;
         sidePanel?: Parameters<typeof enableActionClickSidePanel>[0] & NativeSidePanelOpenApi;
@@ -570,7 +577,14 @@ export default defineBackground(() => {
 
               return tabs[0]?.id;
             },
-            runtime: () => getBrowserRuntime({ debuggerApi, scriptingApi, tabGroupsApi, tabsApi }),
+            runtime: () =>
+              getBrowserRuntime({
+                debuggerApi,
+                downloadsApi: chromeApi?.downloads,
+                scriptingApi,
+                tabGroupsApi,
+                tabsApi,
+              }),
           }),
         }),
   });
@@ -606,6 +620,7 @@ export default defineBackground(() => {
     void (async (): Promise<void> => {
       const response = await handleTabDebuggerRequest({
         debuggerApi: chromeApi.debugger,
+        ...(chromeApi.downloads === undefined ? {} : { downloadsApi: chromeApi.downloads }),
         request: message,
         scriptingApi: chromeApi.scripting,
         tabGroupsApi: chromeApi.tabGroups,

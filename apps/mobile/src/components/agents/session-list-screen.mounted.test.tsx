@@ -299,6 +299,7 @@ vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   X: 'X',
   SlidersHorizontal: 'SlidersHorizontal',
+  RotateCcw: 'RotateCcw',
 }));
 vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
 vi.mock('@/components/agents/session-list-content', () => ({

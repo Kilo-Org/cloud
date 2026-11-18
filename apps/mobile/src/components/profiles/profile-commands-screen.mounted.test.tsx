@@ -114,6 +114,7 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronUp: 'ChevronUp',
   Terminal: 'Terminal',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 /** The role sentence a member reads in the action's place. */

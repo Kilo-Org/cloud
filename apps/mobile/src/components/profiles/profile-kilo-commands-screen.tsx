@@ -19,7 +19,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { Terminal, Plus } from '@/components/ui/icons';
+import { Plus, Terminal } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { SlashCommandsSkeleton } from '@/components/profiles/slash-commands-skeleton';
 import { ADD_FORM_KEY, useCommandSavePhase } from '@/components/profiles/use-command-save-phase';

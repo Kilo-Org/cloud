@@ -90,12 +90,12 @@ describe('RowSkeleton', () => {
     expect(skeletons(renderSkeleton({ lines: 3 }))).toHaveLength(3);
   });
 
-  it('reserves the 48pt trailing icon target', () => {
+  it('reserves the compact trailing icon target', () => {
     const bars = skeletons(renderSkeleton({ trailingControl: true }));
     const control = bars.at(-1);
 
     expect(classesOf(first(control))).toEqual(
-      expect.arrayContaining(['h-[48px]', 'w-[48px]', 'shrink-0'])
+      expect.arrayContaining(['h-[32px]', 'w-[32px]', 'shrink-0'])
     );
   });
 

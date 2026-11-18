@@ -176,10 +176,16 @@ vi.mock('@/lib/format', () => ({
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
 vi.mock('@/components/empty-state', () => ({
-  StateAction: 'StateAction',
   // Renders the action so a test can reach the CTA that lives inside it.
   EmptyState: (props: { action?: ReactNode }) => createElement('EmptyState', props, props.action),
-  StateAction: (props: { label?: string }) => createElement('StateAction', null, props.label),
+  // The action is a control: the suites read its label from the node and press
+  // it through the same `Pressable` shape a row control has.
+  StateAction: (props: { label?: string; onPress?: () => void }) =>
+    createElement(
+      'Pressable',
+      { accessibilityLabel: props.label, onPress: props.onPress },
+      createElement('Text', null, props.label)
+    ),
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
@@ -377,7 +383,9 @@ export function emptyDescription(view: PasskeysView): string {
 }
 
 export function buttonByLabel(view: PasskeysView, label: string): ReactTestInstance {
-  const button = nodes(view, 'Button').find(
+  // The empty state's one action is a `StateAction`, whose stub renders a
+  // pressable; a footer action is a `Button`. Both carry their label as text.
+  const button = [...nodes(view, 'Button'), ...nodes(view, 'Pressable')].find(
     node =>
       node.findAll(inner => String(inner.type) === 'Text' && inner.props.children === label)
         .length > 0
@@ -389,7 +397,7 @@ export function buttonByLabel(view: PasskeysView, label: string): ReactTestInsta
 }
 
 export function hasButtonLabel(view: PasskeysView, label: string): boolean {
-  return [...nodes(view, 'Button'), ...nodes(view, 'StateAction')].some(
+  return [...nodes(view, 'Button'), ...nodes(view, 'StateAction'), ...nodes(view, 'Pressable')].some(
     node =>
       node.props.label === label ||
       node.findAll(inner => String(inner.type) === 'Text' && inner.props.children === label)

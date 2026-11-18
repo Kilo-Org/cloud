@@ -178,7 +178,7 @@ function EmptyStateBody({
  * and in a colour. Wider than `LucideIcon` so a brand mark (`GitHubIcon`) can
  * fill the slot too, while the action still owns the metrics around it.
  */
-export type StateActionIcon = ComponentType<{ size?: number; color?: string }>;
+type StateActionIcon = ComponentType<{ size?: number; color?: string }>;
 
 type StateActionProps = {
   label: string;

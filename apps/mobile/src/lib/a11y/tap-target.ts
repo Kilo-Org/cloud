@@ -190,11 +190,11 @@ export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify
  * size is a `style` object rather than a class — the `Switch` a row hosts —
  * reads the same box from here, so the row keeps its frame whatever it ends in.
  */
-export const COMPACT_CONTROL_BOX_DP = 32;
+const COMPACT_CONTROL_BOX_DP = 32;
 
 /**
  * The vertical margin a full {@link TOUCH_TARGET_DP} control cancels per side
- * when it is hosted in a {@link COMPACT_CONTROL_BOX_DP} row:
+ * when it is hosted in a compact 32dp row:
  * `(44 - 32) / 2 = 6`. A control-size audit reads the control's own node rect,
  * so `hitSlop` cannot lift a compact box and the node itself must render the
  * target; the negative margin then keeps the node from setting the row's

@@ -117,11 +117,11 @@ describe('DestructiveConfirmDialog', () => {
   it('gives the confirm action the destructive fill and cancel a neutral one', () => {
     const root = mount();
 
-    expect(pressableWith(root, 'bg-destructive')).toBeDefined();
-    expect(pressableWith(root, 'border-border')).toBeDefined();
+    expect(pressableWith(root, 'bg-destructive-solid')).toBeDefined();
+    expect(pressableWith(root, 'border-input')).toBeDefined();
     expect(
       root.findAll(
-        node => isType(node, 'Pressable') && classNameOf(node).includes('bg-destructive')
+        node => isType(node, 'Pressable') && classNameOf(node).includes('bg-destructive-solid')
       )
     ).toHaveLength(1);
   });
@@ -143,7 +143,7 @@ describe('DestructiveConfirmDialog', () => {
   it('labels the confirm action with the sign-out copy', () => {
     const root = mount();
 
-    const confirm = pressableWith(root, 'bg-destructive');
+    const confirm = pressableWith(root, 'bg-destructive-solid');
     expect(
       confirm.findAll(node => isType(node, 'Text') && node.children.includes('Sign out'))
     ).toHaveLength(1);
@@ -162,7 +162,7 @@ describe('DestructiveConfirmDialog', () => {
   it('keeps the request on screen through dismissal, then runs the action', () => {
     const root = mount();
 
-    callProp(pressableWith(root, 'bg-destructive'), 'onPress');
+    callProp(pressableWith(root, 'bg-destructive-solid'), 'onPress');
 
     // The sheet is dismissing, not empty: the title and the message are still
     // drawn while the native dismissal runs, and the destructive action has not
@@ -219,7 +219,7 @@ describe('DestructiveConfirmDialog', () => {
   it('runs the destructive action only when the destructive control is pressed', () => {
     const root = mount();
 
-    callProp(pressableWith(root, 'border-border'), 'onPress');
+    callProp(pressableWith(root, 'border-input'), 'onPress');
     expect(onConfirm).not.toHaveBeenCalled();
 
     callProp(
@@ -261,7 +261,7 @@ describe('DestructiveConfirmDialog', () => {
   it('renders a supplied cancel label instead of the default Cancel', () => {
     const root = mount({ cancelLabel: 'Keep editing' });
 
-    const cancel = pressableWith(root, 'border-border');
+    const cancel = pressableWith(root, 'border-input');
     expect(
       cancel.findAll(node => isType(node, 'Text') && node.children.includes('Keep editing'))
     ).toHaveLength(1);

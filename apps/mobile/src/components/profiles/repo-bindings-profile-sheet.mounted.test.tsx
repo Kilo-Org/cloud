@@ -28,6 +28,7 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   SlidersHorizontal: 'SlidersHorizontal',
+  Plus: 'Plus',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -103,7 +104,7 @@ describe('binding profile picker', () => {
         expect(empty.props.title).toBe('No profiles yet');
         expect(empty.props.description).toBe('Create a profile to reuse environment variables.');
         // EmptyState renders its action as given; the mocked surface keeps it a prop.
-        expect(empty.props.action?.props.children.props.children).toBe('Create profile');
+        expect(empty.props.action?.props.label).toBe('Create profile');
         act(() => {
           empty.props.action?.props.onPress();
         });

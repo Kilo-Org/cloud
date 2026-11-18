@@ -109,6 +109,7 @@ vi.mock('@/components/ui/icons', () => ({
   SlidersHorizontal: 'SlidersHorizontal',
   Trash2: 'Trash2',
   Unlock: 'Unlock',
+  Plus: 'Plus',
 }));
 
 const GITHUB_REPO: TestRepoOption = { platform: 'github', fullName: 'acme/api', private: true };
@@ -207,8 +208,10 @@ describe('RepoBindingsScreen roles', () => {
 
     const { renderer, unmount } = await mountScreen('org-1');
 
-    expect(findOne(renderer.root, 'EmptyState').props.description).toBeNull();
-    expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(1);
+    // A member's state carries the rule as its own description, so the screen
+    // names the withheld action nowhere else.
+    expect(findOne(renderer.root, 'EmptyState').props.description).toBe(ROLE_SENTENCE);
+    expect(textContents(renderer.root).filter(text => text === ROLE_SENTENCE)).toHaveLength(0);
     expect(buttonLabels(renderer.root)).not.toContain(ADD_LABEL);
     expect(
       pressableLabels(renderer.root).filter(label => label.startsWith('Unbind '))
@@ -262,7 +265,7 @@ describe('RepoBindingsScreen roles', () => {
 
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
     const empty = emptyStateProps(renderer.root, 'No profiles yet');
-    expect(empty.action?.props.children.props.children).toBe('Create profile');
+    expect(empty.action?.props.label).toBe('Create profile');
 
     permissionState.permission = 'read-only';
     act(() => {

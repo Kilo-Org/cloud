@@ -312,6 +312,7 @@ vi.mock('@/components/ui/icons', () => ({
   Loader2: 'Loader2',
   MessageSquare: 'MessageSquare',
   SlidersHorizontal: 'SlidersHorizontal',
+  RotateCcw: 'RotateCcw',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronLeft: 'ChevronLeft',

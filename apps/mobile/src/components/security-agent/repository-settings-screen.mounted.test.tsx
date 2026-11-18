@@ -132,7 +132,7 @@ vi.mock('@/components/screen-header', () => ({
     createElement(Fragment, null, props.headerRight),
 }));
 vi.mock('@/lib/haptics', () => ({ selectionHaptic: () => undefined }));
-vi.mock('@/components/ui/icons', () => ({ FolderGit2: 'FolderGit2' }));
+vi.mock('@/components/ui/icons', () => ({ ExternalLink: 'ExternalLink', FolderGit2: 'FolderGit2' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/radio-group', () => ({ RadioGroup: 'RadioGroup' }));

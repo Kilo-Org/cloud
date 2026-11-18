@@ -58,6 +58,9 @@ vi.mock('@/components/ui/text', () => ({
 
 vi.mock('@/components/ui/icons', () => ({
   Building2: 'Building2',
+  ArrowLeft: 'ArrowLeft',
+  ArrowRight: 'ArrowRight',
+  Plus: 'Plus',
 }));
 
 const openPickerMock = vi.hoisted(() => vi.fn());

@@ -126,6 +126,7 @@ vi.mock('@/components/ui/icons', () => ({
   Search: 'Search',
   SearchX: 'SearchX',
   X: 'X',
+  ShieldCheck: 'ShieldCheck',
 }));
 vi.mock('@/components/ui/input', () => ({ Input: 'TextInput' }));
 vi.mock('@/components/tab-screen', () => ({

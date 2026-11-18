@@ -47,6 +47,7 @@ vi.mock('@/components/ui/icons', () => ({
   Clock: 'Clock',
   FolderGit2: 'FolderGit2',
   ShieldCheck: 'ShieldCheck',
+  Settings: 'Settings',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalArrowRight: 'DirectionalArrowRight',
@@ -359,11 +360,9 @@ describe('DashboardSections repository card with an empty grant', () => {
 
   type ActionNode = {
     props: {
-      className?: string;
-      variant?: string;
+      label: string;
       loading?: boolean;
       onPress: () => void;
-      children: { props: { children: string } };
     };
   };
 
@@ -397,8 +396,8 @@ describe('DashboardSections repository card with an empty grant', () => {
     );
     const action = actionOf(state);
 
-    expect(action.props.className).toContain(STATE_ACTION_CLASS);
-    expect(action.props.variant).toBe('default');
+    // The state's one action is a `StateAction`, which owns its own style.
+    expect(action.props.label).toBe('securityAgent.dashboard.manageRepositories');
     act(() => {
       action.props.onPress();
     });
@@ -417,7 +416,7 @@ describe('DashboardSections repository card with an empty grant', () => {
     const state = emptyState(renderSections({ emptyGrant: true, emptyGrantAction: manageAccess }));
     const action = actionOf(state);
 
-    expect(action.props.children.props.children).toBe('securityAgent.repositories.manageAccess');
+    expect(action.props.label).toBe('securityAgent.repositories.manageAccess');
     expect(action.props.loading).toBe(true);
   });
 

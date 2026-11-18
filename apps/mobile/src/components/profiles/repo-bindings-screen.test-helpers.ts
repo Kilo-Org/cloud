@@ -54,7 +54,9 @@ export function pressPressable(root: ReactTestInstance, label: string): void {
 }
 
 export function findButton(root: ReactTestInstance, label: string): ReactTestInstance {
-  const button = findAll(root, 'Button').find(node => node.props.accessibilityLabel === label);
+  const button = [...findAll(root, 'Button'), ...findAll(root, 'StateAction')].find(
+    node => node.props.label === label || node.props.accessibilityLabel === label
+  );
   if (!button) {
     throw new Error(`button ${label} was not rendered`);
   }

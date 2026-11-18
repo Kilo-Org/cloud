@@ -34,7 +34,6 @@ vi.mock('@/components/empty-state', () => ({
   StateAction: 'StateAction',
   EmptyState: (props: { action?: React.ReactNode }) =>
     React.createElement('EmptyState', props, props.action),
-  StateAction: 'StateAction',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

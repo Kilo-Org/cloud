@@ -192,6 +192,9 @@ vi.mock('@/components/ui/icons', () => ({
   Search: 'Search',
   SearchX: 'SearchX',
   X: 'X',
+  Settings: 'Settings',
+  ArrowRight: 'ArrowRight',
+  ShieldCheck: 'ShieldCheck',
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
 vi.mock('@/lib/app-shell-handoff', () => ({ appShellHandoffUrl: state.handoffUrl }));
@@ -898,10 +901,8 @@ describe('empty reviews connect action', () => {
   }
 
   function actionLabel(renderer: RenderWithProvidersResult['renderer']) {
-    const action = emptyState(renderer).props.action as ReactElement<{
-      children: ReactElement<{ children: string }>;
-    }>;
-    return action.props.children.props.children;
+    const action = emptyState(renderer).props.action as ReactElement<{ label: string }>;
+    return action.props.label;
   }
 
   it('replaces the button with a role notice for a plain member', async () => {

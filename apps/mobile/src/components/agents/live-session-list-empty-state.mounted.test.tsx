@@ -32,7 +32,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/components/empty-state', () => ({
   StateAction: 'StateAction',
   EmptyState: ({ action }: { action?: ReactElement }) => action ?? null,
-  StateAction: 'StateAction',
 }));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;

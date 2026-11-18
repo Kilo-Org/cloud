@@ -23,7 +23,7 @@ import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { Terminal, Plus } from '@/components/ui/icons';
+import { Plus, Terminal } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileCommands } from '@/lib/hooks/use-agent-profiles';

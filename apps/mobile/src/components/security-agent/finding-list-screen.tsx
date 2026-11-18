@@ -17,7 +17,7 @@ import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
@@ -28,7 +28,6 @@ import {
 } from '@/components/security-agent/finding-row-skeleton';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { IconButton } from '@/components/ui/icon-button';
-import { Text } from '@/components/ui/text';
 import {
   useSecurityAgentConfig,
   useSecurityAgentRepositories,

@@ -1,182 +1,30 @@
-/* eslint-disable max-lines -- one save-contract suite: the switch, both fields, the rejected writes and the screen states share one mocked data layer */
 // The low balance alert screen's save contract: the switch writes at once, the
 // fields write on blur and on submit under one all-valid rule, and a rejected
 // write keeps the draft, names itself in localized copy and offers Retry.
+import {
+  calls,
+  capSentence,
+  emailsFieldOf,
+  EMOJI_REJECTION,
+  mountScreen,
+  query,
+  resetLowBalanceState,
+  retryButtonOf,
+  saveMutate,
+  statusMessages,
+  switchOf,
+  thresholdFieldOf,
+} from '@/components/organization/low-balance-alert-screen.test-helpers';
+import { beforeEach, describe, expect, it } from 'vitest';
 
-import { createElement } from 'react';
-import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { LowBalanceAlertScreen } from '@/components/organization/low-balance-alert-screen';
 import { i18n } from '@/i18n';
-import { formatPrefixedUsd } from '@/lib/format';
-import { renderWithProviders } from '@/test/render-with-providers';
-
-const boundary = vi.hoisted(() => ({
-  organizationId: 'org-1' as string | null,
-  role: 'owner',
-  org: { organizationId: 'org-1' } as unknown,
-  isResolving: false,
-}));
-const query = vi.hoisted(() => ({
-  data: undefined as unknown,
-  isPending: false,
-  isError: false,
-  isFetching: false,
-  refetch: vi.fn(),
-}));
-type SaveCall = {
-  input: {
-    enabled: boolean;
-    minimum_balance?: number;
-    minimum_balance_alert_email?: string[];
-  };
-  options: { onSuccess?: () => void; onError?: (error: unknown) => void };
-};
-const saveMutate = vi.hoisted(() => vi.fn());
-const calls = vi.hoisted((): { list: SaveCall[] } => ({ list: [] }));
-
-vi.mock('expo-router', () => ({ useRouter: () => ({ back: vi.fn() }) }));
-vi.mock('expo-haptics', () => ({
-  selectionAsync: vi.fn(),
-  notificationAsync: vi.fn(),
-  NotificationFeedbackType: { Success: 'success' },
-}));
-vi.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
-  useColorScheme: () => 'light',
-  Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
-  Switch: 'Switch',
-  View: 'View',
-}));
-vi.mock('@/components/organization/organization-boundary', () => ({
-  OrganizationBoundary: 'OrganizationBoundary',
-}));
-vi.mock('@/components/organization/permission-denied', () => ({
-  PermissionDenied: 'PermissionDenied',
-}));
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-// The real clearance reads the tab bar and the keyboard, neither of which this
-// suite models: the surface still renders its body as the ScrollView host.
-vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-// The switch row is the shared `PreferenceRow`: its trailing cell reaches the
-// icon barrel, whose lucide modules this project cannot parse in the mounted
-// environment, so the barrel is stubbed here the way every row suite does.
-vi.mock('@/components/ui/icons', () => ({
-  ArrowLeft: 'ArrowLeft',
-  ArrowRight: 'ArrowRight',
-  Check: 'Check',
-  ChevronLeft: 'ChevronLeft',
-  ChevronRight: 'ChevronRight',
-  LogOut: 'LogOut',
-}));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({
-    mutedForeground: '#6F6A61',
-    primary: '#000000',
-    primaryForeground: '#FFFFFF',
-  }),
-}));
-vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/lib/hooks/use-organization-queries', () => ({
-  useOrgBoundary: () => boundary,
-  useOrgWithMembers: () => query,
-  isMoneyRole: (role: string) => role === 'owner' || role === 'billing_manager',
-}));
-vi.mock('@/lib/hooks/use-organization-mutations', () => ({
-  useOrganizationMutations: () => ({
-    updateMinimumBalanceAlert: { mutate: saveMutate, isPending: false },
-  }),
-}));
-vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: () => ({ email: 'owner@example.com' }),
-}));
-vi.mock('@/lib/format', () => ({
-  formatNumber: String,
-  formatPrefixedUsd: String,
-  normalizeLocalizedNumber: (value: string) => {
-    const text = value.trim().replaceAll(',', '');
-    return /^-?\d+(\.\d+)?$/.test(text) ? text : null;
-  },
-  parseLocalizedNumber: (value: string) => {
-    const parsed = Number(value.trim().replaceAll(',', ''));
-    return Number.isFinite(parsed) ? parsed : null;
-  },
-}));
-
-const thresholdFieldOf = (renderer: ReactTestRenderer): ReactTestInstance =>
-  fieldByLabel(renderer, i18n.t('organization.lowBalanceAlert.thresholdLabel'));
-
-const emailsFieldOf = (renderer: ReactTestRenderer): ReactTestInstance =>
-  fieldByLabel(renderer, i18n.t('organization.lowBalanceAlert.notifyEmailsLabel'));
-
-const switchOf = (renderer: ReactTestRenderer): ReactTestInstance =>
-  renderer.root.find(node => String(node.type) === 'Switch');
-
-const retryButtonOf = (renderer: ReactTestRenderer): ReactTestInstance | undefined =>
-  renderer.root
-    .findAll(node => String(node.type) === 'Button')
-    .find(node => node.props.accessibilityLabel === i18n.t('common.retry'));
-
-/** The sentence the threshold field shows for an amount above the stored ceiling. */
-const capSentence = () =>
-  i18n.t('spendAlerts.thresholdMaxError', {
-    max: formatPrefixedUsd(1_000_000_000, i18n.language, {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }),
-  });
-
-const EMOJI_REJECTION =
-  '[{"validation":"email","code":"invalid_format","path":["minimum_balance_alert_email"]}]';
+import { act } from '@/test/renderer';
 
 beforeEach(() => {
-  boundary.organizationId = 'org-1';
-  boundary.org = { organizationId: 'org-1' };
-  boundary.role = 'owner';
-  boundary.isResolving = false;
-  query.data = {
-    settings: { minimum_balance: 25, minimum_balance_alert_email: ['one@example.com'] },
-  };
-  query.isPending = false;
-  query.isError = false;
-  query.isFetching = false;
-  query.refetch.mockClear();
-  calls.list = [];
-  saveMutate.mockClear();
-  saveMutate.mockImplementation((input: SaveCall['input'], options: SaveCall['options']) => {
-    calls.list.push({ input, options });
-  });
+  resetLowBalanceState();
 });
 
-function mountScreen() {
-  return renderWithProviders(createElement(LowBalanceAlertScreen));
-}
-
-function fieldByLabel(renderer: ReactTestRenderer, label: string): ReactTestInstance {
-  const field = renderer.root
-    .findAll(node => String(node.type) === 'FormField')
-    .find(node => node.props.label === label);
-  if (!field) {
-    throw new Error(`FormField for ${label} not found`);
-  }
-  return field;
-}
-
-function statusMessages(renderer: ReactTestRenderer): string[] {
-  return renderer.root
-    .findAll(node => String(node.type) === 'AccessibleStatus')
-    .map(node => node.props.message)
-    .filter((message): message is string => typeof message === 'string');
-}
-
-describe('low balance alert screen', () => {
+describe('low balance alert screen form', () => {
   it('renders the pushed screen header instead of a sheet header', async () => {
     const { renderer, unmount } = await mountScreen();
     expect(renderer.root.findAll(node => String(node.type) === 'ScreenHeader')).toHaveLength(1);
@@ -417,33 +265,6 @@ describe('low balance alert screen', () => {
       calls.list[1]?.options.onSuccess?.();
     });
     expect(statusMessages(renderer)).toContain(i18n.t('organizationGuardrails.statusSaved'));
-    unmount();
-  });
-
-  it('keeps a missing organization on the boundary with a header', async () => {
-    boundary.organizationId = null;
-    boundary.org = null;
-    const { renderer, unmount } = await mountScreen();
-    const boundaryNode = renderer.root.find(node => String(node.type) === 'OrganizationBoundary');
-    expect(boundaryNode.props.title).toBe(i18n.t('organization.lowBalanceAlert.title'));
-    unmount();
-  });
-
-  it('keeps a failed read retryable outside the scroller', async () => {
-    query.isError = true;
-    query.data = undefined;
-    const { renderer, unmount } = await mountScreen();
-    expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
-    const error = renderer.root.find(node => String(node.type) === 'QueryError');
-    (error.props.onRetry as () => void)();
-    expect(query.refetch).toHaveBeenCalledOnce();
-    unmount();
-  });
-
-  it('keeps a refused role on the permission state', async () => {
-    boundary.role = 'member';
-    const { renderer, unmount } = await mountScreen();
-    expect(renderer.root.findAll(node => String(node.type) === 'PermissionDenied')).toHaveLength(1);
     unmount();
   });
 });

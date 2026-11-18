@@ -79,7 +79,6 @@ import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
 import { SCREEN_GUTTER_CLASS } from '@/lib/layout';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import {

@@ -92,6 +92,7 @@ vi.mock('@/components/ui/icons', () => ({
   ShieldCheck: 'ShieldCheck',
   SlidersHorizontal: 'SlidersHorizontal',
   Info: 'Info',
+  X: 'X',
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));

@@ -76,8 +76,6 @@ export function ProviderConnectGate({
 }>) {
   const trpc = useTRPC();
   const router = useRouter();
-  const colors = useThemeColors();
-  const mutedDisabledInk = useMutedDisabledInk();
   const iconColor = usePrReviewGateIconColor();
   const { t } = useTranslation();
   const scope = useProviderPrScopeOrNull();

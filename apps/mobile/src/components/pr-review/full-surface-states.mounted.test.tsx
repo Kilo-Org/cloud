@@ -104,6 +104,8 @@ vi.mock('@/components/ui/icons', () => ({
   MessageSquare: 'MessageSquare',
   UserRound: 'UserRound',
   Users: 'Users',
+  Download: 'Download',
+  RefreshCw: 'RefreshCw',
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));

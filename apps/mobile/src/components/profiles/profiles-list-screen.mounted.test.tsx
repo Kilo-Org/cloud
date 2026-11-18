@@ -255,10 +255,12 @@ describe('ProfilesListScreen', () => {
     expect(personalRow.props.accessibilityLabel).toBe(
       'Personal profile, 2 MCP · 9 setup cmds, Default profile, Opens the profile'
     );
-    const star = personalRow.props.trailing as { type: string; props: object };
+    const star = personalRow.props.titleBadge as { type: string; props: object };
     expect(star.type).toBe('Star');
-    // The mark is inside the row's name, so it is not a control of its own.
+    // The mark is beside the name inside the row, so it is not a control of its
+    // own and the row keeps its chevron.
     expect(star.props).not.toHaveProperty('accessibilityLabel');
+    expect(personalRow.props.trailing).toBeUndefined();
 
     const orgRow = findAll(renderer.root, 'ConfigureRow').find(
       row => row.props.title === 'Org profile'

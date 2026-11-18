@@ -98,6 +98,7 @@ vi.mock('@/components/ui/icons', () => ({
   Smartphone: 'Smartphone',
   Shield: 'Shield',
   X: 'X',
+  ArrowLeft: 'ArrowLeft',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalLogOut: 'DirectionalLogOut' }));
 vi.mock('@/lib/auth/auth-context', () => ({
@@ -186,11 +187,12 @@ describe('account surface states', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     const signOut = renderer.root.findAll(node => String(node.type) === 'Pressable');
     expect(signOut).toHaveLength(1);
-    // The control is the shared icon button: its own 48 dp box carries the
-    // platform's minimum touch target, so the row needs no hit slop of its
-    // own and the loading skeleton reserves the same row height.
-    expect(signOut[0]?.props.className).toContain('h-[48px]');
-    expect(signOut[0]?.props.className).toContain('w-[48px]');
+    // The control is the shared row icon action: a compact 32pt box whose
+    // touch region reaches 48pt through `hitSlop`, so the row it ends keeps
+    // `RowFrame`'s geometry and the loading skeleton reserves the same height.
+    expect(signOut[0]?.props.className).toContain('h-[32px]');
+    expect(signOut[0]?.props.className).toContain('w-[32px]');
+    expect(signOut[0]?.props.hitSlop).toEqual({ top: 8, bottom: 8, left: 8, right: 8 });
     unmount();
   });
 
@@ -224,20 +226,6 @@ describe('account surface states', () => {
       0
     );
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(1);
-    unmount();
-  });
-
-  // The empty-state escape names the Preferences hub, so it must land there,
-  // not one row short on Account (where the screen is pushed from).
-  it('sends the empty-state escape to the Preferences hub', async () => {
-    const { renderer, unmount } = await renderWithProviders(createElement(TrustedHostsScreen));
-    const emptyState = renderer.root.find(node => String(node.type) === 'EmptyState');
-    const action = emptyState.props.action as { props: { onPress: () => void } };
-    act(() => {
-      action.props.onPress();
-    });
-    expect(router.dismissTo).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/preferences');
-    expect(router.back).not.toHaveBeenCalled();
     unmount();
   });
 

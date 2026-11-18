@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- one suite covers the personal and organization scopes, the row controls and every list state, against one mocked data layer. */
-import { createElement, type ElementType } from 'react';
+import { createElement, type ElementType, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -95,7 +95,10 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/switch', () => ({ Switch: 'Switch' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState', StateAction: 'StateAction' }));
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { action?: ReactNode }) => createElement('EmptyState', props, props.action),
+  StateAction: 'StateAction',
+}));
 vi.mock('@/components/organization/organization-boundary', () => ({
   OrganizationBoundary: 'OrganizationBoundary',
 }));
@@ -105,6 +108,7 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' })
 
 const SWITCH = 'Switch' as ElementType;
 const BUTTON = 'Button' as ElementType;
+const STATE_ACTION = 'StateAction' as ElementType;
 
 let renderer: ReactTestRenderer | undefined = undefined;
 
@@ -139,7 +143,7 @@ function textsInRow(root: ReactTestRenderer['root'], provider: string) {
 function button(root: ReactTestRenderer['root'], label: string) {
   const found = root.findAll(
     node =>
-      Object.is(node.type, BUTTON) &&
+      (Object.is(node.type, BUTTON) || Object.is(node.type, STATE_ACTION)) &&
       node.findAll(child => child.props.children === label).length > 0
   );
   const [first] = found;

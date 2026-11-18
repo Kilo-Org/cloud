@@ -47,6 +47,7 @@ vi.mock('@/components/ui/icons', () => ({
   Search: 'Search',
   Share2: 'Share2',
   Terminal: 'Terminal',
+  X: 'X',
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/row-skeleton', () => ({ RowSkeleton: 'RowSkeleton' }));
@@ -168,7 +169,8 @@ describe('ShareDestinationList surface states', () => {
       description: 'Unavailable share',
     });
     const action = emptyState.props.action as { props: { onPress: () => void } };
-    expect(action.props).toMatchObject({ accessibilityLabel: 'Close' });
+    // `StateAction` owns the accessible name: it announces its visible label.
+    expect(action.props).toMatchObject({ label: 'Close' });
     act(() => {
       action.props.onPress();
     });

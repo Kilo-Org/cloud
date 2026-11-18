@@ -69,6 +69,7 @@ vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   Pencil: 'Pencil',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 vi.mock('@/components/profiles/agent-form-sheet', () => ({ AgentFormSheet: 'AgentFormSheet' }));
 

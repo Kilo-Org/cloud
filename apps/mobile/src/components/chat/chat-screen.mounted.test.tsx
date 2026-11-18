@@ -213,6 +213,8 @@ vi.mock('@/components/ui/icons', () => ({
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
   Wrench: 'Wrench',
+  ArrowLeft: 'ArrowLeft',
+  RotateCcw: 'RotateCcw',
 }));
 vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
@@ -338,13 +340,19 @@ const messagesOf = (tree: ReactTestRenderer): unknown[] =>
 
 const buttonLabels = (tree: ReactTestRenderer): unknown[] =>
   tree.root
-    .findAll(node => (node.type as string) === 'Button')
-    .map(button => button.find(node => (node.type as string) === 'Text').props.children);
+    .findAll(node => {
+      const type = node.type as string;
+      return type === 'Button' || type === 'StateAction';
+    })
+    .map(action => action.find(node => (node.type as string) === 'Text').props.children);
 
 /** The button carrying the given label, for the props a press alone cannot show. */
 function buttonOf(tree: ReactTestRenderer, label: unknown) {
   const button = tree.root
-    .findAll(node => (node.type as string) === 'Button')
+    .findAll(node => {
+      const type = node.type as string;
+      return type === 'Button' || type === 'StateAction';
+    })
     .find(node => node.find(child => (child.type as string) === 'Text').props.children === label);
   if (button === undefined) {
     throw new TypeError(`No button ${String(label)}`);

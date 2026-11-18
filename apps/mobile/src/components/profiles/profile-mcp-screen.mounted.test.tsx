@@ -98,6 +98,7 @@ vi.mock('@/components/ui/icons', () => ({
   Pencil: 'Pencil',
   Server: 'Server',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 /** The props a mocked Switch host element exposes, which the renderer keeps untyped. */

@@ -72,8 +72,8 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * {@link TOUCH_TARGET_DP} on both axes, and a caller never shrinks it with a
  * smaller `style` box. A row that must keep its compact height cancels the
  * excess instead: a negative vertical margin of
- * {@link TOUCH_TARGET_OVERHANG_DP} a side makes the node contribute a
- * {@link COMPACT_CONTROL_BOX_DP} box to layout, and the row's own vertical
+ * {@link TOUCH_TARGET_OVERHANG_DP} a side makes the node contribute a compact
+ * 32dp box to layout, and the row's own vertical
  * padding of at least that margin keeps the node inside the row's bounds
  * (Android delivers a touch only inside a parent view). `row-trailing.tsx`
  * holds the one switch host that does this.

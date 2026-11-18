@@ -75,6 +75,7 @@ vi.mock('@/components/ui/icons', () => ({
   ArrowLeft: () => null,
   AlertCircle: () => null,
   Lock: () => null,
+  RotateCcw: () => null,
   SearchX: () => null,
   ServerCrash: () => null,
   WifiOff: () => null,

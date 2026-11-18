@@ -136,6 +136,7 @@ vi.mock('@/components/ui/preference-row', () => ({
     subtitle: string;
     value: boolean;
     disabled: boolean;
+    accessibilityLabel?: string;
     onValueChange: (value: boolean) => void;
   }) =>
     createElement(
@@ -146,7 +147,7 @@ vi.mock('@/components/ui/preference-row', () => ({
       createElement('Switch', {
         value: props.value,
         disabled: props.disabled,
-        accessibilityLabel: props.title,
+        accessibilityLabel: props.accessibilityLabel ?? props.title,
         onValueChange: props.onValueChange,
       })
     ),
@@ -657,12 +658,9 @@ describe('NotificationsScreen category availability', () => {
     expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
   });
 
-  it('paints the unavailable row with the muted switch pair, and keeps the accent beside it', async () => {
-    // A dimmed title beside a full-strength accent track reads as both
-    // unavailable and on: Android folds the colours into the switch drawables
-    // and draws no unavailable appearance of its own. The shared switch paints
-    // the palette's muted pair there, so the unavailable row loses the accent
-    // while an available row beside it keeps it.
+  it('disables the unavailable row and keeps its available sibling enabled', async () => {
+    // The switch's own paint is `PreferenceRow`'s (its suite asserts the muted
+    // pair); this screen owns which rows the capability disables.
     platform.os = 'android';
     prefsQueryFn.mockResolvedValue(
       fullPrefs({
@@ -677,13 +675,9 @@ describe('NotificationsScreen category availability', () => {
     const unavailable = switchPaint(renderer.root, 'Balance alerts');
     expect(unavailable?.disabled).toBe(true);
     expect(unavailable?.value).toBe(true);
-    expect(unavailable?.trackColor).toEqual({ false: '#A9A39A', true: '#6F6A61' });
-    expect(unavailable?.thumbColor).toBe('#fff');
 
     const available = switchPaint(renderer.root, 'Agent updates');
     expect(available?.disabled).toBe(false);
-    expect(available?.trackColor).toEqual({ false: '#A9A39A', true: '#4F5A10' });
-    expect(available?.thumbColor).toBe('#fff');
   });
 
   it('non-retryable unhappy: an unavailable category keeps its translated description, never the response sentence', async () => {

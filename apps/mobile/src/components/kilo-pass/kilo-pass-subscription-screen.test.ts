@@ -2,7 +2,6 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import '@/i18n';
 
 import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
 import { i18n } from '@/i18n';

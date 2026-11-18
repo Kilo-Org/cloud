@@ -113,6 +113,7 @@ vi.mock('@/components/ui/icons', () => ({
   Pencil: 'Pencil',
   Sparkles: 'Sparkles',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 describe('ProfileSkillsScreen', () => {

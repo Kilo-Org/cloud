@@ -272,7 +272,7 @@ describe('RowFrame trailing cell', () => {
     const group = root.find(
       node =>
         Object.is(node.type, 'View') &&
-        classesOf(node).includes('gap-2') &&
+        classesOf(node).includes('gap-5') &&
         classesOf(node).includes('flex-row')
     );
 

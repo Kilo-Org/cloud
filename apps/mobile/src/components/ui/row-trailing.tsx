@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
  * Hosting it without this margin made the control, not `ROW_FRAME_CLASS`, set
  * the row's height: a one-line switch row measured 65.1pt beside the 54.1pt of
  * a two-line chevron row in the 2026-11-18 gate dump. The negative margin is
- * `(TOUCH_TARGET_DP - COMPACT_CONTROL_BOX_DP) / 2` a side, so the node
+ * `(TOUCH_TARGET_DP - 32) / 2` a side, so the node
  * contributes the compact box to layout and overlaps the row's own 10.5pt
  * vertical padding, which keeps every touch inside the row's bounds (Android
  * drops a touch outside a parent view).

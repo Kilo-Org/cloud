@@ -92,6 +92,7 @@ vi.mock('@/components/ui/icons', () => ({
   KeyRound: 'KeyRound',
   Lock: 'Lock',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 describe('ProfileVariablesScreen', () => {

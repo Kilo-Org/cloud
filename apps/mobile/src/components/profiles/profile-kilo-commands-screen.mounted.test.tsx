@@ -115,6 +115,7 @@ vi.mock('@/components/ui/icons', () => ({
   Pencil: 'Pencil',
   Terminal: 'Terminal',
   Trash2: 'Trash2',
+  Plus: 'Plus',
 }));
 
 type TestCommand = {
@@ -611,7 +612,12 @@ describe('ProfileKiloCommandsScreen row controls', () => {
     );
     expect(actions.map(node => node.props.accessibilityLabel)).toEqual(labels);
     for (const action of actions) {
-      expect(action.props.hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+      expect(action.props.hitSlop).toEqual({
+        top: COMPACT_CONTROL_HIT_SLOP_DP,
+        bottom: COMPACT_CONTROL_HIT_SLOP_DP,
+        left: COMPACT_CONTROL_HIT_SLOP_DP,
+        right: COMPACT_CONTROL_HIT_SLOP_DP,
+      });
     }
 
     unmount();

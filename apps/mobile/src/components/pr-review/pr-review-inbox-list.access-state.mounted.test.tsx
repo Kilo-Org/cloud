@@ -60,6 +60,7 @@ vi.mock('@/components/ui/icons', () => ({
   Clock: 'Clock',
   GitPullRequest: 'GitPullRequest',
   Inbox: 'Inbox',
+  ArrowRight: 'ArrowRight',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
@@ -160,12 +161,13 @@ function continueInPersonalPress(renderer: TestRenderer.ReactTestRenderer): () =
   const action: unknown = accessError(renderer).props.action;
   if (
     !isActionElement(action) ||
-    typeof action.props.accessibilityLabel !== 'string' ||
+    typeof action.props.label !== 'string' ||
     typeof action.props.onPress !== 'function'
   ) {
     throw new Error('the access state rendered no action button');
   }
-  expect(action.props.accessibilityLabel).toBe('prReview.inbox.continueInPersonal');
+  // `StateAction` announces its visible label, so the label is the name.
+  expect(action.props.label).toBe('prReview.inbox.continueInPersonal');
   // The mock host element's handler is an opaque function prop.
   const press = action.props.onPress as () => void;
   return press;

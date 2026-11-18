@@ -1,6 +1,7 @@
 /* eslint-disable max-lines */
 import { z } from 'zod';
 import { buildWorkflowPageCode } from './agent-workflow-runner';
+import { TAB_TAKEN_ERROR } from './browser-caller';
 import { KILO_BROWSER_TOOL_PREFIX, toKiloBrowserToolName } from './browser-tool-contract';
 import {
   redactSensitiveBody,
@@ -11,6 +12,7 @@ import {
   DEBUGGER_PROTOCOL_VERSION,
   discoverWebMcpToolsInTab,
   evalInTabWithScripting,
+  evaluateTabCode,
   executeWebMcpToolInTab,
   getInspectableTab,
   getViewportScreenshotWithTabsApi,
@@ -24,6 +26,7 @@ import type {
   ChromeDebuggerDetachListener,
   ChromeDebuggerEventListener,
   ChromeDebuggerTarget,
+  EvalTabResult,
   WebMcpToolDescriptor,
 } from './tab-debugger';
 
@@ -108,6 +111,18 @@ const BROWSER_TOOL_SESSION_DISPOSED_ERROR = 'The browser tool session was dispos
 const BROWSER_TOOL_SESSION_DETACHED_ERROR = 'The debugger detached from the tab.';
 const DETACH_REASON_TARGET_CLOSED = 'target_closed';
 
+/**
+ * A hidden tab queues `Input.*` commands until it is shown, then fires them
+ * late; the call that already returned success acted on the wrong page state.
+ * Bound each input command instead of retrying blind.
+ * Evidence: https://github.com/BrowserMCP/mcp/blob/main/packages/mcp/spikes/hidden-tabs/RESULTS.md
+ */
+const INPUT_COMMAND_TIMEOUT_MS = 5000;
+const FOCUS_EMULATION_METHOD = 'Emulation.setFocusEmulationEnabled';
+const visibilityStateSchema = z.object({
+  result: z.object({ value: z.string().optional() }).optional(),
+});
+
 export interface BrowserConsoleMessage {
   readonly level: string;
   readonly text: string;
@@ -186,6 +201,25 @@ export interface BrowserToolTabsApi {
   readonly remove?: ((tabId: number) => Promise<void> | void) | undefined;
 }
 
+/**
+ * Identity of one tab's viewport state. The tab session and every caller view
+ * share the same object, so a viewport override a resize applied from one
+ * caller belongs to the tab and is cleared once when the tab's session is
+ * disposed.
+ */
+export interface BrowserToolViewportState {
+  readonly tabId: number;
+}
+
+/**
+ * A live call's cancellation state: the side panel took the tab over, so the
+ * call still unwinding must stop issuing commands instead of interleaving them
+ * with the panel's. Read before every command the caller view sends.
+ */
+export interface BrowserToolCallGuard {
+  readonly cancelled: () => boolean;
+}
+
 export interface BrowserToolSession {
   /**
    * Attaches the debugger and enables the CDP domains, once. Idempotent, and
@@ -195,6 +229,14 @@ export interface BrowserToolSession {
    * backend it validates that the tab is inspectable instead.
    */
   readonly attach: () => Promise<void>;
+  /**
+   * A caller-scoped view of this tab session. It shares the tab's one
+   * attachment, console/network buffers and dialogs, but its ref registry is
+   * private: a full snapshot from one caller never invalidates another
+   * caller's refs. A `guard` ends this view's commands as soon as it reports
+   * cancelled.
+   */
+  readonly bindCaller: (callerKey: string, guard?: BrowserToolCallGuard) => BrowserToolSession;
   /**
    * Which platform the session drives. `scripting` means `chrome.debugger` is
    * unavailable (Firefox) and the page is driven through
@@ -221,6 +263,12 @@ export interface BrowserToolSession {
    */
   readonly dispose: () => Promise<void>;
   /**
+   * Runs model-authored code (the workflow `page` scripts) in this tab through
+   * the same attachment the tool calls use. Never attaches or detaches a second
+   * debugger: the session owns the tab's one attachment.
+   */
+  readonly evaluateInTab: (code: string, timeoutMs?: number) => Promise<EvalTabResult>;
+  /**
    * The tool error for a tool this platform cannot run, or `undefined` when it
    * can. The wiring layer consults it before dispatching a tool, so the
    * debugger-only tools fail by name on Firefox instead of returning an empty
@@ -238,11 +286,19 @@ export interface BrowserToolSession {
    * current load).
    */
   readonly networkRequestsSinceLoad: () => BrowserNetworkRequest[];
-  /** Replaces the registry, so a ref from an older snapshot cannot resolve. */
+  /** Replaces this caller's registry, so a ref from an older snapshot cannot resolve. */
   readonly registerRefs: (
     entries: readonly BrowserToolRefEntry[],
     options?: { readonly merge?: boolean }
   ) => void;
+  /**
+   * Drops a caller's ref registry for good: the caller itself is gone (its
+   * conversation was deleted, its workflow run or agent session finished). The
+   * attachment and other callers keep working. Releasing a lease at turn end
+   * does not call this, so a caller's refs outlive its turn like Playwright's
+   * page handles; only a navigation, a tab dispose or this call clears them.
+   */
+  readonly disposeCaller: (callerKey: string) => void;
   readonly resolveTarget: (target: string) => Promise<BrowserToolResolvedTarget | undefined>;
   readonly send: (
     method: string,
@@ -250,6 +306,8 @@ export interface BrowserToolSession {
   ) => Promise<Record<string, unknown> | undefined>;
   /** Returns the pending dialog and clears it, so a second call cannot re-answer it. */
   readonly takeDialog: () => BrowserToolDialog | undefined;
+  /** The tab's viewport identity, shared with every caller view of this tab. */
+  readonly viewportState: BrowserToolViewportState;
 }
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
@@ -1283,11 +1341,15 @@ export const createBrowserToolSession = ({
    */
   const backend: BrowserToolBackend = debuggerApi === undefined ? 'scripting' : 'debugger';
   const target: ChromeDebuggerTarget = { tabId };
+  const viewportState: BrowserToolViewportState = { tabId };
   const consoleBuffer: BrowserConsoleMessage[] = [];
   const networkById = new Map<string, MutableNetworkRequest>();
-  const refs = new Map<string, BrowserToolRefEntry>();
+  // Refs belong to a caller, not a tab: two side-panel conversations (or a workflow and a panel) must not invalidate each other's snapshots.
+  const refsByCaller = new Map<string, Map<string, BrowserToolRefEntry>>();
+  const defaultRefs = new Map<string, BrowserToolRefEntry>();
   let attached = false;
   let disposed = false;
+  let focusEmulated = false;
   let attachPromise: Promise<void> | undefined = undefined;
   // Bumped by every Debugger.detach for this tab, so an attach in flight can tell that the debugger it just acquired is gone.
   let detachCount = 0;
@@ -1302,22 +1364,43 @@ export const createBrowserToolSession = ({
   let webMcpDiscovery: { documentId: string; tools: readonly WebMcpToolDescriptor[] } | undefined =
     undefined;
 
+  const callerRefs = (callerKey: string): Map<string, BrowserToolRefEntry> => {
+    const existing = refsByCaller.get(callerKey);
+
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const created = new Map<string, BrowserToolRefEntry>();
+    refsByCaller.set(callerKey, created);
+    return created;
+  };
+
+  const clearRefs = (): void => {
+    defaultRefs.clear();
+    // A caller view holds its own map by reference, so clear each one before dropping it: a view bound before the navigation must not keep resolving a ref of the old document.
+    for (const refs of refsByCaller.values()) {
+      refs.clear();
+    }
+    refsByCaller.clear();
+  };
+
   const clearState = (): void => {
     consoleBuffer.length = 0;
     consoleMessagesSinceNavigation = 0;
     networkById.clear();
     mainFrameId = undefined;
-    refs.clear();
+    clearRefs();
     documentNodeId = undefined;
     dialog = undefined;
     webMcpDiscovery = undefined;
   };
 
-  // A navigation replaces the document, so the cached root node id and the snapshot refs of the previous document are stale; drop them instead of querying the old document.
+  // A navigation replaces the document, so the cached root node id and the snapshot refs of the previous document are stale for every caller; drop them instead of querying the old document.
   const invalidateDocument = (): void => {
     documentNodeId = undefined;
     consoleMessagesSinceNavigation = 0;
-    refs.clear();
+    clearRefs();
   };
 
   const pushConsoleMessage = (message: BrowserConsoleMessage): void => {
@@ -1607,6 +1690,7 @@ export const createBrowserToolSession = ({
 
     detachCount += 1;
     attached = false;
+    focusEmulated = false;
     clearState();
 
     if (reason === DETACH_REASON_TARGET_CLOSED) {
@@ -1693,6 +1777,9 @@ export const createBrowserToolSession = ({
         // eslint-disable-next-line no-await-in-loop -- domains must be enabled in order before any tool call reads their events
         await debuggerApi.sendCommand(target, method);
       }
+      // A background tab reports no focus to the page; emulation keeps the page acting as if the user is looking at it.
+      await debuggerApi.sendCommand(target, FOCUS_EMULATION_METHOD, { enabled: true });
+      focusEmulated = true;
     } catch (error) {
       await detachQuietly();
 
@@ -1738,6 +1825,68 @@ export const createBrowserToolSession = ({
     attachPromise = undefined;
   };
 
+  const applyFocusEmulation = async (): Promise<void> => {
+    if (debuggerApi === undefined) {
+      return;
+    }
+
+    await debuggerApi.sendCommand(target, FOCUS_EMULATION_METHOD, { enabled: true });
+    focusEmulated = true;
+  };
+
+  const readVisibilityState = async (): Promise<string | undefined> => {
+    if (debuggerApi === undefined) {
+      return undefined;
+    }
+
+    const response = await debuggerApi.sendCommand(target, 'Runtime.evaluate', {
+      expression: 'document.visibilityState',
+      returnByValue: true,
+    });
+    const parsed = visibilityStateSchema.safeParse(response);
+
+    return parsed.success ? parsed.data.result?.value : undefined;
+  };
+
+  /**
+   * Input goes through one guard: re-apply focus emulation when the tab is
+   * hidden, then bound the command. A timeout fails the call with the observed
+   * visibility and never retries — the queued command may still fire later.
+   */
+  const sendInputCommand = async (
+    method: string,
+    params?: Record<string, unknown>
+  ): Promise<Record<string, unknown> | undefined> => {
+    if (debuggerApi === undefined) {
+      return undefined;
+    }
+
+    if (!focusEmulated) {
+      await applyFocusEmulation();
+    }
+
+    const visibility = await readVisibilityState();
+
+    if (visibility === 'hidden') {
+      await applyFocusEmulation();
+    }
+
+    const { promise: timedOut, reject } = Promise.withResolvers<never>();
+    const timer = setTimeout(() => {
+      reject(
+        new Error(
+          `${method} timed out after ${String(INPUT_COMMAND_TIMEOUT_MS)} ms with document.visibilityState = "${visibility ?? 'unknown'}". The tab may be in the background; bring it to the foreground before retrying.`
+        )
+      );
+    }, INPUT_COMMAND_TIMEOUT_MS);
+
+    try {
+      return await Promise.race([debuggerApi.sendCommand(target, method, params), timedOut]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
   const send = async (
     method: string,
     params?: Record<string, unknown>
@@ -1754,6 +1903,10 @@ export const createBrowserToolSession = ({
     }
 
     await attach();
+
+    if (method.startsWith('Input.')) {
+      return sendInputCommand(method, params);
+    }
 
     return debuggerApi.sendCommand(target, method, params);
   };
@@ -1811,7 +1964,8 @@ export const createBrowserToolSession = ({
   };
 
   const resolveTarget = async (
-    targetText: string
+    targetText: string,
+    refs: ReadonlyMap<string, BrowserToolRefEntry>
   ): Promise<BrowserToolResolvedTarget | undefined> => {
     const ref = parseRef(targetText);
 
@@ -1839,6 +1993,7 @@ export const createBrowserToolSession = ({
   };
 
   const registerRefs = (
+    refs: Map<string, BrowserToolRefEntry>,
     entries: readonly BrowserToolRefEntry[],
     options?: { readonly merge?: boolean }
   ): void => {
@@ -1882,6 +2037,7 @@ export const createBrowserToolSession = ({
   };
 
   const resolveTargetArg = (
+    refs: ReadonlyMap<string, BrowserToolRefEntry>,
     targetText: string
   ): { readonly description: string; readonly selector: string } | { readonly error: string } => {
     const resolved = resolveScriptingTarget(refs, targetText);
@@ -2047,9 +2203,10 @@ export const createBrowserToolSession = ({
     };
   };
 
-  const callTool = async (
+  const runCallTool = async (
     toolName: string,
-    args: Record<string, unknown> = {}
+    args: Record<string, unknown>,
+    refs: Map<string, BrowserToolRefEntry>
   ): Promise<BrowserToolCallResult> => {
     const baseName = toolName.startsWith(KILO_BROWSER_TOOL_PREFIX)
       ? toolName.slice(KILO_BROWSER_TOOL_PREFIX.length)
@@ -2070,7 +2227,7 @@ export const createBrowserToolSession = ({
           return { error: 'browser_click needs a target and valid options.', ok: false };
         }
 
-        const resolved = resolveTargetArg(parsed.data.target);
+        const resolved = resolveTargetArg(refs, parsed.data.target);
 
         if ('error' in resolved) {
           return { error: resolved.error, ok: false };
@@ -2098,13 +2255,13 @@ export const createBrowserToolSession = ({
           return { error: 'browser_drag needs startTarget and endTarget.', ok: false };
         }
 
-        const start = resolveTargetArg(parsed.data.startTarget);
+        const start = resolveTargetArg(refs, parsed.data.startTarget);
 
         if ('error' in start) {
           return { error: start.error, ok: false };
         }
 
-        const end = resolveTargetArg(parsed.data.endTarget);
+        const end = resolveTargetArg(refs, parsed.data.endTarget);
 
         if ('error' in end) {
           return { error: end.error, ok: false };
@@ -2122,7 +2279,7 @@ export const createBrowserToolSession = ({
           return { error: 'browser_drop needs a target and data or paths.', ok: false };
         }
 
-        const resolved = resolveTargetArg(parsed.data.target);
+        const resolved = resolveTargetArg(refs, parsed.data.target);
 
         if ('error' in resolved) {
           return { error: resolved.error, ok: false };
@@ -2147,7 +2304,7 @@ export const createBrowserToolSession = ({
         let selector: string | undefined = undefined;
 
         if (parsed.data.target !== undefined) {
-          const resolved = resolveTargetArg(parsed.data.target);
+          const resolved = resolveTargetArg(refs, parsed.data.target);
 
           if ('error' in resolved) {
             return { error: resolved.error, ok: false };
@@ -2176,7 +2333,7 @@ export const createBrowserToolSession = ({
         }[] = [];
 
         for (const field of parsed.data.fields) {
-          const resolved = resolveTargetArg(field.target);
+          const resolved = resolveTargetArg(refs, field.target);
 
           if ('error' in resolved) {
             return { error: resolved.error, ok: false };
@@ -2210,7 +2367,7 @@ export const createBrowserToolSession = ({
         let targetSelector: string | undefined = undefined;
 
         if (parsed.data.target !== undefined) {
-          const resolved = resolveTargetArg(parsed.data.target);
+          const resolved = resolveTargetArg(refs, parsed.data.target);
 
           if ('error' in resolved) {
             return { error: resolved.error, ok: false };
@@ -2241,7 +2398,7 @@ export const createBrowserToolSession = ({
         }
 
         scriptingRefCount = found.data.nextRef;
-        registerRefs(found.data.refs);
+        registerRefs(refs, found.data.refs);
 
         if (found.data.total === 0) {
           return {
@@ -2266,7 +2423,7 @@ export const createBrowserToolSession = ({
           return { error: 'browser_hover needs a target.', ok: false };
         }
 
-        const resolved = resolveTargetArg(parsed.data.target);
+        const resolved = resolveTargetArg(refs, parsed.data.target);
 
         if ('error' in resolved) {
           return { error: resolved.error, ok: false };
@@ -2326,7 +2483,7 @@ export const createBrowserToolSession = ({
           return { error: 'browser_select_option needs a target and values.', ok: false };
         }
 
-        const resolved = resolveTargetArg(parsed.data.target);
+        const resolved = resolveTargetArg(refs, parsed.data.target);
 
         if ('error' in resolved) {
           return { error: resolved.error, ok: false };
@@ -2350,7 +2507,7 @@ export const createBrowserToolSession = ({
         let targetSelector: string | undefined = undefined;
 
         if (parsed.data.target !== undefined) {
-          const resolved = resolveTargetArg(parsed.data.target);
+          const resolved = resolveTargetArg(refs, parsed.data.target);
 
           if ('error' in resolved) {
             return { error: resolved.error, ok: false };
@@ -2379,7 +2536,7 @@ export const createBrowserToolSession = ({
         }
 
         scriptingRefCount = snapshot.data.nextRef;
-        registerRefs(snapshot.data.refs, { merge: targetSelector !== undefined });
+        registerRefs(refs, snapshot.data.refs, { merge: targetSelector !== undefined });
 
         const note =
           parsed.data.filename === undefined
@@ -2505,7 +2662,7 @@ export const createBrowserToolSession = ({
           return { error: 'browser_type needs a target and text.', ok: false };
         }
 
-        const resolved = resolveTargetArg(parsed.data.target);
+        const resolved = resolveTargetArg(refs, parsed.data.target);
 
         if ('error' in resolved) {
           return { error: resolved.error, ok: false };
@@ -2626,6 +2783,94 @@ export const createBrowserToolSession = ({
     }
   };
 
+  const evaluateInTab = async (code: string, timeoutMs?: number): Promise<EvalTabResult> => {
+    if (disposed) {
+      return { error: BROWSER_TOOL_SESSION_DISPOSED_ERROR, ok: false };
+    }
+
+    try {
+      await attach();
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : 'The browser tool session is unavailable.',
+        ok: false,
+      };
+    }
+
+    if (debuggerApi === undefined) {
+      if (scriptingApi === undefined) {
+        return { error: 'Tab evaluation API is unavailable.', ok: false };
+      }
+
+      return evalInTabWithScripting({
+        code,
+        scriptingApi,
+        tabId,
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      });
+    }
+
+    return evaluateTabCode({
+      code,
+      send: (method, params) => Promise.resolve(debuggerApi.sendCommand(target, method, params)),
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+    });
+  };
+
+  const getToolUnavailableError = (tool: string): string | undefined =>
+    backend === 'scripting' ? getFirefoxUnsupportedToolError(tool) : undefined;
+
+  const createCallerView = (
+    callerKey: string,
+    refs: Map<string, BrowserToolRefEntry>,
+    guard?: BrowserToolCallGuard
+  ): BrowserToolSession => {
+    const throwIfCancelled = (): void => {
+      if (guard?.cancelled() === true) {
+        throw new Error(TAB_TAKEN_ERROR);
+      }
+    };
+
+    return {
+      attach,
+      backend,
+      bindCaller: nextKey => createCallerView(nextKey, callerRefs(nextKey), guard),
+      callTool: (toolName, args) => {
+        throwIfCancelled();
+        return runCallTool(toolName, args ?? {}, refs);
+      },
+      consoleMessages: () => [...consoleBuffer],
+      // A caller view owns only its ref registry: disposing it must not detach the tab's shared attachment.
+      dispose: () => {
+        refs.clear();
+        refsByCaller.delete(callerKey);
+        return Promise.resolve();
+      },
+      disposeCaller: key => {
+        refsByCaller.get(key)?.clear();
+        refsByCaller.delete(key);
+      },
+      evaluateInTab,
+      getToolUnavailableError,
+      isAttached: () => attached,
+      networkRequests: () => [...networkById.values()],
+      networkRequestsSinceLoad,
+      registerRefs: (entries, options) => {
+        registerRefs(refs, entries, options);
+      },
+      resolveTarget: targetText => {
+        throwIfCancelled();
+        return resolveTarget(targetText, refs);
+      },
+      send: (method, params) => {
+        throwIfCancelled();
+        return send(method, params);
+      },
+      takeDialog,
+      viewportState,
+    };
+  };
+
   // Subscribe before any attach so a detach that lands during attach is not missed.
   debuggerApi?.onDetach.addListener(handleDetach);
   debuggerApi?.onEvent.addListener(handleEvent);
@@ -2634,17 +2879,25 @@ export const createBrowserToolSession = ({
   return {
     attach,
     backend,
-    callTool,
+    bindCaller: (callerKey, guard) => createCallerView(callerKey, callerRefs(callerKey), guard),
+    callTool: (toolName, args) => runCallTool(toolName, args ?? {}, defaultRefs),
     consoleMessages: () => [...consoleBuffer],
     dispose,
-    getToolUnavailableError: (tool: string): string | undefined =>
-      backend === 'scripting' ? getFirefoxUnsupportedToolError(tool) : undefined,
+    disposeCaller: callerKey => {
+      refsByCaller.get(callerKey)?.clear();
+      refsByCaller.delete(callerKey);
+    },
+    evaluateInTab,
+    getToolUnavailableError,
     isAttached: () => attached,
     networkRequests: () => [...networkById.values()],
     networkRequestsSinceLoad,
-    registerRefs,
-    resolveTarget,
+    registerRefs: (entries, options) => {
+      registerRefs(defaultRefs, entries, options);
+    },
+    resolveTarget: targetText => resolveTarget(targetText, defaultRefs),
     send,
     takeDialog,
+    viewportState,
   };
 };

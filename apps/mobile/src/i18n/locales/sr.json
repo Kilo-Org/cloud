@@ -26,6 +26,7 @@
     "creditHistory": "Istorija kredita",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Otkaži",
     "done": "Gotovo",
     "retry": "Pokušaj ponovo",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Izmene",
     "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može da ažurira naplatu na kilo.ai, a zatim pokuša ponovo.",
-    "privateRepositoryA11y": "{{name}}, privatno spremište"
+    "privateRepositoryA11y": "{{name}}, privatno spremište",
+    "legalDocumentEnglishOnly": "Ovaj dokument je dostupan samo na engleskom jeziku."
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promene jezika",
@@ -481,7 +483,14 @@
       "viewReceipt": "Prikaži potvrdu"
     },
     "changelog": "Šta je novo",
-    "changelogVersionPending": "Beleške za ovu verziju stižu sa sledećim ažuriranjem."
+    "changelogVersionPending": "Beleške za verziju {{version}} stižu sa sledećim ažuriranjem aplikacije.",
+    "changelogGroupNew": "Novo",
+    "changelogFixesIn": "Ispravke i poboljšanja u sledećim oblastima: {{areas}}.",
+    "changelogFixesPolish": "Ispravke i poboljšanja u celoj aplikaciji.",
+    "changelogAreas": {
+      "signIn": "Prijavljivanje",
+      "profileOrganizations": "Profil i organizacije"
+    }
   },
   "preferences": {
     "general": "Opšte",
@@ -1377,7 +1386,8 @@
       "managedOnWeb": "Bitbucket vezom ove organizacije upravlja se na vebu, sa računara.",
       "description": "Kreiraj token za pristup radnom prostoru sa potrebnim dozvolama i nalepi ga ispod.",
       "scopes": "Nalog: čitanje · Repozitorijumi: čitanje/pisanje · PR-ovi: čitanje · Veb-dojavnici: čitanje/pisanje",
-      "tokenPlaceholder": "Token za pristup radnom prostoru"
+      "tokenPlaceholder": "Token za pristup radnom prostoru",
+      "tokenRefused": "Bitbucket nije prihvatio ovaj token za pristup radnom prostoru. Proveri da li ima dozvole navedene iznad, pa pokušaj ponovo."
     },
     "scopeList": {
       "personalStillAvailable": "Lični repozitorijumi su i dalje dostupni ispod.",
@@ -1489,7 +1499,8 @@
       "repositoryLine": "Pregledi: {{reviews}} · Nalazi: {{findings}}",
       "empty": "Još nema pregleda sa analitikom",
       "emptyDescription": "Analitika beleži završene preglede dok je uključena za organizaciju.",
-      "off": "Analitika je isključena za ovu organizaciju.",
+      "offTitle": "Analitika je isključena za {{platform}}",
+      "offDescription": "Uključi je u podešavanjima organizacije na vebu da beleži završene preglede.",
       "couldNotLoad": "Nije moguće učitati analitiku"
     },
     "council": {
@@ -3382,6 +3393,7 @@
       "manageOnWeb": "Podešavanja naplate na vebu",
       "changePlan": "Promeni plan",
       "buySeats": "Kupi mesta",
+      "managedOnWeb": "Planom, mestima i automatskom dopunom se upravlja na vebu.",
       "setupAutoTopUp": "Podesi automatsku dopunu",
       "manageAutoTopUp": "Upravljaj automatskom dopunom",
       "opensOnWeb": "Otvara se na vebu"
@@ -3519,7 +3531,6 @@
     },
     "settingsOnWeb": {
       "title": "Podešavanja organizacije na vebu",
-      "integrations": "Integracije na vebu",
       "usageDetails": "Detalji potrošnje",
       "providersAndModels": "Provajderi i modeli",
       "groups": "Grupe",
@@ -3528,9 +3539,17 @@
       "ssoAndDomain": "SSO i domen",
       "dataCollection": "Prikupljanje podataka",
       "auditLogs": "Dnevnici revizije",
-      "requestLogs": "Dnevnici zahteva",
-      "subOrganizations": "Podorganizacije",
-      "distributeFunds": "Raspodela sredstava"
+      "requestLogs": "Dnevnici zahteva"
+    },
+    "requestLogs": {
+      "older": "Prethodni sat",
+      "newer": "Sledeći sat",
+      "truncated": "U ovom satu ima više zahteva nego što lista prikazuje.",
+      "emptyTitle": "Nema zahteva",
+      "loadError": "Učitavanje dnevnika zahteva nije uspelo.",
+      "permissionDenied": "Dnevnike zahteva organizacije mogu da čitaju samo njen vlasnik, administrator ili menadžer za naplatu.",
+      "tokens": "{{input}} ulaz · {{output}} izlaz",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",
@@ -4530,7 +4549,6 @@
     "dismiss": "Odbaci izveštaj",
     "offline": "Van mreže · sačuvan izveštaj",
     "cached": "Sačuvan izveštaj · osvežavanje nije dostupno",
-    "window": "{{start}} – {{end}}",
     "summary": "AI rezime",
     "summaryPending": "AI rezime je u izradi. Pojaviće se ovde kada bude spreman.",
     "summaryUnavailable": "AI rezime nije dostupan. Strukturisan izveštaj je i dalje dostupan.",
@@ -4597,6 +4615,8 @@
     "topModels": "Najčešći modeli",
     "topFeatures": "Najčešće funkcije",
     "emptyTitle": "Nema korišćenja u ovom periodu",
+    "unavailableTitle": "Korišćenje nije dostupno",
+    "unavailableDescription": "Ovaj radni prostor ne prijavljuje korišćenje. Ponovni pokušaj neće pomoći.",
     "orgSelfNotice": "Vidite sopstveno korišćenje u ovoj organizaciji.",
     "viewDetails": "Prikaži detalje korišćenja"
   },
@@ -4647,6 +4667,7 @@
       "title": "Okidači i vebhukovi",
       "subtitle": "Automatizujte pokretanja Cloud Agent-a pomoću vebhuk poziva ili po rasporedu.",
       "new": "Novi okidač",
+      "create": "Napravite okidač",
       "emptyTitle": "Još nema okidača",
       "emptyDescription": "Napravite okidač da biste započeli pokretanje Cloud Agent-a preko vebhuk poziva ili po rasporedu.",
       "loadFailedTitle": "Učitavanje okidača nije uspelo",
@@ -4755,5 +4776,175 @@
     "unavailableDescription": "Ovaj link za deljenje je istekao ili je opozvan.",
     "transcriptUnavailableTitle": "Nije moguće učitati ovaj transkript",
     "transcriptUnavailableDescription": "Link i dalje radi. Pokušajte ponovo za trenutak."
+  },
+  "organizationGuardrails": {
+    "title": "VI zaštitne mere",
+    "permissionDenied": "Samo vlasnici i administratori organizacije mogu da upravljaju VI zaštitnim merama.",
+    "unavailable": "VI zaštitne mere nisu dostupne za ovu organizaciju.",
+    "loadError": "VI zaštitne mere nisu mogle da se učitaju",
+    "statusSaving": "Čuvanje…",
+    "statusSaved": "Sačuvano",
+    "statusFailed": "Čuvanje nije uspelo.",
+    "inputTitle": "Zaštitne mere za ulaz",
+    "inputDescription": "Skenira svaki ulaz pomoću Enkrypt AI, uključujući rezultate alata. Detektor koji blokira odbija zahtev kada Enkrypt nije dostupan.",
+    "outputTitle": "Zaštitne mere za izlaz",
+    "outputDescription": "Skenira odgovore pomoću Enkrypt AI pre nego što ih članovi prime. Isključene su osim ako ih uključite.",
+    "detectorsHint": "Režim Blokiraj odbija označeni zahtev. Režim Samo evidentiraj beleži ga bez odlaganja zahteva.",
+    "detectorsHintOutput": "Režim Blokiraj proglašava označeni odgovor neuspešnim. Režim Samo evidentiraj beleži ga bez odlaganja odgovora.",
+    "choiceLog": "Samo evidentiraj",
+    "applyTo": "Primeni na",
+    "applyToAllMembers": "Svi članovi",
+    "applyKiloDefault": "Primeni Kilo podrazumevane vrednosti",
+    "invalidSavedTitle": "Sačuvana podešavanja ulaznih detektora ne mogu da se pročitaju",
+    "invalidSavedBody": "Zahtevi su blokirani dok se ulazni detektori ponovo ne sačuvaju. Detektori ispod počinju od Kilo podrazumevanih vrednosti.",
+    "invalidSavedOutputTitle": "Sačuvana podešavanja izlaznih detektora ne mogu da se pročitaju",
+    "invalidSavedOutputBody": "Odgovori se zadržavaju dok se izlazni detektori ponovo ne sačuvaju. Izaberite izlazne detektore ispod.",
+    "blockingOutputNote": "Izlazni detektor koji blokira zadržava odgovor dok Enkrypt ne proveri ceo odgovor. Koristite Samo evidentiraj da biste izbegli odlaganje.",
+    "inputDetectorRequired": "Uključite najmanje jedan ulazni detektor.",
+    "outputDetectorRequired": "Uključite najmanje jedan izlazni detektor.",
+    "rulesTooMany": "Dodajte najviše {{max}} pravila.",
+    "ruleIdRequired": "Unesite identifikator pravila.",
+    "ruleIdInvalid": "Identifikator pravila može da sadrži samo slova, brojeve, tačke, crtice i donje crte.",
+    "ruleTextRequired": "Opišite šta pravilo zabranjuje ili zahteva.",
+    "keywordTooLong": "Svaka ključna reč može da ima najviše {{max}} znakova.",
+    "topicTooLong": "Svaka tema može da ima najviše {{max}} znakova.",
+    "keywordsTooMany": "Dodajte najviše {{max}} ključnih reči.",
+    "topicsTooMany": "Dodajte najviše {{max}} tema.",
+    "piiEntityRequired": "Izaberite najmanje jednu vrstu podataka za otkrivanje.",
+    "keywordRequired": "Dodajte najmanje jednu ključnu reč.",
+    "topicRequired": "Dodajte najmanje jednu temu.",
+    "policyTextRequired": "Unesite tekst politike.",
+    "ruleRequired": "Dodajte najmanje jedno pravilo.",
+    "ruleIdDuplicate": "Svako pravilo mora da ima sopstveni ID pravila.",
+    "piiEntities": "Podaci za otkrivanje",
+    "keywordsLabel": "Ključne reči",
+    "keywordsHint": "Jedna ključna reč po redu.",
+    "topicsHint": "Jedna tema po redu.",
+    "policyFormat": "Format politike",
+    "policyFormatRules": "Strukturirana pravila",
+    "policyFormatRulesDescription": "Jedno pravilo po zahtevu, sa kategorijom i ozbiljnošću. Preporučeno.",
+    "policyFormatText": "Tekst politike",
+    "policyFormatTextDescription": "Nalepite postojeću politiku kao običan tekst.",
+    "rulesEmpty": "Još nema pravila. Svako pravilo opisuje jednu stvar koju ulazi ne smeju da sadrže ili traže.",
+    "addRule": "Dodaj pravilo",
+    "ruleNumber": "Pravilo {{number}}",
+    "ruleRemove": "Ukloni pravilo {{number}}",
+    "ruleIdLabel": "Identifikator pravila",
+    "ruleNameLabel": "Naziv (opciono)",
+    "ruleTextLabel": "Pravilo",
+    "ruleRiskCategory": "Kategorija rizika",
+    "ruleApplicability": "Obim",
+    "ruleFrameworks": "Okviri",
+    "detector": {
+      "promptInjection": {
+        "label": "Ubacivanje upita",
+        "description": "Otkriva pokušaje da se prepišu instrukcije ili zaobiđu zaštite modela."
+      },
+      "policyViolation": {
+        "label": "Kršenje politike",
+        "description": "Označava ulaze koji krše politiku vaše organizacije, napisanu kao tekst ili pravila.",
+        "descriptionOutput": "Označava odgovore koji krše politiku vaše organizacije, napisanu kao tekst ili pravila."
+      },
+      "pii": {
+        "label": "PII i tajne",
+        "description": "Otkriva lične podatke, podatke za pristup, IP adrese i URL adrese."
+      },
+      "keywords": {
+        "label": "Zabranjene ključne reči",
+        "descriptionOutput": "Otkriva odgovore koji sadrže bilo koju ključnu reč koju navedete."
+      },
+      "topics": {
+        "label": "Teme",
+        "descriptionOutput": "Označava odgovore o bilo kojoj temi koju navedete."
+      },
+      "toxicity": {
+        "label": "Toksičnost",
+        "description": "Otkriva toksičan, uvredljiv, preteći ili mrzilački jezik."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Otkriva seksualni ili drugi sadržaj neprikladan za radno okruženje."
+      },
+      "bias": {
+        "label": "Pristrasnost",
+        "description": "Otkriva pristrasan ili diskriminatorski jezik."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Lični podaci",
+        "description": "Imena, adrese e-pošte, brojevi telefona."
+      },
+      "secrets": {
+        "label": "Tajne",
+        "description": "API ključevi, tokeni, lozinke."
+      },
+      "ipAddress": {
+        "label": "IP adrese",
+        "description": "IPv4 i IPv6 adrese."
+      },
+      "url": {
+        "label": "URL adrese",
+        "description": "Veb adrese."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Bezbednost i prevara",
+      "safetyHarm": "Sigurnost i šteta",
+      "privacyDataProtection": "Privatnost i zaštita podataka",
+      "brandReputationTrust": "Brend i reputacija",
+      "biasFairnessEthical": "Pristrasnost i pravičnost",
+      "legalIpLiability": "Pravna odgovornost i odgovornost za intelektualnu svojinu",
+      "productMisuse": "Zloupotreba proizvoda",
+      "performanceQuality": "Performanse i kvalitet"
+    },
+    "applicability": {
+      "user": "Korisnički unos",
+      "userAssistant": "Korisnički unos i odgovori"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM 10 najvećih rizika (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Akt EU o veštačkoj inteligenciji",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Funkcija za preduzeća",
+    "enterpriseOnly": "Ovo je funkcija samo za preduzeća.",
+    "readOnly": "Samo vlasnici i administratori organizacije mogu da menjaju ova podešavanja.",
+    "loadError": "Pružaoci i modeli nisu mogli da se učitaju",
+    "tabModels": "Modeli",
+    "tabProviders": "Pružaoci",
+    "tabGateways": "Prolazi",
+    "modelsDescription": "Isključite model da biste ga blokirali za svakog člana. Modeli dozvoljenih pružalaca su na početku uključeni.",
+    "modelsDeniedOnly": "Samo zabranjeni",
+    "modelsEmpty": "Nijedan model ne odgovara ovoj pretrazi.",
+    "providersDescription": "Isključite pružaoca da Kilo za ovu organizaciju prestane da usmerava na njega.",
+    "providersNeedCatalog": "Prekidači pružalaca ostaju samo za čitanje dok se ne učita ceo katalog modela. Da biste ih menjali, dodirnite Pokušaj ponovo iznad.",
+    "providersEmpty": "Nijedan pružalac ne odgovara ovoj pretrazi.",
+    "allowAllShown": "Dozvoli sve prikazano",
+    "denyAllShown": "Zabrani sve prikazano",
+    "gatewaysDescription": "Kilo usmerava zahteve upućene modelima kroz Vercel AI Gateway ili OpenRouter. Onemogućen prolaz odbija te zahteve.",
+    "emptyProviderList": "Dozvolite bar jednog pružaoca. Prazna lista blokira sve rute Kilo modela.",
+    "gatewaysUnavailable": "Podešavanja prolaza nisu dostupna za ovu organizaciju.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Zahtevi za OpenRouter nisu vezani za region.",
+    "inferenceRegion": "Region izvršavanja",
+    "inferenceRegionDescription": "Vezuje zahteve za Vercel AI Gateway za ovaj region. Model koji tamo nije dostupan neće uspeti.",
+    "disableOpenrouterNote": "Ako onemogućite OpenRouter, to takođe blokira BYOK ključeve koji kroz njega usmeravaju zahteve.",
+    "emptyModelList": "Ostavite uključen bar jedan model. Ako odbijete sve modele, članovima neće ostati ništa za korišćenje.",
+    "catalogUnavailable": "Kompletan katalog modela nije učitan, pa su prikazane samo vaše sačuvane liste. Pokušajte ponovo da biste učitali sve modele.",
+    "region": {
+      "global": "Globalno",
+      "us": "Sjedinjene Američke Države",
+      "eu": "Evropska unija",
+      "au": "Australija",
+      "jp": "Japan"
+    }
   }
 }

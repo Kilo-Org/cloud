@@ -31,9 +31,11 @@ export function planLegalInContentLink(
 }
 
 /**
- * The legal document a kilo.ai link points at. Anything else — another host, or
- * a kilo.ai marketing page the sanitized content no longer links to — is not
- * ours to handle, and the renderer's normal flow applies.
+ * The legal document a link points at, counting only the two documents this
+ * screen renders: the terms and the privacy policy themselves, each with at
+ * most one trailing slash. A path below one of them (`/privacy/apps`, say) is a
+ * different page, so it stays out of this screen and the renderer's own
+ * confirm-and-open flow applies, as it does for another host or a relative path.
  */
 export function legalDocumentForLink(href: string): LegalDocument | null {
   const url = parseAbsoluteUrl(href);
@@ -45,11 +47,13 @@ export function legalDocumentForLink(href: string): LegalDocument | null {
     return null;
   }
 
-  if (url.pathname === '/terms' || url.pathname.startsWith('/terms/')) {
+  const path = url.pathname.endsWith('/') ? url.pathname.slice(0, -1) : url.pathname;
+
+  if (path === '/terms') {
     return 'terms';
   }
 
-  if (url.pathname === '/privacy' || url.pathname.startsWith('/privacy/')) {
+  if (path === '/privacy') {
     return 'privacy';
   }
 

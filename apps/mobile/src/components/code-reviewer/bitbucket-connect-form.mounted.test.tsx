@@ -167,7 +167,9 @@ describe('BitbucketConnectForm', () => {
 
     await submit(root, 'workspace-token');
 
-    expect(statusMessage(root)).toBe(i18n.t('prReview.reconnectNotice.bitbucketTitle'));
+    // A first connect pasted the token that never worked, so the sentence
+    // names the token rather than an expired connection.
+    expect(statusMessage(root)).toBe(i18n.t('codeReviewer.bitbucketConnect.tokenRefused'));
     expect(submitButton(root).props.disabled).toBe(false);
 
     // The next token is the repair, so typing retires the sentence.
@@ -175,6 +177,26 @@ describe('BitbucketConnectForm', () => {
 
     expect(statusMessage(root)).toBeNull();
     expect(rendersText(root, MANAGED_ON_WEB)).toBe(false);
+  });
+
+  it('announces an expired connection when replacing a stored token', async () => {
+    mutations.replace.mockRejectedValue({
+      data: { code: 'UNAUTHORIZED', message: 'Bitbucket rejected the Workspace Access Token' },
+    });
+    const { root } = await mount('bitbucket-1');
+
+    await submit(root, 'replacement-token');
+
+    // The replacement path submits against a connection that had already
+    // accepted a token, so the refusal reads as that connection expiring —
+    // the copy the recovery carried before the first connect got its own.
+    expect(mutations.replace).toHaveBeenCalledExactlyOnceWith({
+      integrationId: 'bitbucket-1',
+      accessToken: 'replacement-token',
+    });
+    expect(mutations.connect).not.toHaveBeenCalled();
+    expect(statusMessage(root)).toBe(i18n.t('prReview.reconnectNotice.bitbucketTitle'));
+    expect(submitButton(root).props.disabled).toBe(false);
   });
 
   it('holds the token field still while the submitted token is in flight', async () => {

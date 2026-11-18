@@ -1,7 +1,7 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations, kilocode_users, type Organization } from '@kilocode/db/schema';
 import { isNull, eq, and, or, gt, gte, sql } from 'drizzle-orm';
-import { updateOrganizationSettings } from '@kilocode/web-shared/lib/organizations/organizations';
+import { mutateOrganizationSettings } from '@kilocode/web-shared/lib/organizations/organizations';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { cliConfirm } from '@/scripts/lib/cli-confirm';
 
@@ -54,11 +54,16 @@ async function enableCodeIndexingForOrgs(
         `   [${successCount + errorCount + 1}/${orgs.length}] ${org.name} (${org.id})... `
       );
 
-      const currentSettings = org.settings || {};
-
-      await updateOrganizationSettings(org.id, {
-        ...currentSettings,
-        code_indexing_enabled: true,
+      await mutateOrganizationSettings(org.id, organization => {
+        // Write against the row we locked, not the snapshot taken before the
+        // loop, so a concurrent change to another settings field survives.
+        if (organization.settings.code_indexing_enabled === true) {
+          return organization.settings;
+        }
+        return {
+          ...organization.settings,
+          code_indexing_enabled: true,
+        };
       });
 
       await createAuditLog({

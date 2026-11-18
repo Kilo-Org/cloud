@@ -11,6 +11,7 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { SecurityReviewOwner } from '../core/types';
 import {
   releaseAnalysisStartReservation,
+  tryAcquireAnalysisStartLease,
   tryReserveAnalysisRestartSlot,
   tryReserveAnalysisStartSlot,
 } from './security-analysis';
@@ -260,6 +261,34 @@ describe('tryReserveAnalysisRestartSlot', () => {
         )
       );
     expect(inflight).toHaveLength(1);
+  });
+});
+
+describe('tryAcquireAnalysisStartLease', () => {
+  it('flips an open unanalyzed finding to pending via the shared predicate', async () => {
+    const findingId = await insertFinding({});
+
+    const acquired = await tryAcquireAnalysisStartLease(findingId);
+
+    expect(acquired).toBe(true);
+    const [row] = await db
+      .select({ analysisStatus: security_findings.analysis_status })
+      .from(security_findings)
+      .where(eq(security_findings.id, findingId));
+    expect(row.analysisStatus).toBe('pending');
+  });
+
+  it('rejects a closed finding', async () => {
+    const findingId = await insertFinding({ status: 'fixed' });
+
+    const acquired = await tryAcquireAnalysisStartLease(findingId);
+
+    expect(acquired).toBe(false);
+    const [row] = await db
+      .select({ analysisStatus: security_findings.analysis_status })
+      .from(security_findings)
+      .where(eq(security_findings.id, findingId));
+    expect(row.analysisStatus).toBeNull();
   });
 });
 

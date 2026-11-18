@@ -26,6 +26,7 @@
     "creditHistory": "سجل الرصيد",
     "sentenceJoiner": ". ",
     "listJoiner": "، ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "إلغاء",
     "done": "تم",
     "retry": "إعادة المحاولة",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "التغييرات",
     "organizationTrialEnded": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكن لمالك المؤسسة تحديث الفوترة على kilo.ai، ثم المحاولة مرة أخرى.",
-    "privateRepositoryA11y": "{{name}}، مستودع خاص"
+    "privateRepositoryA11y": "{{name}}، مستودع خاص",
+    "legalDocumentEnglishOnly": "هذا المستند متوفر باللغة الإنجليزية فقط."
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -481,7 +483,14 @@
       "viewReceipt": "عرض الإيصال"
     },
     "changelog": "ما الجديد",
-    "changelogVersionPending": "ستصل ملاحظات هذا الإصدار مع التحديث القادم للتطبيق."
+    "changelogVersionPending": "ستصل ملاحظات الإصدار {{version}} مع التحديث القادم للتطبيق.",
+    "changelogGroupNew": "جديد",
+    "changelogFixesIn": "إصلاحات وتحسينات في {{areas}}.",
+    "changelogFixesPolish": "إصلاحات وتحسينات في جميع أنحاء التطبيق.",
+    "changelogAreas": {
+      "signIn": "تسجيل الدخول",
+      "profileOrganizations": "الملف الشخصي والمؤسسات"
+    }
   },
   "preferences": {
     "general": "عام",
@@ -676,7 +685,8 @@
       "managedOnWeb": "تتم إدارة اتصال Bitbucket الخاص بهذه المؤسسة عبر الويب من جهاز كمبيوتر.",
       "description": "أنشئ رمز وصول لمساحة العمل بالصلاحيات المطلوبة والصقه أدناه.",
       "scopes": "الصلاحيات المطلوبة: الحساب: قراءة · المستودعات: قراءة/كتابة · طلبات السحب: قراءة · خطافات الويب: قراءة/كتابة.",
-      "tokenPlaceholder": "رمز وصول مساحة العمل"
+      "tokenPlaceholder": "رمز وصول مساحة العمل",
+      "tokenRefused": "لم يقبل Bitbucket رمز وصول مساحة العمل هذا. تحقق من أنه يتضمن الصلاحيات المذكورة أعلاه، ثم أعد المحاولة."
     },
     "followReviewMd": "اتباع تعليمات REVIEW.md",
     "followReviewMdSubtitle": "الالتزام بملفات تعليمات REVIEW.md لكل مستودع",
@@ -926,7 +936,8 @@
       "repositoryLine": "المراجعات: {{reviews}} · النتائج: {{findings}}",
       "empty": "لا توجد مراجعات بتحليلات بعد",
       "emptyDescription": "تسجّل التحليلات المراجعات المكتملة ما دامت مفعّلة للمؤسسة.",
-      "off": "التحليلات متوقفة لهذه المؤسسة.",
+      "offTitle": "التحليلات متوقفة لمنصة {{platform}}",
+      "offDescription": "فعّلها في إعدادات المؤسسة على الويب لتسجّل المراجعات المكتملة.",
       "couldNotLoad": "تعذّر تحميل التحليلات"
     },
     "council": {
@@ -3545,6 +3556,7 @@
       "manageOnWeb": "إعدادات الفوترة على الويب",
       "changePlan": "تغيير الخطة",
       "buySeats": "شراء مقاعد",
+      "managedOnWeb": "تتم إدارة الخطة والمقاعد والشحن التلقائي على الويب.",
       "setupAutoTopUp": "إعداد الشحن التلقائي",
       "manageAutoTopUp": "إدارة الشحن التلقائي",
       "opensOnWeb": "يُفتح على الويب"
@@ -3695,7 +3707,6 @@
     },
     "settingsOnWeb": {
       "title": "إعدادات المؤسسة على الويب",
-      "integrations": "التكاملات على الويب",
       "usageDetails": "تفاصيل الاستخدام",
       "providersAndModels": "المزوّدون والنماذج",
       "groups": "المجموعات",
@@ -3704,9 +3715,17 @@
       "ssoAndDomain": "SSO والنطاق",
       "dataCollection": "جمع البيانات",
       "auditLogs": "سجلات التدقيق",
-      "requestLogs": "سجلات الطلبات",
-      "subOrganizations": "المؤسسات الفرعية",
-      "distributeFunds": "توزيع الأموال"
+      "requestLogs": "سجلات الطلبات"
+    },
+    "requestLogs": {
+      "older": "الساعة الأقدم",
+      "newer": "الساعة الأحدث",
+      "truncated": "في هذه الساعة طلبات أكثر مما تعرضه القائمة.",
+      "emptyTitle": "لا توجد طلبات",
+      "loadError": "تعذّر تحميل سجلات الطلبات.",
+      "permissionDenied": "يمكن فقط لمالك المؤسسة أو مسؤولها أو مدير الفوترة فيها قراءة سجلات الطلبات الخاصة بها.",
+      "tokens": "{{input}} إدخال · {{output}} إخراج",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "رموز الإدخال",
@@ -4740,7 +4759,6 @@
     "dismiss": "استبعاد التقرير",
     "offline": "غير متصل · تقرير محفوظ",
     "cached": "تقرير محفوظ · التحديث غير متاح",
-    "window": "{{start}} – {{end}}",
     "summary": "ملخص AI",
     "summaryPending": "جارٍ إعداد ملخص AI. سيُرفق هنا عند جاهزيته.",
     "summaryUnavailable": "ملخص AI غير متاح. لا يزال تقريرك المنظّم متاحًا.",
@@ -4807,6 +4825,8 @@
     "topModels": "أكثر النماذج استخدامًا",
     "topFeatures": "أكثر الميزات استخدامًا",
     "emptyTitle": "لا يوجد استخدام في هذه الفترة",
+    "unavailableTitle": "الاستخدام غير متاح",
+    "unavailableDescription": "مساحة العمل هذه لا تبلّغ عن أي استخدام. إعادة المحاولة لن تفيد.",
     "orgSelfNotice": "أنت تشاهد استخدامك الخاص في هذه المؤسسة.",
     "viewDetails": "عرض تفاصيل الاستخدام"
   },
@@ -4857,6 +4877,7 @@
       "title": "المشغلات والويب هوك",
       "subtitle": "أتمت تشغيل Cloud Agent من استدعاء ويب هوك أو جدول زمني.",
       "new": "مشغل جديد",
+      "create": "أنشئ مشغلاً",
       "emptyTitle": "لا توجد مشغلات بعد",
       "emptyDescription": "أنشئ مشغلاً لبدء تشغيل Cloud Agent من استدعاء ويب هوك أو وفق جدول زمني.",
       "loadFailedTitle": "تعذر تحميل المشغلات",
@@ -4965,5 +4986,175 @@
     "unavailableDescription": "انتهت صلاحية رابط المشاركة هذا أو تم إبطاله.",
     "transcriptUnavailableTitle": "تعذّر تحميل هذا السجل",
     "transcriptUnavailableDescription": "لا يزال الرابط يعمل. حاول مرة أخرى بعد قليل."
+  },
+  "organizationGuardrails": {
+    "title": "ضوابط حماية الذكاء الاصطناعي",
+    "permissionDenied": "يمكن لمالكي المؤسسة ومسؤوليها فقط إدارة ضوابط حماية الذكاء الاصطناعي.",
+    "unavailable": "ضوابط حماية الذكاء الاصطناعي غير متاحة لهذه المؤسسة.",
+    "loadError": "تعذّر تحميل ضوابط حماية الذكاء الاصطناعي",
+    "statusSaving": "جارٍ الحفظ…",
+    "statusSaved": "تم الحفظ",
+    "statusFailed": "تعذّر الحفظ.",
+    "inputTitle": "ضوابط حماية المدخلات",
+    "inputDescription": "يفحص كل المدخلات باستخدام Enkrypt AI، بما فيها نتائج الأدوات. يرفض الكاشف المضبوط على الحظر الطلبَ عندما تكون Enkrypt غير متاحة.",
+    "outputTitle": "ضوابط حماية المخرجات",
+    "outputDescription": "يفحص الردود باستخدام Enkrypt AI قبل أن يتلقاها الأعضاء. يبقى معطّلًا ما لم تفعّله.",
+    "detectorsHint": "يرفض خيار «حظر» الطلب المُبلَّغ عنه. أما «تسجيل فقط» فيسجّله دون تأخير الطلب.",
+    "detectorsHintOutput": "يُفشل خيار «حظر» الرد المُبلَّغ عنه. أما «تسجيل فقط» فيسجّله دون تأخير الرد.",
+    "choiceLog": "تسجيل فقط",
+    "applyTo": "تطبيق على",
+    "applyToAllMembers": "كل الأعضاء",
+    "applyKiloDefault": "تطبيق إعدادات Kilo الافتراضية",
+    "invalidSavedTitle": "تتعذّر قراءة إعدادات كواشف المدخلات المحفوظة",
+    "invalidSavedBody": "تُحظر الطلبات إلى أن تُحفظ كواشف المدخلات مجددًا. تبدأ الكواشف أدناه من إعدادات Kilo الافتراضية.",
+    "invalidSavedOutputTitle": "تتعذّر قراءة إعدادات كواشف المخرجات المحفوظة",
+    "invalidSavedOutputBody": "تُحجب الردود إلى أن تُحفظ كواشف المخرجات مجددًا. اختر كواشف المخرجات أدناه.",
+    "blockingOutputNote": "يحتجز كاشف المخرجات المضبوط على الحظر الردَّ إلى أن تفحصه Enkrypt بالكامل. استخدم «تسجيل فقط» لتجنّب التأخير.",
+    "inputDetectorRequired": "فعّل كاشف مدخلات واحدًا على الأقل.",
+    "outputDetectorRequired": "فعّل كاشف مخرجات واحدًا على الأقل.",
+    "rulesTooMany": "أضف ما يصل إلى {{max}} قاعدة.",
+    "ruleIdRequired": "أدخل معرّف القاعدة.",
+    "ruleIdInvalid": "لا يمكن أن يحتوي معرّف القاعدة إلا على أحرف وأرقام ونقاط وشرطات وشرطات سفلية.",
+    "ruleTextRequired": "صِف ما تمنعه القاعدة أو تشترطه.",
+    "keywordTooLong": "يمكن أن تصل كل كلمة مفتاحية إلى {{max}} حرف كحد أقصى.",
+    "topicTooLong": "يمكن أن يصل كل موضوع إلى {{max}} حرف كحد أقصى.",
+    "keywordsTooMany": "أضف ما يصل إلى {{max}} كلمة مفتاحية.",
+    "topicsTooMany": "أضف ما يصل إلى {{max}} موضوعًا.",
+    "piiEntityRequired": "حدّد نوعًا واحدًا على الأقل من البيانات المطلوب اكتشافها.",
+    "keywordRequired": "أضف كلمة مفتاحية واحدة على الأقل.",
+    "topicRequired": "أضف موضوعًا واحدًا على الأقل.",
+    "policyTextRequired": "أدخل نص السياسة.",
+    "ruleRequired": "أضف قاعدة واحدة على الأقل.",
+    "ruleIdDuplicate": "تحتاج كل قاعدة إلى معرّف قاعدة خاص بها.",
+    "piiEntities": "البيانات المطلوب اكتشافها",
+    "keywordsLabel": "الكلمات المفتاحية",
+    "keywordsHint": "كلمة مفتاحية واحدة في كل سطر.",
+    "topicsHint": "موضوع واحد في كل سطر.",
+    "policyFormat": "تنسيق السياسة",
+    "policyFormatRules": "قواعد منظَّمة",
+    "policyFormatRulesDescription": "قاعدة واحدة لكل متطلب، مع فئة ومستوى خطورة. موصى به.",
+    "policyFormatText": "نص السياسة",
+    "policyFormatTextDescription": "الصق سياسة موجودة كنص عادي.",
+    "rulesEmpty": "لا توجد قواعد بعد. تصف كل قاعدة شيئًا واحدًا يجب ألا تحتويه المدخلات أو تطلبه.",
+    "addRule": "إضافة قاعدة",
+    "ruleNumber": "القاعدة {{number}}",
+    "ruleRemove": "إزالة القاعدة {{number}}",
+    "ruleIdLabel": "معرّف القاعدة",
+    "ruleNameLabel": "الاسم (اختياري)",
+    "ruleTextLabel": "القاعدة",
+    "ruleRiskCategory": "فئة المخاطر",
+    "ruleApplicability": "النطاق",
+    "ruleFrameworks": "الأطر",
+    "detector": {
+      "promptInjection": {
+        "label": "حقن الموجّهات",
+        "description": "يكتشف محاولات تجاوز التعليمات أو كسر حماية النموذج."
+      },
+      "policyViolation": {
+        "label": "انتهاك السياسة",
+        "description": "يُبلغ عن المدخلات التي تنتهك سياسة مؤسستك، المكتوبة كنص أو كقواعد.",
+        "descriptionOutput": "يُبلغ عن الردود التي تنتهك سياسة مؤسستك، المكتوبة كنص أو كقواعد."
+      },
+      "pii": {
+        "label": "البيانات الشخصية والأسرار",
+        "description": "يكتشف البيانات الشخصية وبيانات الاعتماد وعناوين IP وعناوين URL."
+      },
+      "keywords": {
+        "label": "الكلمات المحظورة",
+        "descriptionOutput": "يكتشف الردود التي تحتوي على أي كلمة مفتاحية تدرجها."
+      },
+      "topics": {
+        "label": "المواضيع",
+        "descriptionOutput": "يُبلغ عن الردود التي تتناول أي موضوع تدرجه."
+      },
+      "toxicity": {
+        "label": "اللغة السامة",
+        "description": "يكتشف اللغة السامة أو المهينة أو المهدِّدة أو التي تحض على الكراهية."
+      },
+      "nsfw": {
+        "label": "محتوى غير لائق (NSFW)",
+        "description": "يكتشف المحتوى الجنسي أو غير اللائق لبيئة العمل."
+      },
+      "bias": {
+        "label": "التحيّز",
+        "description": "يكتشف اللغة المتحيّزة أو التمييزية."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "البيانات الشخصية",
+        "description": "الأسماء وعناوين البريد الإلكتروني وأرقام الهواتف."
+      },
+      "secrets": {
+        "label": "الأسرار",
+        "description": "مفاتيح API والرموز المميّزة وكلمات المرور."
+      },
+      "ipAddress": {
+        "label": "عناوين IP",
+        "description": "عناوين IPv4 وIPv6."
+      },
+      "url": {
+        "label": "عناوين URL",
+        "description": "عناوين الويب."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "الأمن والاحتيال",
+      "safetyHarm": "السلامة والضرر",
+      "privacyDataProtection": "الخصوصية وحماية البيانات",
+      "brandReputationTrust": "العلامة التجارية والسمعة",
+      "biasFairnessEthical": "التحيّز والإنصاف",
+      "legalIpLiability": "المسؤولية القانونية والملكية الفكرية",
+      "productMisuse": "إساءة استخدام المنتج",
+      "performanceQuality": "الأداء والجودة"
+    },
+    "applicability": {
+      "user": "مدخلات المستخدم",
+      "userAssistant": "مدخلات المستخدم والردود"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "قانون الاتحاد الأوروبي للذكاء الاصطناعي",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "ميزة خطة الشركات",
+    "enterpriseOnly": "هذه الميزة متاحة لخطة الشركات فقط.",
+    "readOnly": "يمكن لمالكي المؤسسة ومسؤوليها فقط تغيير هذه الإعدادات.",
+    "loadError": "تعذّر تحميل المزوّدين والنماذج",
+    "tabModels": "النماذج",
+    "tabProviders": "المزوّدون",
+    "tabGateways": "البوابات",
+    "modelsDescription": "عطّل نموذجًا لحظره عن جميع الأعضاء. تكون النماذج من المزوّدين المسموح بهم مفعّلة افتراضيًا.",
+    "modelsDeniedOnly": "المرفوضة فقط",
+    "modelsEmpty": "لا توجد نماذج تطابق هذا البحث.",
+    "providersDescription": "عطّل مزوّدًا ليتوقف Kilo عن توجيه الطلبات إليه في هذه المؤسسة.",
+    "providersNeedCatalog": "تبقى مفاتيح المزوّدين للقراءة فقط حتى يكتمل تحميل كتالوج النماذج بالكامل. اضغط على إعادة المحاولة في الأعلى لتعديلها.",
+    "providersEmpty": "لا يوجد مزوّدون يطابقون هذا البحث.",
+    "allowAllShown": "السماح بكل المعروض",
+    "denyAllShown": "رفض كل المعروض",
+    "gatewaysDescription": "يوجّه Kilo طلبات النماذج عبر Vercel AI Gateway أو OpenRouter. تفشل هذه الطلبات إذا كانت البوابة معطّلة.",
+    "emptyProviderList": "اسمح بمزوّد واحد على الأقل. إذا كانت القائمة فارغة، فلن يتمكن Kilo من توجيه الطلبات إلى أي نموذج.",
+    "gatewaysUnavailable": "إعدادات البوابات غير متاحة لهذه المؤسسة.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "طلبات OpenRouter غير مثبّتة على منطقة معيّنة.",
+    "inferenceRegion": "منطقة الاستدلال",
+    "inferenceRegionDescription": "يثبّت طلبات Vercel AI Gateway على هذه المنطقة. يفشل أي نموذج غير متاح فيها.",
+    "disableOpenrouterNote": "يؤدي تعطيل OpenRouter أيضًا إلى حظر مفاتيح BYOK التي توجّه الطلبات عبره.",
+    "emptyModelList": "أبقِ نموذجًا واحدًا على الأقل مفعّلًا. إذا رفضت جميع النماذج، فلن يتبقى للأعضاء أي شيء لاستخدامه.",
+    "catalogUnavailable": "لم يتم تحميل كتالوج النماذج الكامل، لذا تُعرض قوائمك المحفوظة فقط. أعد المحاولة لتحميل جميع النماذج.",
+    "region": {
+      "global": "عالمي",
+      "us": "الولايات المتحدة",
+      "eu": "الاتحاد الأوروبي",
+      "au": "أستراليا",
+      "jp": "اليابان"
+    }
   }
 }

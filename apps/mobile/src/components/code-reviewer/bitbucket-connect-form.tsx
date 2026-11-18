@@ -67,7 +67,13 @@ export function BitbucketConnectForm({
         }
       } catch (error) {
         if (attempt.owns()) {
-          attempt.fail(bitbucketConnectionFailure(error, t));
+          attempt.fail(
+            bitbucketConnectionFailure(
+              error,
+              t,
+              integrationId === null ? 'first-connect' : 'replace-token'
+            )
+          );
         }
       }
     })();

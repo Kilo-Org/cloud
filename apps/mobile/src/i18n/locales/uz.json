@@ -26,6 +26,7 @@
     "creditHistory": "Kreditlar tarixi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Bekor qilish",
     "done": "Tayyor",
     "retry": "Qayta urinish",
@@ -175,7 +176,8 @@
     "durationHourShort": "soat",
     "changes": "O'zgarishlar",
     "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin.",
-    "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya"
+    "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya",
+    "legalDocumentEnglishOnly": "Ushbu hujjat faqat ingliz tilida mavjud."
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -481,7 +483,14 @@
       "viewReceipt": "Kvitansiyani ko'rish"
     },
     "changelog": "Yangiliklar",
-    "changelogVersionPending": "Bu versiya yangiliklari ilovaning keyingi yangilanishi bilan keladi."
+    "changelogVersionPending": "{{version}} versiyasi yangiliklari ilovaning keyingi yangilanishi bilan keladi.",
+    "changelogGroupNew": "Yangi",
+    "changelogFixesIn": "Quyidagi bo‘limlarda tuzatishlar va yaxshilanishlar: {{areas}}.",
+    "changelogFixesPolish": "Butun ilova bo‘ylab tuzatishlar va yaxshilanishlar.",
+    "changelogAreas": {
+      "signIn": "Kirish",
+      "profileOrganizations": "Profil va tashkilotlar"
+    }
   },
   "preferences": {
     "general": "Umumiy",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "Bu tashkilotning Bitbucket ulanishi kompyuterdan veb orqali boshqariladi.",
       "description": "Kerakli ruxsatlarga ega ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",
-      "tokenPlaceholder": "Ish maydoniga kirish tokeni"
+      "tokenPlaceholder": "Ish maydoniga kirish tokeni",
+      "tokenRefused": "Bitbucket bu ish maydoniga kirish tokenini qabul qilmadi. U yuqoridagi ruxsatlarga ega ekanligini tekshirib, qayta urinib ko'ring."
     },
     "scopeList": {
       "personalStillAvailable": "Quyida shaxsiy repozitoriyalaringizdan foydalanishingiz mumkin.",
@@ -1465,7 +1475,8 @@
       "repositoryLine": "Koʻrib chiqishlar: {{reviews}} · Muammolar: {{findings}}",
       "empty": "Statistikasi bor koʻrib chiqishlar hozircha yoʻq",
       "emptyDescription": "Statistika tashkilot uchun yoqilgan boʻlsa, tugallangan koʻrib chiqishlarni qayd etadi.",
-      "off": "Bu tashkilot uchun statistika oʻchirilgan.",
+      "offTitle": "{{platform}} uchun statistika oʻchirilgan",
+      "offDescription": "Tugallangan koʻrib chiqishlarni qayd etish uchun veb-saytdagi tashkilot sozlamalarida statistikani yoqing.",
       "couldNotLoad": "Statistikani yuklab boʻlmadi"
     },
     "council": {
@@ -3325,6 +3336,7 @@
       "manageOnWeb": "Veb-saytdagi to'lovlar sozlamalari",
       "changePlan": "Tarifni o'zgartirish",
       "buySeats": "O'rin sotib olish",
+      "managedOnWeb": "Tarif, o'rinlar va avtomatik to'ldirish veb-saytda boshqariladi.",
       "setupAutoTopUp": "Avtomatik to'ldirishni sozlash",
       "manageAutoTopUp": "Avtomatik to'ldirishni boshqarish",
       "opensOnWeb": "Vebda ochiladi"
@@ -3462,7 +3474,6 @@
     },
     "settingsOnWeb": {
       "title": "Veb-saytdagi tashkilot sozlamalari",
-      "integrations": "Veb-saytdagi integratsiyalar",
       "usageDetails": "Foydalanish tafsilotlari",
       "providersAndModels": "Provayderlar va modellar",
       "groups": "Guruhlar",
@@ -3471,9 +3482,17 @@
       "ssoAndDomain": "SSO va domen",
       "dataCollection": "Ma'lumotlar yig'ish",
       "auditLogs": "Audit jurnallari",
-      "requestLogs": "So'rovlar jurnallari",
-      "subOrganizations": "Quyi tashkilotlar",
-      "distributeFunds": "Mablag'larni taqsimlash"
+      "requestLogs": "So'rovlar jurnallari"
+    },
+    "requestLogs": {
+      "older": "Oldingi soat",
+      "newer": "Keyingi soat",
+      "truncated": "Bu soatda ro'yxatda ko'rsatilganidan ko'proq so'rov bor.",
+      "emptyTitle": "So'rovlar yo'q",
+      "loadError": "So'rovlar jurnallarini yuklab bo'lmadi.",
+      "permissionDenied": "So'rovlar jurnallarini faqat tashkilot egasi, administratori yoki to'lovlar menejeri ko'ra oladi.",
+      "tokens": "{{input}} kirish · {{output}} chiqish",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Kirish tokenlari",
@@ -4460,7 +4479,6 @@
     "dismiss": "Brifingni e’tiborsiz qoldirish",
     "offline": "Oflayn · saqlangan brifing",
     "cached": "Saqlangan hisobot · yangilab bo‘lmaydi",
-    "window": "{{start}} – {{end}}",
     "summary": "AI xulosasi",
     "summaryPending": "AI xulosasi tayyorlanmoqda. Tayyor bo‘lgach shu yerga qo‘shiladi.",
     "summaryUnavailable": "AI xulosasi mavjud emas. Tuzilgan hisobotingiz baribir mavjud.",
@@ -4527,6 +4545,8 @@
     "topModels": "Yetakchi modellar",
     "topFeatures": "Yetakchi funksiyalar",
     "emptyTitle": "Bu davrda foydalanish yo'q",
+    "unavailableTitle": "Foydalanish mavjud emas",
+    "unavailableDescription": "Bu Workspace foydalanish haqida xabar bermaydi. Qayta urinish yordam bermaydi.",
     "orgSelfNotice": "Siz ushbu tashkilotdagi o'z foydalanishingizni ko'ryapsiz.",
     "viewDetails": "Foydalanish tafsilotlarini ko'rish"
   },
@@ -4577,6 +4597,7 @@
       "title": "Ishga tushirgichlar va vebhooklar",
       "subtitle": "Cloud Agent ishga tushirishlarini vebhook chaqiruvi yoki jadval boʻyicha avtomatlashtiring.",
       "new": "Yangi ishga tushirgich",
+      "create": "Ishga tushirgich yarating",
       "emptyTitle": "Hozircha ishga tushirgichlar yoʻq",
       "emptyDescription": "Cloud Agent ishga tushirishini vebhook chaqiruvi yoki jadval boʻyicha boshlash uchun ishga tushirgich yarating.",
       "loadFailedTitle": "Ishga tushirgichlarni yuklab boʻlmadi",
@@ -4685,5 +4706,175 @@
     "unavailableDescription": "Bu ulashish havolasining muddati tugagan yoki u bekor qilingan.",
     "transcriptUnavailableTitle": "Bu transkriptni yuklab boʻlmadi",
     "transcriptUnavailableDescription": "Havola hali ham ishlaydi. Birozdan soʻng qayta urinib koʻring."
+  },
+  "organizationGuardrails": {
+    "title": "AI himoya to'siqlari",
+    "permissionDenied": "Faqat tashkilot egalari va administratorlari AI himoya to'siqlarini boshqara oladi.",
+    "unavailable": "AI himoya to'siqlari bu tashkilot uchun mavjud emas.",
+    "loadError": "AI himoya to'siqlarini yuklab bo'lmadi",
+    "statusSaving": "Saqlanmoqda…",
+    "statusSaved": "Saqlandi",
+    "statusFailed": "Saqlab bo'lmadi.",
+    "inputTitle": "Kirish himoya to'siqlari",
+    "inputDescription": "Har bir kirishni Enkrypt AI bilan skanerlaydi, jumladan asbob natijalarini. Bloklovchi detektor Enkrypt mavjud bo'lmaganda so'rovni rad etadi.",
+    "outputTitle": "Chiqish himoya to'siqlari",
+    "outputDescription": "A'zolar javoblarni olishidan oldin ularni Enkrypt AI bilan skanerlaydi. Siz yoqmaguningizcha o'chirilgan.",
+    "detectorsHint": "Bloklash belgilangan so'rovni rad etadi. Faqat jurnalga yozish uni kechiktirmasdan qayd etadi.",
+    "detectorsHintOutput": "Bloklash belgilangan javobni rad etadi. Faqat jurnalga yozish uni kechiktirmasdan qayd etadi.",
+    "choiceLog": "Faqat jurnalga yozish",
+    "applyTo": "Qo'llash",
+    "applyToAllMembers": "Barcha a'zolarga",
+    "applyKiloDefault": "Kilo standartini qo'llash",
+    "invalidSavedTitle": "Saqlangan kirish detektori sozlamalarini o'qib bo'lmaydi",
+    "invalidSavedBody": "Kirish detektorlari qayta saqlanmaguncha so'rovlar bloklanadi. Quyidagi detektorlar Kilo standartidan boshlanadi.",
+    "invalidSavedOutputTitle": "Saqlangan chiqish detektori sozlamalarini o'qib bo'lmaydi",
+    "invalidSavedOutputBody": "Chiqish detektorlari qayta saqlanmaguncha javoblar ushlab turiladi. Quyida chiqish detektorlarini tanlang.",
+    "blockingOutputNote": "Bloklovchi chiqish detektori Enkrypt barchasini tekshirmaguncha javobni ushlab turadi. Kechikishdan qochish uchun faqat jurnalga yozishdan foydalaning.",
+    "inputDetectorRequired": "Kamida bitta kirish detektorini yoqing.",
+    "outputDetectorRequired": "Kamida bitta chiqish detektorini yoqing.",
+    "rulesTooMany": "{{max}} tagacha qoida qo'shing.",
+    "ruleIdRequired": "Qoida identifikatorini kiriting.",
+    "ruleIdInvalid": "Qoida identifikatorida faqat harflar, raqamlar, nuqtalar, chiziqchalar va pastki chiziqlardan foydalanish mumkin.",
+    "ruleTextRequired": "Qoida nimani taqiqlashi yoki talab qilishini tavsiflang.",
+    "keywordTooLong": "Har bir kalit so'z {{max}} belgigacha bo'lishi mumkin.",
+    "topicTooLong": "Har bir mavzu {{max}} belgigacha bo'lishi mumkin.",
+    "keywordsTooMany": "{{max}} tagacha kalit so'z qo'shing.",
+    "topicsTooMany": "{{max}} tagacha mavzu qo'shing.",
+    "piiEntityRequired": "Aniqlash uchun kamida bitta ma'lumot turini tanlang.",
+    "keywordRequired": "Kamida bitta kalit so'z qo'shing.",
+    "topicRequired": "Kamida bitta mavzu qo'shing.",
+    "policyTextRequired": "Siyosat matnini kiriting.",
+    "ruleRequired": "Kamida bitta qoida qo'shing.",
+    "ruleIdDuplicate": "Har bir qoida uchun alohida qoida ID bo'lishi kerak.",
+    "piiEntities": "Aniqlanadigan ma'lumotlar",
+    "keywordsLabel": "Kalit so'zlar",
+    "keywordsHint": "Har satrda bitta kalit so'z.",
+    "topicsHint": "Har satrda bitta mavzu.",
+    "policyFormat": "Siyosat formati",
+    "policyFormatRules": "Tuzilgan qoidalar",
+    "policyFormatRulesDescription": "Har bir talab uchun bitta qoida, kategoriya va jiddiylik darajasi bilan. Tavsiya etiladi.",
+    "policyFormatText": "Siyosat matni",
+    "policyFormatTextDescription": "Mavjud siyosatni oddiy matn sifatida joylashtiring.",
+    "rulesEmpty": "Hali qoidalar yo'q. Har bir qoida kirishlarda bo'lmasligi yoki so'ralmasligi kerak bo'lgan bitta narsani tavsiflaydi.",
+    "addRule": "Qoida qo'shish",
+    "ruleNumber": "{{number}}-qoida",
+    "ruleRemove": "{{number}}-qoidani olib tashlash",
+    "ruleIdLabel": "Qoida identifikatori",
+    "ruleNameLabel": "Nomi (ixtiyoriy)",
+    "ruleTextLabel": "Qoida",
+    "ruleRiskCategory": "Xavf kategoriyasi",
+    "ruleApplicability": "Qamrov",
+    "ruleFrameworks": "Ramkalar",
+    "detector": {
+      "promptInjection": {
+        "label": "Ko'rsatma inyeksiyasi",
+        "description": "Ko'rsatmalarni bekor qilish yoki modelni cheklovlardan chiqarishga urinishlarni aniqlaydi."
+      },
+      "policyViolation": {
+        "label": "Siyosat buzilishi",
+        "description": "Matn yoki qoidalar shaklida yozilgan, tashkilot siyosatini buzadigan kirishlarni belgilaydi.",
+        "descriptionOutput": "Matn yoki qoidalar shaklida yozilgan, tashkilot siyosatini buzadigan javoblarni belgilaydi."
+      },
+      "pii": {
+        "label": "PII va maxfiy ma'lumotlar",
+        "description": "Shaxsiy ma'lumotlar, hisob ma'lumotlari, IP manzillar va URL manzillarni aniqlaydi."
+      },
+      "keywords": {
+        "label": "Taqiqlangan kalit so'zlar",
+        "descriptionOutput": "Siz ro'yxatga kiritgan har qanday kalit so'zni o'z ichiga olgan javoblarni aniqlaydi."
+      },
+      "topics": {
+        "label": "Mavzular",
+        "descriptionOutput": "Siz ro'yxatga kiritgan har qanday mavzudagi javoblarni belgilaydi."
+      },
+      "toxicity": {
+        "label": "Toksiklik",
+        "description": "Toksik, haqoratli, tahdidli yoki nafratli tilni aniqlaydi."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Jinsiy yoki boshqa tarzda ish uchun xavfsiz bo'lmagan kontentni aniqlaydi."
+      },
+      "bias": {
+        "label": "Tarafkashlik",
+        "description": "Tarafkash yoki kamsituvchi tilni aniqlaydi."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Shaxsiy ma'lumotlar",
+        "description": "Ismlar, elektron pochta manzillari, telefon raqamlari."
+      },
+      "secrets": {
+        "label": "Maxfiy ma'lumotlar",
+        "description": "API kalitlari, tokenlar, parollar."
+      },
+      "ipAddress": {
+        "label": "IP manzillar",
+        "description": "IPv4 va IPv6 manzillari."
+      },
+      "url": {
+        "label": "URL manzillar",
+        "description": "Veb manzillar."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Xavfsizlik va firibgarlik",
+      "safetyHarm": "Xavfsizlik va zarar yetkazish",
+      "privacyDataProtection": "Maxfiylik va ma'lumotlarni himoya qilish",
+      "brandReputationTrust": "Brend, obro' va ishonch",
+      "biasFairnessEthical": "Tarafkashlik, adolat va axloq",
+      "legalIpLiability": "Huquqiy va intellektual mulk javobgarligi",
+      "productMisuse": "Mahsulotdan noto'g'ri foydalanish",
+      "performanceQuality": "Ishlash va sifat"
+    },
+    "applicability": {
+      "user": "Foydalanuvchi kiritmasi",
+      "userAssistant": "Foydalanuvchi kiritmasi va javoblar"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM eng muhim 10 xavfi (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Yevropa Ittifoqining sun'iy intellekt to'g'risidagi qonuni",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Korxona xususiyati",
+    "enterpriseOnly": "Bu faqat korxonalar uchun mavjud xususiyat.",
+    "readOnly": "Faqat tashkilot egalari va administratorlari bu sozlamalarni o'zgartira oladi.",
+    "loadError": "Provayderlar va modellarni yuklab bo'lmadi",
+    "tabModels": "Modellar",
+    "tabProviders": "Provayderlar",
+    "tabGateways": "Shlyuzlar",
+    "modelsDescription": "Modelni o'chirish orqali uni har bir a'zo uchun bloklang. Ruxsat berilgan provayderlardan olingan modellar yoqilgan holda boshlanadi.",
+    "modelsDeniedOnly": "Faqat taqiqlanganlar",
+    "modelsEmpty": "Bu qidiruvga mos model topilmadi.",
+    "providersDescription": "Provayderni o'chirish orqali Kilo bu tashkilot uchun unga yo'naltirishni to'xtatadi.",
+    "providersNeedCatalog": "To'liq modellar katalogi yuklanmaguncha provayder kalitlari faqat o'qish uchun bo'ladi. Ularni tahrirlash uchun yuqoridagi Qayta urinish tugmasini bosing.",
+    "providersEmpty": "Bu qidiruvga mos provayder topilmadi.",
+    "allowAllShown": "Ko'rsatilganlarning barchasiga ruxsat berish",
+    "denyAllShown": "Ko'rsatilganlarning barchasini taqiqlash",
+    "gatewaysDescription": "Kilo model so'rovlarini Vercel AI Gateway yoki OpenRouter orqali yo'naltiradi. O'chirilgan shlyuz bu so'rovlarni muvaffaqiyatsiz qiladi.",
+    "emptyProviderList": "Kamida bitta provayderga ruxsat bering. Bo'sh ro'yxat barcha Kilo model yo'naltirishlarini to'sib qo'yadi.",
+    "gatewaysUnavailable": "Shlyuz sozlamalari bu tashkilot uchun mavjud emas.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "OpenRouter so'rovlari hududga qat'iy biriktirilmagan.",
+    "inferenceRegion": "Xulosa chiqarish hududi",
+    "inferenceRegionDescription": "Vercel AI Gateway so'rovlarini shu hududga qat'iy biriktiradi. U yerda mavjud bo'lmagan model ishlamaydi.",
+    "disableOpenrouterNote": "OpenRouter'ni o'chirish, so'rovlarni u orqali yo'naltiruvchi BYOK kalitlarini ham bloklaydi.",
+    "emptyModelList": "Kamida bitta modelni yoqilgan holda qoldiring. Barcha modellarni rad etsangiz, a'zolarda foydalanish uchun hech narsa qolmaydi.",
+    "catalogUnavailable": "To'liq modellar katalogi yuklanmadi, shuning uchun faqat saqlangan ro'yxatlaringiz ko'rsatilmoqda. Barcha modellarni yuklash uchun qayta urinib ko'ring.",
+    "region": {
+      "global": "Butun dunyo",
+      "us": "Qo'shma Shtatlar",
+      "eu": "Yevropa Ittifoqi",
+      "au": "Avstraliya",
+      "jp": "Yaponiya"
+    }
   }
 }

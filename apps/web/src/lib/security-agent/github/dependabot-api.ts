@@ -15,6 +15,7 @@ import type {
   DependabotAlertsAvailability,
   DependabotAlertState,
 } from '../core/types';
+import type { DismissReason } from '../core/schemas';
 import {
   errorExceptInTest,
   sentryLogger,
@@ -551,16 +552,6 @@ export async function fetchDependabotAlert(
 }
 
 /**
- * Dismiss reason types for Dependabot alerts
- */
-export type DependabotDismissReason =
-  | 'fix_started'
-  | 'no_bandwidth'
-  | 'tolerable_risk'
-  | 'inaccurate'
-  | 'not_used';
-
-/**
  * Dismiss a Dependabot alert
  * Uses octokit.rest.dependabot.updateAlert() with state: 'dismissed'
  */
@@ -569,7 +560,7 @@ export async function dismissDependabotAlert(
   owner: string,
   repo: string,
   alertNumber: number,
-  dismissedReason: DependabotDismissReason,
+  dismissedReason: DismissReason,
   dismissedComment?: string
 ): Promise<void> {
   const tokenData = await generateGitHubInstallationToken(installationId);

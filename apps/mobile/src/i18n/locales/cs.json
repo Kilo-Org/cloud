@@ -26,6 +26,7 @@
     "creditHistory": "Historie kreditů",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Zrušit",
     "done": "Hotovo",
     "retry": "Zkusit znovu",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Změny",
     "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu.",
-    "privateRepositoryA11y": "{{name}}, soukromý repozitář"
+    "privateRepositoryA11y": "{{name}}, soukromý repozitář",
+    "legalDocumentEnglishOnly": "Tento dokument je k dispozici pouze v angličtině."
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -481,7 +483,14 @@
       "viewReceipt": "Zobrazit potvrzení"
     },
     "changelog": "Co je nového",
-    "changelogVersionPending": "Poznámky k této verzi přijdou s další aktualizací aplikace."
+    "changelogVersionPending": "Poznámky k verzi {{version}} přijdou s další aktualizací aplikace.",
+    "changelogGroupNew": "Novinky",
+    "changelogFixesIn": "Opravy a vylepšení v oblastech: {{areas}}.",
+    "changelogFixesPolish": "Opravy a vylepšení v celé aplikaci.",
+    "changelogAreas": {
+      "signIn": "Přihlášení",
+      "profileOrganizations": "Profil a organizace"
+    }
   },
   "preferences": {
     "general": "Obecné",
@@ -1400,7 +1409,8 @@
       "managedOnWeb": "Připojení Bitbucket této organizace se spravuje na webu z počítače.",
       "description": "Vytvořte přístupový token pracovního prostoru s požadovanými oprávněními a vložte jej níže.",
       "scopes": "Účet: čtení · Repozitáře: čtení/zápis · PR: čtení · Webhooky: čtení/zápis",
-      "tokenPlaceholder": "Přístupový token pracovního prostoru"
+      "tokenPlaceholder": "Přístupový token pracovního prostoru",
+      "tokenRefused": "Bitbucket tento token pracovního prostoru nepřijal. Zkontrolujte, že má výše uvedená oprávnění, a poté to zkuste znovu."
     },
     "scopeList": {
       "personalStillAvailable": "Osobní repozitáře jsou stále k dispozici níže.",
@@ -1513,7 +1523,8 @@
       "repositoryLine": "Kontroly: {{reviews}} · Nálezy: {{findings}}",
       "empty": "Zatím žádné kontroly s analytikou",
       "emptyDescription": "Analytika zaznamenává dokončené kontroly, pokud je pro organizaci zapnutá.",
-      "off": "Analytika je pro tuto organizaci vypnutá.",
+      "offTitle": "Analytika je pro {{platform}} vypnutá",
+      "offDescription": "Zapněte analytiku v nastavení organizace na webu, aby zaznamenávala dokončené kontroly.",
       "couldNotLoad": "Analytiku se nepodařilo načíst"
     },
     "council": {
@@ -3439,6 +3450,7 @@
       "manageOnWeb": "Nastavení fakturace na webu",
       "changePlan": "Změnit plán",
       "buySeats": "Koupit uživatelská místa",
+      "managedOnWeb": "Plán, uživatelská místa a automatické dobití se spravují na webu.",
       "setupAutoTopUp": "Nastavit automatické dobití",
       "manageAutoTopUp": "Spravovat automatické dobití",
       "opensOnWeb": "Otevře se na webu"
@@ -3576,7 +3588,6 @@
     },
     "settingsOnWeb": {
       "title": "Nastavení organizace na webu",
-      "integrations": "Integrace na webu",
       "usageDetails": "Podrobnosti o využití",
       "providersAndModels": "Poskytovatelé a modely",
       "groups": "Skupiny",
@@ -3585,9 +3596,17 @@
       "ssoAndDomain": "SSO a doména",
       "dataCollection": "Shromažďování dat",
       "auditLogs": "Auditní protokoly",
-      "requestLogs": "Protokoly požadavků",
-      "subOrganizations": "Podorganizace",
-      "distributeFunds": "Rozdělit prostředky"
+      "requestLogs": "Protokoly požadavků"
+    },
+    "requestLogs": {
+      "older": "Starší hodina",
+      "newer": "Novější hodina",
+      "truncated": "V této hodině je více požadavků, než seznam zobrazuje.",
+      "emptyTitle": "Žádné požadavky",
+      "loadError": "Protokoly požadavků se nepodařilo načíst.",
+      "permissionDenied": "Protokoly požadavků organizace si může prohlížet jen její vlastník, administrátor nebo správce fakturace.",
+      "tokens": "{{input}} vstup · {{output}} výstup",
+      "byok": "BYOK"
     },
     "usageStats": {
       "inputTokens": "Vstupní tokeny",
@@ -4600,7 +4619,6 @@
     "dismiss": "Skrýt přehled",
     "offline": "Offline · uložený přehled",
     "cached": "Uložený přehled · obnovení nedostupné",
-    "window": "{{start}} – {{end}}",
     "summary": "AI shrnutí",
     "summaryPending": "AI shrnutí se připravuje. Až bude hotové, objeví se zde.",
     "summaryUnavailable": "AI shrnutí není k dispozici. Strukturovaný přehled je stále dostupný.",
@@ -4667,6 +4685,8 @@
     "topModels": "Nejpoužívanější modely",
     "topFeatures": "Nejpoužívanější funkce",
     "emptyTitle": "V tomto období žádné využití",
+    "unavailableTitle": "Využití není k dispozici",
+    "unavailableDescription": "Tento pracovní prostor nevykazuje využití. Opakování nepomůže.",
     "orgSelfNotice": "Vidíte své vlastní využití v této organizaci.",
     "viewDetails": "Zobrazit podrobnosti o využití"
   },
@@ -4717,6 +4737,7 @@
       "title": "Spouštěče a webhooky",
       "subtitle": "Automatizujte spouštění Cloud Agent voláním webhooku nebo podle plánu.",
       "new": "Nový spouštěč",
+      "create": "Vytvořit spouštěč",
       "emptyTitle": "Zatím žádné spouštěče",
       "emptyDescription": "Vytvořte spouštěč pro spuštění Cloud Agent voláním webhooku nebo podle plánu.",
       "loadFailedTitle": "Spouštěče se nepodařilo načíst",
@@ -4825,5 +4846,175 @@
     "unavailableDescription": "Platnost tohoto odkazu pro sdílení vypršela nebo byl odkaz zrušen.",
     "transcriptUnavailableTitle": "Tento přepis se nepodařilo načíst",
     "transcriptUnavailableDescription": "Odkaz stále funguje. Zkuste to znovu za chvíli."
+  },
+  "organizationGuardrails": {
+    "title": "Ochranná pravidla AI",
+    "permissionDenied": "Ochranná pravidla AI mohou spravovat jen vlastníci a správci organizace.",
+    "unavailable": "Ochranná pravidla AI nejsou pro tuto organizaci k dispozici.",
+    "loadError": "Ochranná pravidla AI se nepodařilo načíst",
+    "statusSaving": "Ukládání…",
+    "statusSaved": "Uloženo",
+    "statusFailed": "Uložení se nezdařilo.",
+    "inputTitle": "Ochranná pravidla pro vstup",
+    "inputDescription": "Kontroluje každý vstup pomocí Enkrypt AI, včetně výsledků nástrojů. Blokující detektor odmítne požadavek, když je Enkrypt nedostupný.",
+    "outputTitle": "Ochranná pravidla pro výstup",
+    "outputDescription": "Kontroluje odpovědi pomocí Enkrypt AI dříve, než je členové obdrží. Je vypnuto, dokud ho nezapnete.",
+    "detectorsHint": "Možnost Blokovat označený požadavek odmítne. Možnost Jen zaznamenat ho pouze zaznamená, aniž by požadavek zdržela.",
+    "detectorsHintOutput": "Možnost Blokovat způsobí selhání označené odpovědi. Možnost Jen zaznamenat ji pouze zaznamená, aniž by odpověď zdržela.",
+    "choiceLog": "Jen zaznamenat",
+    "applyTo": "Použít pro",
+    "applyToAllMembers": "Všichni členové",
+    "applyKiloDefault": "Použít výchozí nastavení Kilo",
+    "invalidSavedTitle": "Uložené nastavení vstupních detektorů nelze načíst",
+    "invalidSavedBody": "Požadavky jsou blokovány, dokud vstupní detektory znovu neuložíte. Detektory níže vycházejí z výchozího nastavení Kilo.",
+    "invalidSavedOutputTitle": "Uložené nastavení výstupních detektorů nelze načíst",
+    "invalidSavedOutputBody": "Odpovědi jsou zadržovány, dokud výstupní detektory znovu neuložíte. Výstupní detektory vyberte níže.",
+    "blockingOutputNote": "Blokující výstupní detektor zadrží odpověď, dokud ji Enkrypt celou nezkontroluje. Zdržení se vyhnete volbou Jen zaznamenat.",
+    "inputDetectorRequired": "Zapněte alespoň jeden vstupní detektor.",
+    "outputDetectorRequired": "Zapněte alespoň jeden výstupní detektor.",
+    "rulesTooMany": "Maximální počet pravidel je {{max}}.",
+    "ruleIdRequired": "Zadejte ID pravidla.",
+    "ruleIdInvalid": "ID pravidla může obsahovat jen písmena, číslice, tečky, pomlčky a podtržítka.",
+    "ruleTextRequired": "Popište, co pravidlo zakazuje nebo vyžaduje.",
+    "keywordTooLong": "Každé klíčové slovo může mít nejvýše {{max}} znaků.",
+    "topicTooLong": "Každé téma může mít nejvýše {{max}} znaků.",
+    "keywordsTooMany": "Přidejte nejvýše {{max}} klíčových slov.",
+    "topicsTooMany": "Přidejte nejvýše {{max}} témat.",
+    "piiEntityRequired": "Vyberte alespoň jeden typ dat k detekci.",
+    "keywordRequired": "Přidejte alespoň jedno klíčové slovo.",
+    "topicRequired": "Přidejte alespoň jedno téma.",
+    "policyTextRequired": "Zadejte text zásad.",
+    "ruleRequired": "Přidejte alespoň jedno pravidlo.",
+    "ruleIdDuplicate": "Každé pravidlo musí mít vlastní ID pravidla.",
+    "piiEntities": "Data k detekci",
+    "keywordsLabel": "Klíčová slova",
+    "keywordsHint": "Jedno klíčové slovo na řádek.",
+    "topicsHint": "Jedno téma na řádek.",
+    "policyFormat": "Formát zásad",
+    "policyFormatRules": "Strukturovaná pravidla",
+    "policyFormatRulesDescription": "Jedno pravidlo pro každou podmínku, s kategorií a závažností. Doporučeno.",
+    "policyFormatText": "Text zásad",
+    "policyFormatTextDescription": "Vložte existující zásady jako prostý text.",
+    "rulesEmpty": "Zatím žádná pravidla. Každé pravidlo popisuje jednu věc, kterou vstupy nesmí obsahovat ani o ni žádat.",
+    "addRule": "Přidat pravidlo",
+    "ruleNumber": "Pravidlo {{number}}",
+    "ruleRemove": "Odebrat pravidlo {{number}}",
+    "ruleIdLabel": "ID pravidla",
+    "ruleNameLabel": "Název (nepovinné)",
+    "ruleTextLabel": "Pravidlo",
+    "ruleRiskCategory": "Kategorie rizika",
+    "ruleApplicability": "Rozsah",
+    "ruleFrameworks": "Rámce",
+    "detector": {
+      "promptInjection": {
+        "label": "Injektáž promptu",
+        "description": "Detekuje pokusy přepsat instrukce nebo obejít omezení modelu (jailbreak)."
+      },
+      "policyViolation": {
+        "label": "Porušení zásad",
+        "description": "Označuje vstupy, které porušují zásady vaší organizace zadané jako text nebo pravidla.",
+        "descriptionOutput": "Označuje odpovědi, které porušují zásady vaší organizace zadané jako text nebo pravidla."
+      },
+      "pii": {
+        "label": "Osobní a tajné údaje",
+        "description": "Detekuje osobní údaje, přihlašovací údaje, IP adresy a URL adresy."
+      },
+      "keywords": {
+        "label": "Zakázaná klíčová slova",
+        "descriptionOutput": "Detekuje odpovědi, které obsahují kterékoli z uvedených klíčových slov."
+      },
+      "topics": {
+        "label": "Témata",
+        "descriptionOutput": "Označuje odpovědi týkající se kteréhokoli z uvedených témat."
+      },
+      "toxicity": {
+        "label": "Toxicita",
+        "description": "Detekuje toxický, urážlivý, výhružný nebo nenávistný jazyk."
+      },
+      "nsfw": {
+        "label": "NSFW",
+        "description": "Detekuje sexuální nebo jinak nevhodný obsah (NSFW)."
+      },
+      "bias": {
+        "label": "Předpojatost",
+        "description": "Detekuje předpojatý nebo diskriminační jazyk."
+      }
+    },
+    "pii": {
+      "personalData": {
+        "label": "Osobní údaje",
+        "description": "Jména, e-mailové adresy, telefonní čísla."
+      },
+      "secrets": {
+        "label": "Tajné údaje",
+        "description": "Klíče API, tokeny, hesla."
+      },
+      "ipAddress": {
+        "label": "IP adresy",
+        "description": "Adresy IPv4 a IPv6."
+      },
+      "url": {
+        "label": "URL adresy",
+        "description": "Webové adresy."
+      }
+    },
+    "riskCategory": {
+      "securityFraud": "Zabezpečení a podvody",
+      "safetyHarm": "Bezpečnost a újma",
+      "privacyDataProtection": "Soukromí a ochrana dat",
+      "brandReputationTrust": "Značka a pověst",
+      "biasFairnessEthical": "Předpojatost a férovost",
+      "legalIpLiability": "Právní odpovědnost a duševní vlastnictví",
+      "productMisuse": "Zneužití produktu",
+      "performanceQuality": "Výkon a kvalita"
+    },
+    "applicability": {
+      "user": "Vstup uživatele",
+      "userAssistant": "Vstup uživatele a odpovědi"
+    },
+    "framework": {
+      "hipaa": "HIPAA",
+      "finra": "FINRA",
+      "gdpr": "GDPR",
+      "ccpa": "CCPA",
+      "owasp": "OWASP LLM Top 10 (2025)",
+      "nist": "NIST AI RMF",
+      "euAiAct": "Akt EU o umělé inteligenci",
+      "iso": "ISO/IEC 42001"
+    }
+  },
+  "organizationModelAccess": {
+    "enterpriseOnlyTitle": "Funkce pro Enterprise",
+    "enterpriseOnly": "Tato funkce je dostupná pouze v tarifu Enterprise.",
+    "readOnly": "Tato nastavení mohou měnit jen vlastníci a správci organizace.",
+    "loadError": "Poskytovatele a modely se nepodařilo načíst",
+    "tabModels": "Modely",
+    "tabProviders": "Poskytovatelé",
+    "tabGateways": "Brány",
+    "modelsDescription": "Vypnutím modelu ho zablokujete pro všechny členy. Modely od povolených poskytovatelů jsou ve výchozím stavu zapnuté.",
+    "modelsDeniedOnly": "Jen zakázané",
+    "modelsEmpty": "Hledání neodpovídají žádné modely.",
+    "providersDescription": "Po vypnutí poskytovatele k němu Kilo pro tuto organizaci přestane směrovat požadavky.",
+    "providersNeedCatalog": "Přepínače poskytovatelů zůstanou jen pro čtení, dokud se nenačte celý katalog modelů. Pokud je chcete upravit, klepněte výše na Zkusit znovu.",
+    "providersEmpty": "Hledání neodpovídají žádní poskytovatelé.",
+    "allowAllShown": "Povolit vše zobrazené",
+    "denyAllShown": "Zakázat vše zobrazené",
+    "gatewaysDescription": "Kilo směruje požadavky na modely přes Vercel AI Gateway nebo OpenRouter. Pokud je brána vypnutá, tyto požadavky selžou.",
+    "emptyProviderList": "Povolte alespoň jednoho poskytovatele. Při prázdném seznamu Kilo nemůže směrovat požadavky na žádný model.",
+    "gatewaysUnavailable": "Nastavení bran není pro tuto organizaci k dispozici.",
+    "openrouter": "OpenRouter",
+    "openrouterNote": "Požadavky přes OpenRouter nejsou vázány na region.",
+    "inferenceRegion": "Region inference",
+    "inferenceRegionDescription": "Váže požadavky přes Vercel AI Gateway na tento region. Model, který v něm není k dispozici, selže.",
+    "disableOpenrouterNote": "Vypnutím OpenRouter zablokujete i klíče BYOK, které přes něj směrují požadavky.",
+    "emptyModelList": "Nechte zapnutý alespoň jeden model. Pokud zakážete všechny modely, členové nebudou mít co používat.",
+    "catalogUnavailable": "Úplný katalog modelů se nenačetl, proto se zobrazují jen vaše uložené seznamy. Zkuste to znovu a načtěte všechny modely.",
+    "region": {
+      "global": "Globální",
+      "us": "Spojené státy",
+      "eu": "Evropská unie",
+      "au": "Austrálie",
+      "jp": "Japonsko"
+    }
   }
 }

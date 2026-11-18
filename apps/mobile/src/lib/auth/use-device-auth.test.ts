@@ -4,7 +4,7 @@ import * as React from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getDeviceAuth429Error } from '@/lib/auth/poll-response';
+import { getDeviceAuthStartRefusalError } from '@/lib/auth/poll-response';
 import {
   buildDeviceAuthPollRequest,
   parseDeviceAuthTokenResponse,
@@ -69,29 +69,40 @@ describe('device-auth polling request', () => {
   });
 });
 
-// --- Existing 429 tests (unchanged) ---
+// --- Device-auth start refusals ---
 
-describe('use-device-auth start path — 429 rate-limit message', () => {
-  it('carries the server error field as untranslated text', () => {
+describe('use-device-auth start path — rate-limit refusal', () => {
+  it('reads the stable RATE_LIMITED code and ignores the server sentence', () => {
     const serverBody = {
-      error: 'Too many sign-in attempts from this network. Wait a few minutes and try again.',
+      error: 'RATE_LIMITED',
+      message: 'x',
+      retryAfterSeconds: 30,
     };
-    const error = getDeviceAuth429Error(serverBody);
-    expect(error).toEqual({ kind: 'text', text: serverBody.error });
-  });
-
-  it('falls back to the catalog key when the server body has no error field', () => {
-    const serverBody: { error?: string } = {};
-    expect(getDeviceAuth429Error(serverBody)).toEqual({
+    // A status other than 429, so the code alone decides this case.
+    expect(getDeviceAuthStartRefusalError(serverBody, 400)).toEqual({
       kind: 'key',
       key: 'authErrors.tooManySignInAttempts',
     });
   });
 
-  it('falls back to the catalog key when JSON parsing fails', () => {
-    expect(getDeviceAuth429Error(undefined)).toEqual({
+  it('keeps the rate-limit copy for a 429 whose body names no code', () => {
+    expect(getDeviceAuthStartRefusalError(undefined, 429)).toEqual({
       kind: 'key',
       key: 'authErrors.tooManySignInAttempts',
+    });
+  });
+
+  it('keeps the rate-limit copy for a 429 whose body names another code', () => {
+    expect(getDeviceAuthStartRefusalError({ error: 'SOMETHING_ELSE' }, 429)).toEqual({
+      kind: 'key',
+      key: 'authErrors.tooManySignInAttempts',
+    });
+  });
+
+  it('falls back to the generic start failure for a non-429 refusal', () => {
+    expect(getDeviceAuthStartRefusalError({ error: 'INVALID_REQUESTING_CLIENT' }, 400)).toEqual({
+      kind: 'key',
+      key: 'authErrors.startSignInFailed',
     });
   });
 });
@@ -535,6 +546,30 @@ describe('useDeviceAuth hook', () => {
       key: 'authErrors.startSignInFailed',
     });
     expect(resultRef.current?.expiredPendingLinkToken).toBeUndefined();
+  });
+
+  it('shows the rate-limit copy for a refused start and opens no browser', async () => {
+    vi.mocked(openAuthSessionAsync).mockClear();
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json(
+        { error: 'RATE_LIMITED', message: 'Too many sign-in attempts.', retryAfterSeconds: 600 },
+        { status: 429 }
+      )
+    );
+
+    const resultRef = await mountSettled();
+    await act(async () => {
+      await requireResult(resultRef).start('signin');
+    });
+
+    expect(resultRef.current?.status).toBe('error');
+    expect(resultRef.current?.error).toEqual({
+      kind: 'key',
+      key: 'authErrors.tooManySignInAttempts',
+    });
+    expect(startDeviceAuthPoll).not.toHaveBeenCalled();
+    expect(vi.mocked(openAuthSessionAsync)).not.toHaveBeenCalled();
   });
 
   it('opens a plain browser for a non-product auth host (no consent alert)', async () => {

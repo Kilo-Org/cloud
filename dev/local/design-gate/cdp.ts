@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { InfraError } from './capture';
+import { logSourceFilterExpression, logSourceFilterStatsExpression } from './log-source-filter';
 import { scopeToFocusedRoute } from './route-scope';
 import { parseDump, type ProbeDump } from './tree';
 
@@ -73,6 +74,19 @@ export type ProbeClient = {
     readonly samples: ProbeSample[];
     readonly truncated: boolean;
   }>;
+  /**
+   * Mutes the styling engine's own "Can't perform a React state update..." log
+   * in the app runtime, decided by the call stack that produced it, and closes
+   * one already painted before the replacement. Idempotent per runtime, so every
+   * readiness wait installs it.
+   */
+  installLogSourceFilter?: () => Promise<void>;
+  /** The filter's counters, or `null` when no runtime ever installed it. */
+  logSourceFilterStats?: () => Promise<{
+    suppressed: number;
+    forwardedGuard: number;
+    dismissed: number;
+  } | null>;
   disconnect: () => void;
 };
 
@@ -474,6 +488,20 @@ export function createProbeClient(options: ProbeClientOptions): ProbeClient {
           dump: scopeToFocusedRoute(sample.dump),
         })),
       };
+    },
+    installLogSourceFilter: async () => {
+      await call(logSourceFilterExpression());
+    },
+    logSourceFilterStats: async () => {
+      const stats = record(await call(logSourceFilterStatsExpression()));
+      const suppressed = stats?.suppressed;
+      const forwardedGuard = stats?.forwardedGuard;
+      const dismissed = stats?.dismissed;
+      const complete =
+        typeof suppressed === 'number' &&
+        typeof forwardedGuard === 'number' &&
+        typeof dismissed === 'number';
+      return complete ? { suppressed, forwardedGuard, dismissed } : null;
     },
     disconnect,
   };

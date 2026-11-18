@@ -88,10 +88,7 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field', async () => {
   const { createElement, useRef } = await import('react');
   return {
-    FormField: (props: {
-      defaultValue?: string;
-      onChangeText?: (value: string) => void;
-    }) => {
+    FormField: (props: { defaultValue?: string; onChangeText?: (value: string) => void }) => {
       // Native uncontrolled text only accepts defaultValue when mounted.
       const nativeText = useRef(props.defaultValue);
       return createElement('FormField', {

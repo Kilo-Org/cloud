@@ -3,10 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import { ChevronDown, ChevronUp, Trash2 } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
-import {
-  LINE_ACTION_BOX_CLASS,
-  LINE_ACTION_OVERLAY_CLASS,
-} from '@/lib/a11y/tap-target';
+import { LINE_ACTION_BOX_CLASS, LINE_ACTION_OVERLAY_CLASS } from '@/lib/a11y/tap-target';
 
 /**
  * The box a row's control renders in: the whole touch target on its own

@@ -141,10 +141,22 @@ function directoryCtes(scope: WorkspaceReadScope, worktreeIds?: readonly string[
       UNION
       SELECT git_url, branch FROM workspace_pr_base_refs
     ),
+    workspace_chat_base_candidates AS (
+      SELECT DISTINCT s.cloud_agent_worktree_id AS worktree_id
+      FROM workspace_pr_base_refs refs
+      INNER JOIN cli_sessions_v2 s ON s.git_url = refs.git_url AND s.git_branch = refs.branch
+      WHERE s.kilo_user_id = ${scope.userId}
+        AND s.organization_id IS NOT DISTINCT FROM ${scope.organizationId}::uuid
+        AND s.cloud_agent_worktree_id IS NOT NULL
+        AND s.parent_session_id IS NULL AND ${visibleChat}
+    ),
     workspace_directory AS (
       SELECT * FROM scoped_workspaces
       WHERE worktree_id IN (SELECT worktree_id FROM workspace_family)
-        OR (git_url IS NULL AND EXISTS (SELECT 1 FROM workspace_pr_base_refs))
+        OR (git_url IS NULL AND (
+          git_branch IN (SELECT branch FROM workspace_pr_base_refs)
+          OR worktree_id IN (SELECT worktree_id FROM workspace_chat_base_candidates)
+        ))
         OR (git_url IN (
             SELECT git_url FROM scoped_workspaces
             WHERE worktree_id IN (SELECT worktree_id FROM workspace_family)
@@ -318,8 +330,9 @@ export function workspaceStackDirectoryQuery(
       AND (w.git_url IS NOT NULL OR w.worktree_id IN (SELECT worktree_id FROM workspace_family)
         OR w.parent_worktree_id IS NOT NULL
         OR w.worktree_id IN (SELECT parent_worktree_id FROM scoped_workspaces WHERE parent_worktree_id IS NOT NULL)
-        OR (visible.git_url IS NOT NULL
-          AND coalesce(w.git_branch, visible.git_branch) IN (SELECT branch FROM workspace_pr_base_refs)))
+        OR (visible.git_url, coalesce(w.git_branch, visible.git_branch)) IN (
+          SELECT git_url, branch FROM workspace_pr_base_refs
+        ))
       AND ${urls ? sql`coalesce(w.git_url, visible.git_url) = ANY(${sql.param(urls)}::text[])` : sql`true`}
     ORDER BY w.worktree_id`;
 }

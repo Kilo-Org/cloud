@@ -792,6 +792,26 @@ describe('cliSessionsV2 workspace read model', () => {
       [makeSession('ses_missing_checkout_unrelated', worktreeId(), { git_branch: 'unrelated' })],
       { git_url: null, git_branch: null }
     );
+    await insertWorkspace(
+      [
+        makeSession('ses_missing_checkout_other_repo', worktreeId(), {
+          git_url: 'https://github.com/workspace-list/other',
+          git_branch: 'stack/base',
+        }),
+      ],
+      { git_url: null, git_branch: null }
+    );
+    const stale = worktreeId();
+    await insertWorkspace(
+      [
+        makeSession('ses_missing_checkout_old', stale, {
+          git_branch: 'stack/base',
+          last_activity_at: OLD,
+        }),
+        makeSession('ses_missing_checkout_new', stale, { git_branch: 'unrelated' }),
+      ],
+      { git_url: null, git_branch: null }
+    );
     await insertPr(child, 'open', 7);
     await db
       .update(github_branch_pull_requests)

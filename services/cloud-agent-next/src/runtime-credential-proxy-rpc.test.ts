@@ -180,7 +180,7 @@ describe('persisted runtime credential proxy RPC', () => {
         metadata: async () => metadata(),
         authorization: async () => authorization(),
         fence: async () => currentFence,
-        token: async () => token,
+        token: async () => ({ token, renewed: false }),
       });
 
     await expect(resolveWith(controlFence('connection_2'))).resolves.toEqual({
@@ -291,16 +291,18 @@ describe('persisted runtime credential proxy RPC', () => {
     const store = storage();
     const token = signedToken(Date.now() + 10 * 60_000);
     const handle = await issue({ store, token });
-    const getToken = vi.fn(async () => token);
+    const getSecret = vi.fn(async () => secret);
+    const getToken = vi.fn(async () => ({ token, renewed: false }));
+    const readFence = vi.fn(async () => fence());
 
     await expect(
       resolvePersistedRuntimeProxyCredential({
-        env,
+        env: { NEXTAUTH_SECRET: { get: getSecret } },
         storage: store,
         handle: handle!,
         metadata: async () => metadata(),
         authorization: async () => authorization(),
-        fence: async () => fence(),
+        fence: readFence,
         token: getToken,
       })
     ).resolves.toEqual({
@@ -312,7 +314,10 @@ describe('persisted runtime credential proxy RPC', () => {
         resourceId: 'agent_1',
       },
     });
-    expect(getToken).toHaveBeenCalledTimes(1);
+    expect(getSecret).toHaveBeenCalledOnce();
+    expect(getSecret).toHaveBeenCalledBefore(readFence);
+    expect(getToken).toHaveBeenCalledExactlyOnceWith(secret);
+    expect(readFence).toHaveBeenCalledOnce();
   });
 
   it('renews a near-expiry backing token without changing the persisted handle grant lease', async () => {
@@ -323,7 +328,11 @@ describe('persisted runtime credential proxy RPC', () => {
     const renewed = signedToken(Date.now() + 2 * 60 * 60_000);
     const handle = await issue({ store, token: nearExpiry });
     const before = await store.get<RuntimeProxyGrant>(RUNTIME_PROXY_GRANT_KEY);
-    const getToken = vi.fn(async () => (getToken.mock.calls.length === 1 ? nearExpiry : renewed));
+    const getToken = vi
+      .fn()
+      .mockResolvedValueOnce({ token: nearExpiry, renewed: false })
+      .mockResolvedValueOnce({ token: renewed, renewed: true });
+    const readFence = vi.fn(async () => fence());
 
     await expect(
       resolvePersistedRuntimeProxyCredential({
@@ -332,11 +341,12 @@ describe('persisted runtime credential proxy RPC', () => {
         handle: handle!,
         metadata: async () => metadata(),
         authorization: async () => authorization(),
-        fence: async () => fence(),
+        fence: readFence,
         token: getToken,
       })
     ).resolves.toMatchObject({ token: renewed });
     expect(getToken).toHaveBeenCalledTimes(2);
+    expect(readFence).toHaveBeenCalledTimes(2);
     expect(await store.get(RUNTIME_PROXY_GRANT_KEY)).toEqual(before);
     vi.useRealTimers();
   });
@@ -355,7 +365,7 @@ describe('persisted runtime credential proxy RPC', () => {
       metadata: async () => metadata(),
       authorization: async () => authorization(),
       fence: async () => fence(),
-      token: async () => token,
+      token: async () => ({ token, renewed: false }),
     };
 
     await resolvePersistedRuntimeProxyCredential(input);
@@ -378,7 +388,7 @@ describe('persisted runtime credential proxy RPC', () => {
         metadata: async () => metadata(),
         authorization: async () => authorization('revoked'),
         fence: async () => fence(),
-        token: async () => token,
+        token: async () => ({ token, renewed: false }),
       })
     ).resolves.toBeNull();
   });
@@ -401,7 +411,7 @@ describe('persisted runtime credential proxy RPC', () => {
       token: async () => {
         started.resolve();
         await release.promise;
-        return token;
+        return { token, renewed: true };
       },
     });
     await started.promise;
@@ -432,7 +442,7 @@ describe('persisted runtime credential proxy RPC', () => {
       token: async () => {
         started.resolve();
         await release.promise;
-        return token;
+        return { token, renewed: true };
       },
     });
     await started.promise;
@@ -452,6 +462,7 @@ describe('persisted runtime credential proxy RPC', () => {
     expect(handleB).toEqual(expect.any(String));
     expect(handleB).not.toBe(handleA);
 
+    const readFence = vi.fn(async () => fence(2));
     const resolveWith = (handle: string) =>
       resolvePersistedRuntimeProxyCredential({
         env,
@@ -459,11 +470,12 @@ describe('persisted runtime credential proxy RPC', () => {
         handle,
         metadata: async () => metadata(),
         authorization: async () => authorization(),
-        fence: async () => fence(2),
-        token: async () => token,
+        fence: readFence,
+        token: async () => ({ token, renewed: false }),
       });
 
     await expect(resolveWith(handleA!)).resolves.toBeNull();
+    expect(readFence).not.toHaveBeenCalled();
     await expect(resolveWith(handleB!)).resolves.toEqual({
       token,
       organizationId: 'org_1',
@@ -500,7 +512,7 @@ describe('persisted runtime credential proxy RPC', () => {
           if (calls === 2 && replacement === 'grant') {
             await issue({ store, token: renewed });
           }
-          return calls === 1 ? nearExpiry : renewed;
+          return { token: calls === 1 ? nearExpiry : renewed, renewed: calls === 2 };
         },
       });
       if (replacement === 'fence') {
@@ -542,7 +554,7 @@ describe('persisted runtime credential proxy RPC', () => {
           currentFence = controlFence('connection_2');
           await issue({ store, currentFence, token: renewed });
         }
-        return calls === 1 ? nearExpiry : renewed;
+        return { token: calls === 1 ? nearExpiry : renewed, renewed: calls === 2 };
       },
     });
 
@@ -580,7 +592,7 @@ describe('persisted runtime credential proxy RPC', () => {
           currentFence = controlFence('connection_2', { wrapperInstanceId: 'wrapper_2' });
           await issue({ store, currentFence, token: renewed });
         }
-        return calls === 1 ? nearExpiry : renewed;
+        return { token: calls === 1 ? nearExpiry : renewed, renewed: calls === 2 };
       },
     });
 
@@ -601,7 +613,7 @@ describe('persisted runtime credential proxy RPC', () => {
         metadata: async () => metadata(),
         authorization: async () => authorization(),
         fence: async () => null,
-        token: async () => token,
+        token: async () => ({ token, renewed: false }),
       })
     ).resolves.toBeNull();
 
@@ -629,7 +641,7 @@ describe('persisted runtime credential proxy RPC', () => {
         metadata: async () => metadata(),
         authorization: async () => authorization(),
         fence: async () => controlFence('connection_1', { wrapperInstanceId: 'wrapper_2' }),
-        token: async () => token,
+        token: async () => ({ token, renewed: false }),
       })
     ).resolves.toBeNull();
 
@@ -659,7 +671,7 @@ describe('persisted runtime credential proxy RPC', () => {
         metadata: async () => metadata(),
         authorization: async () => authorization(),
         fence: async () => fence(),
-        token: async () => token,
+        token: async () => ({ token, renewed: false }),
       })
     ).resolves.toMatchObject({ token });
 
@@ -679,7 +691,7 @@ describe('persisted runtime credential proxy RPC', () => {
       metadata: async () => metadata(),
       authorization: async () => authorization(),
       fence: async () => controlFence('connection_1', { wrapperInstanceId: 'wrapper_2' }),
-      token: async () => token,
+      token: async () => ({ token, renewed: false }),
     });
 
     const fields = loggerWithFieldsMock.mock.calls[0]?.[0] as Record<string, unknown>;

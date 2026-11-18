@@ -125,6 +125,8 @@ export async function getRuntimeAuthorizationRecoveryState(input: {
     : { state: 'active', id: authorization.data.id };
 }
 
+export type RuntimeTokenRenewal = { token: string | null; renewed: boolean };
+
 export async function renewStoredRuntimeAuthorization(input: {
   metadata: SessionMetadata | null;
   getAuthorization: () => Promise<unknown>;
@@ -133,9 +135,9 @@ export async function renewStoredRuntimeAuthorization(input: {
   putMetadata: (metadata: SessionMetadata) => Promise<void>;
   renew: (authorization: RuntimeAuthorization) => Promise<{ token: string }>;
   now?: number;
-}): Promise<string | null> {
+}): Promise<RuntimeTokenRenewal> {
   const metadata = input.metadata;
-  if (!metadata) return null;
+  if (!metadata) return { token: null, renewed: false };
   const authorization = RuntimeAuthorizationSchema.safeParse(await input.getAuthorization());
   if (!authorization.success) {
     if (hasModernRuntimeAuthorization(metadata)) {
@@ -146,7 +148,7 @@ export async function renewStoredRuntimeAuthorization(input: {
       );
       throw new RuntimeAuthorizationRevokedError();
     }
-    return metadata.auth.kilocodeToken ?? null;
+    return { token: metadata.auth.kilocodeToken ?? null, renewed: false };
   }
   if (authorization.data.state !== 'active') {
     logRuntimeAuthorizationDiagnostic(
@@ -186,7 +188,7 @@ export async function renewStoredRuntimeAuthorization(input: {
     decoded.exp * 1000 <= Date.parse(authorization.data.delegationExpiresAt) &&
     runtimeAuthorizationId(decoded.runtimeAuthorization) === authorization.data.id
   ) {
-    return token ?? null;
+    return { token: token ?? null, renewed: false };
   }
   let postRenewalStateChanged = false;
   try {
@@ -213,7 +215,7 @@ export async function renewStoredRuntimeAuthorization(input: {
         auth: { ...currentMetadata.auth, kilocodeToken: renewed.token },
       })
     );
-    return renewed.token;
+    return { token: renewed.token, renewed: true };
   } catch (error) {
     logRuntimeAuthorizationDiagnostic(
       metadata.identity.sessionId,

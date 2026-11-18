@@ -1704,7 +1704,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           localScopeView = resolution?.scopeView;
           return resolution;
         },
-        token: () => this.getRuntimeToken(),
+        token: secret => this.getRuntimeTokenWithRenewal(secret),
       });
     } catch (error) {
       // A revoked/expired authorization threw. Fall through to scope resolution
@@ -1785,9 +1785,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /** C1c model preflight: renew and return the backing runtime token. */
   async getRuntimeToken(): Promise<string | null> {
-    const metadata = await this.getMetadata();
     const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
     if (!secret) throw new Error('NEXTAUTH_SECRET is not configured on the worker');
+    return (await this.getRuntimeTokenWithRenewal(secret)).token;
+  }
+
+  private async getRuntimeTokenWithRenewal(secret: string) {
+    const metadata = await this.getMetadata();
     return renewStoredRuntimeAuthorization({
       metadata,
       getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),

@@ -1,5 +1,5 @@
 {
-  "id": "2d4e69bc-755c-4753-8f54-ef4f31e2c026",
+  "id": "11a2ce65-96d4-4bf6-a565-29a780abfd9e",
   "prevId": "e7b9957b-099e-45fd-b59f-f302a88d8dae",
   "version": "7",
   "dialect": "postgresql",
@@ -3226,6 +3226,55 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.blacklisted_domains_settings": {
+      "name": "blacklisted_domains_settings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "blocked_signup_tlds": {
+          "name": "blocked_signup_tlds",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by_email": {
+          "name": "updated_by_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "blacklisted_domains_settings_singleton": {
+          "name": "blacklisted_domains_settings_singleton",
+          "value": "\"blacklisted_domains_settings\".\"id\" = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.bot_request_cloud_agent_sessions": {
       "name": "bot_request_cloud_agent_sessions",
       "schema": "",
@@ -5390,62 +5439,6 @@
           ],
           "isUnique": false,
           "where": "\"cli_sessions_v2\".\"cloud_agent_worktree_id\" is not null",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_cli_sessions_v2_workspace_activity": {
-          "name": "IDX_cli_sessions_v2_workspace_activity",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "cloud_agent_worktree_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "coalesce(\"last_activity_at\", \"created_at\") DESC",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "session_id",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"cli_sessions_v2\".\"parent_session_id\" IS NULL AND \"cli_sessions_v2\".\"cloud_agent_worktree_id\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_cli_sessions_v2_workspace_active": {
-          "name": "IDX_cli_sessions_v2_workspace_active",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "cloud_agent_worktree_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"cli_sessions_v2\".\"parent_session_id\" IS NULL AND \"cli_sessions_v2\".\"status\" IN ('question', 'permission', 'busy', 'retry')",
           "concurrently": true,
           "method": "btree",
           "with": {}
@@ -8130,61 +8123,6 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_cloud_agent_session_runs_latest": {
-          "name": "IDX_cloud_agent_session_runs_latest",
-          "columns": [
-            {
-              "expression": "cloud_agent_session_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "\"queued_at\" DESC NULLS LAST",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "message_id",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_cloud_agent_session_runs_open": {
-          "name": "IDX_cloud_agent_session_runs_open",
-          "columns": [
-            {
-              "expression": "cloud_agent_session_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "\"queued_at\" DESC NULLS LAST",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "message_id",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"cloud_agent_session_runs\".\"status\" IN ('queued', 'accepted')",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
         "IDX_cloud_agent_session_runs_queued_at": {
           "name": "IDX_cloud_agent_session_runs_queued_at",
           "columns": [
@@ -9248,26 +9186,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "closed_session_ids": {
-          "name": "closed_session_ids",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "tab_order": {
-          "name": "tab_order",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "last_activity_at": {
-          "name": "last_activity_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -9334,34 +9252,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_cloud_agent_worktrees_owner_activity": {
-          "name": "IDX_cloud_agent_worktrees_owner_activity",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "last_activity_at",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"cloud_agent_worktrees\".\"deletion_started_at\" IS NULL AND \"cloud_agent_worktrees\".\"deletion_completed_at\" IS NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

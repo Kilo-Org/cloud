@@ -1,6 +1,7 @@
 import {
   canManageOrganization,
   canManageOrganizationBilling,
+  type OrganizationRole,
 } from '@kilocode/app-shared/organizations';
 
 // Pure classification logic for the code-reviewer domain's async query
@@ -186,7 +187,7 @@ export function classifyPermission(input: {
   isError: boolean;
   isFetching: boolean;
   hasData: boolean;
-  role: string | undefined;
+  role: OrganizationRole | undefined;
   refetch: () => void;
 }): PermissionState {
   if (input.isPersonal) {

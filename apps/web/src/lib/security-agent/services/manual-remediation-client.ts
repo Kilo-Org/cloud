@@ -13,7 +13,10 @@ import {
   SECURITY_REMEDIATION_REJECTED_MESSAGE,
   SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE,
 } from '@kilocode/app-shared/security-agent';
-import { postSecurityWorkerJson } from './security-worker-request';
+import {
+  isDefinitiveSecurityWorkerRejection,
+  postSecurityWorkerJson,
+} from './security-worker-request';
 import type { SecurityReviewOwner } from '../core/types';
 
 type ManualRemediationStartParams = {
@@ -164,7 +167,7 @@ export async function submitManualRemediationStart(
         return { queued: false, reason: parsedBody.data.reason };
       }
     }
-    if (response.status >= 500) {
+    if (!isDefinitiveSecurityWorkerRejection({ status: response.status, body })) {
       throw ambiguousTransportError(`Remediation request failed with ${response.status}`);
     }
     logDefinitiveRejection('remediation/start', response.status, body);
@@ -200,7 +203,7 @@ export async function submitRemediationCancellation(
   });
   const workerBody = body as RemediationCancellationResponse | undefined;
   if (!response.ok) {
-    if (response.status >= 500) {
+    if (!isDefinitiveSecurityWorkerRejection({ status: response.status, body })) {
       throw ambiguousTransportError(`Remediation cancellation failed with ${response.status}`);
     }
     logDefinitiveRejection('remediation/cancel', response.status, body);
@@ -229,7 +232,7 @@ export async function submitApplyAutoRemediation(
   });
   const workerBody = body as ApplyAutoRemediationResponse | undefined;
   if (!response.ok) {
-    if (response.status >= 500) {
+    if (!isDefinitiveSecurityWorkerRejection({ status: response.status, body })) {
       throw ambiguousTransportError(`Apply auto-remediation failed with ${response.status}`);
     }
     logDefinitiveRejection('apply-auto-remediation', response.status, body);

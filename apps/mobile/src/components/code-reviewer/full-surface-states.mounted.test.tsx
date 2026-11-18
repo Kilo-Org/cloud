@@ -4,6 +4,7 @@ import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { type OrganizationRole } from '@kilocode/app-shared/organizations';
 import ReposRoute from '@/app/(app)/code-reviewer/[scope]/[platform]/(edit)/repos';
 import { type ReviewerPlatform, type ReviewerScopePlatform } from '@/lib/code-reviewer-config';
 import type * as ReviewerStatusModule from '@/lib/code-reviewer-status';
@@ -41,6 +42,7 @@ const state = vi.hoisted(() => ({
   insets: { left: 0, right: 0 },
   platform: 'gitlab',
   connected: false,
+  connectivity: 'online' as 'online' | 'offline' | 'unknown',
   githubError: false,
   githubStaleError: false,
   gitlabError: false,
@@ -48,7 +50,7 @@ const state = vi.hoisted(() => ({
   organizations: [] as {
     organizationId: string;
     organizationName: string;
-    role?: string;
+    role?: OrganizationRole;
   }[],
   permissionOverride: null as
     | { status: 'loading' }
@@ -76,6 +78,7 @@ const state = vi.hoisted(() => ({
     isLoading: false,
     isError: false,
     isFetching: false,
+    fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
     isFetchingNextPage: false,
     isFetchNextPageError: false,
     hasNextPage: false,
@@ -219,7 +222,7 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
-  useCommittedConnectivityStatus: () => 'online',
+  useCommittedConnectivityStatus: () => state.connectivity,
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   isPersonal: (scope: string) => scope === 'personal',
@@ -300,6 +303,7 @@ beforeEach(() => {
   state.insets.right = 0;
   state.platform = 'gitlab';
   state.connected = false;
+  state.connectivity = 'online';
   state.githubError = false;
   state.githubStaleError = false;
   state.gitlabError = false;
@@ -315,6 +319,8 @@ beforeEach(() => {
   state.bitbucket.isError = false;
   state.reviews.data = { pages: [{ success: true, reviews: [] }], pageParams: [0] };
   state.reviews.isError = false;
+  state.reviews.isFetching = false;
+  state.reviews.fetchStatus = 'idle';
   state.reviews.isFetchingNextPage = false;
   state.reviews.isFetchNextPageError = false;
   state.reviews.hasNextPage = false;
@@ -351,7 +357,22 @@ function firstList(renderer: Awaited<ReturnType<typeof renderWithProviders>>['re
   return renderer.root.find(node => String(node.type) === 'FlashList');
 }
 
-/** Every string a React element tree renders, in order. */
+/** The notice the list puts over its rows, which the stale cases read. */
+function listHeaderNotice(renderer: RenderWithProvidersResult['renderer']) {
+  const header = firstList(renderer).props.ListHeaderComponent as ReactElement<{
+    variant?: string;
+    onRetry?: () => void;
+    isRetrying?: boolean;
+    placement?: string;
+  }> | null;
+  if (header == null) {
+    throw new Error('The list rendered no header notice.');
+  }
+  expect(String(header.type)).toBe('QueryError');
+  return header;
+}
+
+/** Every string a React element tree or mounted node renders, in order. */
 function elementTexts(node: unknown): string[] {
   if (node == null || typeof node === 'boolean') {
     return [];
@@ -361,6 +382,11 @@ function elementTexts(node: unknown): string[] {
   }
   if (Array.isArray(node)) {
     return node.flatMap(child => elementTexts(child));
+  }
+  if (typeof node === 'object' && 'children' in node) {
+    // A mounted node keeps its rendered children on `children`; a React
+    // element keeps them in `props`, so the two are told apart here.
+    return elementTexts(node.children);
   }
   if (typeof node === 'object' && 'props' in node) {
     const props = node.props;
@@ -382,7 +408,7 @@ function firstRowAge(renderer: Awaited<ReturnType<typeof renderWithProviders>>['
   if (row === undefined) {
     throw new Error('The list rendered no review row.');
   }
-  const age = elementTexts(row.props.children).at(-1);
+  const age = elementTexts(row.children).at(-1);
   if (age === undefined) {
     throw new Error('The review row rendered no relative time.');
   }
@@ -641,7 +667,7 @@ describe('Recent review bodies', () => {
     }
   );
 
-  it('keeps cached reviews after a background failure', async () => {
+  it('keeps cached reviews and raises the stale notice after a background failure', async () => {
     state.reviews.isError = true;
     state.reviews.data = {
       pages: [{ success: true, reviews: [review('r1', 'Saved review')] }],
@@ -652,7 +678,102 @@ describe('Recent review bodies', () => {
     );
     const list = firstList(renderer);
     expect(list.props.data).toEqual([review('r1', 'Saved review')]);
+    // The cached rows stay, and the failed background refresh says so above them
+    // with the action that retries it, instead of posing as current.
+    const header = listHeaderNotice(renderer);
+    expect(header.props.variant).toBe('server');
+    expect(typeof header.props.onRetry).toBe('function');
+    unmount();
+  });
+
+  it('keeps cached rows and raises the offline notice when the refresh pauses', async () => {
+    state.reviews.data = {
+      pages: [{ success: true, reviews: [review('r1', 'Saved review')] }],
+      pageParams: [0],
+    };
+    state.reviews.fetchStatus = 'paused';
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    const list = firstList(renderer);
+    expect(list.props.data).toEqual([review('r1', 'Saved review')]);
+    const header = listHeaderNotice(renderer);
+    expect(header.props.variant).toBe('offline');
+    expect(header.props.isRetrying).toBe(false);
+    expect(typeof header.props.onRetry).toBe('function');
+    unmount();
+  });
+
+  it('keeps the paused notice mounted while its Retry runs', async () => {
+    // A notice gated on `!isFetching` would unmount on the tap that starts the
+    // retry, so the reader saw the notice vanish instead of its spinner.
+    state.reviews.data = {
+      pages: [{ success: true, reviews: [review('r1', 'Saved review')] }],
+      pageParams: [0],
+    };
+    state.reviews.fetchStatus = 'paused';
+    state.reviews.isFetching = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    const list = firstList(renderer);
+    expect(list.props.data).toEqual([review('r1', 'Saved review')]);
+    const header = listHeaderNotice(renderer);
+    expect(header.props.variant).toBe('offline');
+    expect(header.props.isRetrying).toBe(true);
+    unmount();
+  });
+
+  it('shows the retryable offline state instead of an empty list when the first read is paused', async () => {
+    // A paused read settles into no branch of a body switch keyed on
+    // `isLoading`/`isError`/`data`: the screen painted an empty FlashList
+    // forever (finding). Connectivity confirmed names the pause offline with
+    // Retry instead of a list with no rows.
+    state.reviews.data = undefined;
+    state.reviews.fetchStatus = 'paused';
+    state.connectivity = 'offline';
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(error.props.variant).toBe('offline');
+    expect(error.props.title).toBe('Failed to load');
+    expect(typeof error.props.onRetry).toBe('function');
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
+    unmount();
+  });
+
+  it('keeps the skeleton while a first read is paused with connectivity unsettled', async () => {
+    // The pause is real but the probe has not confirmed offline yet, so the
+    // shared classifier keeps it in loading and the screen keeps its skeleton.
+    state.reviews.data = undefined;
+    state.reviews.fetchStatus = 'paused';
+    state.connectivity = 'unknown';
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).not.toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
+    unmount();
+  });
+
+  it('raises the offline notice above the empty state of a cached empty list', async () => {
+    // Data present with zero rows is a settled answer, so the empty state
+    // paints — but the refresh that would fill it is paused, and "no reviews"
+    // must not pose as current without the notice and its Retry above it.
+    state.reviews.data = { pages: [{ success: true, reviews: [] }], pageParams: [0] };
+    state.reviews.fetchStatus = 'paused';
+    state.connectivity = 'offline';
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+    expect(empty.props.title).toBe('No reviews yet');
+    const notices = renderer.root.findAll(node => String(node.type) === 'QueryError');
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.props.variant).toBe('offline');
+    expect(notices[0]?.props.placement).toBe('top');
     unmount();
   });
 
@@ -730,6 +851,10 @@ describe('Recent review bodies', () => {
       pageParams: [0],
     };
     state.reviews.isFetchNextPageError = true;
+    // A failed next page also raises the query's `isError` while its cached
+    // pages stay, so the notice must read the page-level flag: otherwise it
+    // stacks a second error over the footer's own error and Retry.
+    state.reviews.isError = true;
     state.reviews.hasNextPage = true;
     const { renderer, unmount } = await renderWithProviders(
       createElement(ReviewListScreen, { scope: 'personal' })
@@ -737,6 +862,7 @@ describe('Recent review bodies', () => {
     const list = firstList(renderer);
     const data = list.props.data as ReviewStub[];
     expect(data.map(item => item.id)).toEqual(['r1']);
+    expect(list.props.ListHeaderComponent ?? null).toBeNull();
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
     const footer = list.props.ListFooterComponent as ReactNode;
     // A failed next page must not auto-refire: the footer flickers skeleton/error and hides Retry.

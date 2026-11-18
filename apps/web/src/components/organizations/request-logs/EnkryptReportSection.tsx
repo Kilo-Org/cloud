@@ -96,30 +96,45 @@ function isPartialHit(scan: EnkryptInputScanReport): boolean {
 }
 
 /**
- * A log-only scan caches text that failed to scan as allowed, so it is not rescanned; see
- * `isCacheableAllow` in the verdict cache.
+ * Whether text that failed to scan was cached as allowed, so it is not rescanned: `certain` from
+ * the report's count, `possible` for an older report without it, when a log-only scan failed and
+ * stored verdicts. See `isCacheableAllow` in the verdict cache.
  */
-function storedDespiteError(scan: EnkryptInputScanReport): boolean {
-  return (
-    scan.scan === 'log_only' &&
+function storedDespiteError(scan: EnkryptInputScanReport): 'certain' | 'possible' | null {
+  if (scan.failed_calls_cached !== undefined) {
+    return scan.failed_calls_cached > 0 ? 'certain' : null;
+  }
+  return scan.scan === 'log_only' &&
     scan.decision === 'error_logged' &&
     scan.verdict_cache_write === 'written'
-  );
+    ? 'possible'
+    : null;
 }
+
+const STORED_DESPITE_ERROR_NOTES = {
+  certain:
+    "Text that failed to scan was cached as allowed, so it won't be scanned again for 7 days.",
+  possible:
+    "Text that failed to scan may have been cached as allowed, in which case it won't be scanned again for 7 days.",
+};
 
 function verdictCacheItem(scan: EnkryptInputScanReport): DetailItem {
   const lookup = isPartialHit(scan) ? 'Partial hit' : VERDICT_CACHE_LABELS[scan.verdict_cache];
   const stored = scan.verdict_cache_write === 'written';
   return {
     label: 'Verdict cache',
-    hint: 'Hit when every unit had a cached verdict, partial hit when only some did. Stored when this scan cached new verdicts.',
-    value: storedDespiteError(scan) ? (
-      <>
-        {lookup}, <span className="text-status-warning">stored despite error</span>
-      </>
-    ) : (
-      `${lookup}${stored ? ', stored' : ''}`
-    ),
+    hint:
+      scan.total_units === undefined
+        ? 'Hit when at least one unit had a cached verdict. Stored when this scan cached new verdicts.'
+        : 'Hit when every unit had a cached verdict, partial hit when only some did. Stored when this scan cached new verdicts.',
+    value:
+      storedDespiteError(scan) === 'certain' ? (
+        <>
+          {lookup}, <span className="text-status-warning">stored despite error</span>
+        </>
+      ) : (
+        `${lookup}${stored ? ', stored' : ''}`
+      ),
   };
 }
 
@@ -246,6 +261,8 @@ function scanItems(scan: Scan): DetailItem[] {
 function ScanCard({ scan }: { scan: Scan }) {
   const decision = DECISIONS[scan.decision];
   const part = PART_LABELS[scan.part];
+  const stored = scan.part === 'response' ? null : storedDespiteError(scan);
+  const storedNote = stored && STORED_DESPITE_ERROR_NOTES[stored];
   return (
     <li className="flex flex-col gap-3 rounded-md border p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -277,11 +294,7 @@ function ScanCard({ scan }: { scan: Scan }) {
       />
       {scan.part === 'tools' && <FlaggedTools scan={scan} />}
       {scan.error && <p className="text-status-destructive text-xs">{scan.error}</p>}
-      {scan.part !== 'response' && storedDespiteError(scan) && (
-        <p className="text-status-warning text-xs">
-          Text that failed to scan was cached as allowed, so it won't be scanned again for 7 days.
-        </p>
-      )}
+      {storedNote && <p className="text-status-warning text-xs">{storedNote}</p>}
     </li>
   );
 }

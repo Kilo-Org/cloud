@@ -344,6 +344,17 @@ function callCacheEntries(
   });
 }
 
+/** Calls that failed but whose units are cached as allowed anyway; see `isCacheableAllow`. */
+function failedCallsCached(
+  results: EnkryptGuardrailScanResult[],
+  cache: VerdictCache | null
+): number {
+  if (!cache) return 0;
+  return results.filter(
+    result => result.report.error !== null && cacheableVerdict(result, cache.config) === 'allow'
+  ).length;
+}
+
 const DECISION_SEVERITY: readonly EnkryptScanReport['decision'][] = [
   'blocked',
   'error_fail_closed',
@@ -464,6 +475,7 @@ async function planSegmentsPart(
       credits_cost: null,
       latency_ms: 0,
       chunks: 0,
+      failed_calls_cached: 0,
     };
     console.debug('[enkrypt-guardrail] decision', { ...scanLogFields(request), ...report });
     return {
@@ -485,7 +497,12 @@ async function planSegmentsPart(
       const result = combineChunks(results);
       return {
         ...result,
-        report: { ...result.report, part, chunks: calls.length },
+        report: {
+          ...result.report,
+          part,
+          chunks: calls.length,
+          failed_calls_cached: failedCallsCached(results, cache),
+        },
         cacheEntries: callCacheEntries(calls, results, cache),
       };
     },
@@ -519,6 +536,7 @@ type ToolOutcome = {
         kind: 'scanned';
         result: EnkryptGuardrailScanResult;
         cacheEntries: EnkryptVerdictCacheEntry[];
+        failedCallsCached: number;
       };
 };
 
@@ -568,6 +586,9 @@ function toolsReport(
       sum(reports.map(report => report.cached_characters)),
     total_units: sum(outcomes.map(each => each.totalUnits)),
     cached_units: sum(outcomes.map(each => each.cachedUnits)),
+    failed_calls_cached: sum(
+      outcomes.map(({ outcome }) => (outcome.kind === 'scanned' ? outcome.failedCallsCached : 0))
+    ),
     scanned_characters: sum(reports.map(report => report.scanned_characters)),
     decision: mostSevereDecision([
       ...reports.map(report => report.decision),
@@ -676,6 +697,7 @@ async function planTools(
             kind: 'scanned',
             result: combineChunks(results),
             cacheEntries: callCacheEntries(plan.calls, results, cache),
+            failedCallsCached: failedCallsCached(results, cache),
           },
         };
       });

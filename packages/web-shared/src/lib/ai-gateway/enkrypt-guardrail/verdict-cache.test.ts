@@ -673,6 +673,7 @@ describe('scanRequestWithVerdictCache', () => {
             cached_segments: 1,
             total_units: segments.length,
             cached_units: 1,
+            failed_calls_cached: 0,
             omitted_attachments: 0,
             scanned_characters: 0,
             decision: 'blocked',
@@ -1362,6 +1363,7 @@ describe('scanRequestWithVerdictCache', () => {
         cached_segments: 0,
         total_units: unitTexts(cold).length,
         cached_units: 0,
+        failed_calls_cached: 0,
         omitted_attachments: 0,
         scanned_characters: sum(coldChunks.map(text => text.length)),
         decision: 'allowed',
@@ -1723,6 +1725,123 @@ describe('scanRequestWithVerdictCache', () => {
     });
   });
 
+  describe('calls that failed but were cached', () => {
+    // No two of these fit one call, so each is a call of its own.
+    const ok = segment('tool result', numbered('a', 60_000));
+    const failing = segment('tool result', numbered('b', 60_000));
+    const segments = [ok, failing];
+    const failFailing = (text: string) =>
+      text === renderSegment(failing)
+        ? new Response('unavailable', { status: 500 })
+        : enkryptResponse({ pii: 0 });
+
+    it('counts a failed call of a log-only scan whose units were cached as allowed', async () => {
+      const dependencies = deps(memoryStore(), failFailing);
+
+      const result = await scanConversation(
+        makeRequest(segments, { config: logOnlyConfig }),
+        dependencies
+      );
+
+      expect(result.verdict).toEqual({ action: 'allow' });
+      expect(result.report).toMatchObject({
+        scan: 'log_only',
+        decision: 'error_logged',
+        error: 'http_500',
+        chunks: 2,
+        failed_calls_cached: 1,
+      });
+      expect(result.cacheEntries).toEqual(allowed(keysFor(segments, { config: logOnlyConfig })));
+    });
+
+    it('counts none when no call failed', async () => {
+      const result = await scanConversation(
+        makeRequest(segments, { config: logOnlyConfig }),
+        deps(memoryStore(), () => enkryptResponse({ pii: 0 }))
+      );
+
+      expect(result.report).toMatchObject({ chunks: 2, error: null, failed_calls_cached: 0 });
+    });
+
+    it('counts none for a failed call of a blocking scan, which caches nothing for it', async () => {
+      const dependencies = deps(memoryStore(), text =>
+        text === renderSegment(failing)
+          ? new Response('unavailable', { status: 500 })
+          : enkryptResponse({ injection_attack: 0 })
+      );
+
+      const result = await scanConversation(makeRequest(segments), dependencies);
+
+      expect(result.verdict).toEqual({ action: 'unavailable', reason: 'transient' });
+      expect(result.report).toMatchObject({
+        decision: 'error_fail_closed',
+        error: 'http_500',
+        failed_calls_cached: 0,
+      });
+      expect(result.cacheEntries).toEqual(allowed([keysFor(segments)[0]!]));
+    });
+
+    it('counts none when there is no verdict cache to cache in', async () => {
+      const result = await scanConversation(
+        makeRequest(segments, { config: logOnlyConfig }),
+        deps(null, failFailing)
+      );
+
+      expect(result.report).toMatchObject({ error: 'http_500', failed_calls_cached: 0 });
+      expect(result.cacheEntries).toEqual([]);
+    });
+
+    describe('at the shared deadline', () => {
+      const first = segment('tool result', numbered('a', 95_000));
+      const second = segment('tool result', numbered('b', 60_000));
+      const third = segment('tool result', numbered('c', 60_000));
+      const queued = [first, second, third];
+
+      it('counts a log-only call that timed out after it was made, not one that never was', async () => {
+        const dependencies = deps(memoryStore());
+        dependencies.limiter = createEnkryptCallLimiter(1);
+        dependencies.timeoutMs = 100;
+        const hang = hangingFetch();
+        let calls = 0;
+        dependencies.fetch = jest.fn((url: string, init: RequestInit) =>
+          calls++ === 0 ? Promise.resolve(enkryptResponse({ pii: 0 })) : hang(url, init)
+        ) as unknown as typeof fetch;
+
+        const result = await scanConversation(
+          makeRequest(queued, { config: logOnlyConfig }),
+          dependencies
+        );
+
+        // The second call hung until the deadline; the third never got a slot.
+        expect(scannedTexts(dependencies)).toHaveLength(2);
+        expect(result.report).toMatchObject({
+          error: 'timeout',
+          attempts: 2,
+          failed_calls_cached: 1,
+        });
+        const keys = keysFor(queued, { config: logOnlyConfig });
+        expect(result.cacheEntries).toEqual(allowed([keys[0]!, keys[1]!]));
+      });
+
+      it('counts none when the deadline passed before any call was made', async () => {
+        const dependencies = deps(memoryStore());
+        dependencies.limiter = createEnkryptCallLimiter(1);
+        dependencies.timeoutMs = 50;
+        dependencies.fetch = hangingFetch();
+        const [only] = [queued[0]!];
+
+        const [result] = await scanRequestWithVerdictCache(
+          makeRequest([only], { config: logOnlyConfig }, { tools: [tool('ls', 'Lists.')] }),
+          Object.assign(dependencies, { deadline: AbortSignal.abort(new Error('timeout')) })
+        );
+
+        expect(dependencies.fetch).not.toHaveBeenCalled();
+        expect(result?.report).toMatchObject({ failed_calls_cached: 0 });
+        expect(result?.cacheEntries).toEqual([]);
+      });
+    });
+  });
+
   describe('tools, system, and conversation parts', () => {
     async function rememberFirstRequest(store: ReturnType<typeof memoryStore>) {
       await remember(
@@ -1777,6 +1896,7 @@ describe('scanRequestWithVerdictCache', () => {
         cached_characters: 0,
         total_units: tools.length,
         cached_units: 0,
+        failed_calls_cached: 0,
         scanned_characters: characters(tools),
         decision: 'allowed',
         error: null,
@@ -2796,6 +2916,7 @@ describe('scanRequestWithVerdictCache', () => {
         cached_characters: toolText(cached).length,
         total_units: 4,
         cached_units: 1,
+        failed_calls_cached: 0,
         scanned_characters: characters([noisy, broken, clean]),
         decision: 'blocked',
         error: 'http_500',
@@ -2960,6 +3081,61 @@ describe('scanRequestWithVerdictCache', () => {
         ...allowed([toolKey(tools[0], { config: logOnlyConfig })]),
         ...allowedBriefly([toolKey(broken, { config: logOnlyConfig })]),
       ]);
+    });
+
+    it('sums the failed calls cached across the scanned tools, whatever their call count', async () => {
+      const cachedTool = tool('cached', 'Was allowed before.');
+      const broken = tool('broken', 'Breaks the detector.');
+      const big = tool('big', numbered('t', 250_000));
+      const bigKeys = toolKeys(big, { config: logOnlyConfig });
+      expect(bigKeys).toHaveLength(3);
+      const store = memoryStore([toolKey(cachedTool, { config: logOnlyConfig })]);
+      const dependencies = deps(store, text =>
+        text === toolText(broken) || text.startsWith('[tool: big, end omitted]')
+          ? new Response('unavailable', { status: 500 })
+          : text.startsWith('[tool: big, beginning omitted]')
+            ? new Response('unavailable', { status: 500 })
+            : enkryptResponse({ pii: 0 })
+      );
+
+      const results = await scanRequestWithVerdictCache(
+        makeRequest([], { config: logOnlyConfig }, { tools: [cachedTool, broken, big, tools[0]!] }),
+        dependencies
+      );
+
+      // One call for the broken tool, two of the big tool's three; the rest did not fail.
+      expect(toolsReport(results)).toMatchObject({
+        tools_cached: 1,
+        tools_scanned: 3,
+        decision: 'error_logged',
+        failed_calls_cached: 3,
+      });
+      expect(results[0]?.cacheEntries).toEqual(
+        allowed([
+          toolKey(broken, { config: logOnlyConfig }),
+          ...bigKeys,
+          toolKey(tools[0]!, { config: logOnlyConfig }),
+        ])
+      );
+    });
+
+    it('counts no failed calls cached for the tools of a blocking scan', async () => {
+      const broken = tool('broken', 'Breaks the detector.');
+      const dependencies = deps(memoryStore(), text =>
+        text === toolText(broken)
+          ? new Response('unavailable', { status: 500 })
+          : enkryptResponse({ injection_attack: 0 })
+      );
+
+      const results = await scanRequestWithVerdictCache(
+        makeRequest([], {}, { tools: [broken, tools[0]!] }),
+        dependencies
+      );
+
+      expect(toolsReport(results)).toMatchObject({
+        error: 'http_500',
+        failed_calls_cached: 0,
+      });
     });
 
     it('does not flag or cache tools when the client disconnected', async () => {

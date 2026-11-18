@@ -231,6 +231,7 @@ function toolsReport(overrides: Partial<EnkryptToolScanReport> = {}): EnkryptToo
     cached_characters: 0,
     total_units: 1,
     cached_units: 0,
+    failed_calls_cached: 0,
     scanned_characters: scanReport.scanned_characters,
     decision: 'allowed',
     error: null,
@@ -674,13 +675,14 @@ describe('startEnkryptInputGuardrail', () => {
       unavailable_reason: null,
       added_latency_ms: 237,
       scans: [
-        { ...scanReport, chunks: 1, verdict_cache_write: 'written' },
+        { ...scanReport, chunks: 1, failed_calls_cached: 0, verdict_cache_write: 'written' },
         {
           ...scanReport,
           scan: 'log_only',
           decision: 'error_logged',
           error: 'timeout',
           chunks: 1,
+          failed_calls_cached: 1,
           verdict_cache_write: 'written',
         },
       ],
@@ -703,7 +705,7 @@ describe('startEnkryptInputGuardrail', () => {
     expect(mockedScanRequest).toHaveBeenCalledTimes(1);
     expect(mockedRedisSet.mock.calls).toEqual(allowWrites(partKeys(scan)));
     expect((await guardrail.report())?.scans).toEqual([
-      { ...scanReport, chunks: 1, verdict_cache_write: 'skipped' },
+      { ...scanReport, chunks: 1, failed_calls_cached: 0, verdict_cache_write: 'skipped' },
     ]);
     expect(mockedRecordUsage).toHaveBeenCalledTimes(1);
     expect(mockedRecordUsage).toHaveBeenCalledWith(expect.objectContaining(call()));
@@ -720,7 +722,7 @@ describe('startEnkryptInputGuardrail', () => {
     const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan), signal);
 
     expect((await guardrail.report())?.scans).toEqual([
-      { ...scanReport, chunks: 1, verdict_cache_write: 'failed' },
+      { ...scanReport, chunks: 1, failed_calls_cached: 0, verdict_cache_write: 'failed' },
     ]);
   });
 
@@ -845,9 +847,10 @@ describe('startEnkryptInputGuardrail', () => {
           decision: 'blocked',
           detectors_fired: ['injection_attack'],
           chunks: 1,
+          failed_calls_cached: 0,
           verdict_cache_write: 'written',
         },
-        { ...scanReport, chunks: 1, verdict_cache_write: 'written' },
+        { ...scanReport, chunks: 1, failed_calls_cached: 0, verdict_cache_write: 'written' },
       ]);
     });
 

@@ -88,25 +88,18 @@ vi.mock('@/components/ui/form-field', async () => {
   return {
     FormField: (props: {
       defaultValue?: string;
-      labelAccessory?: unknown;
       onChangeText?: (value: string) => void;
     }) => {
       // Native uncontrolled text only accepts defaultValue when mounted.
       const nativeText = useRef(props.defaultValue);
-      // The real field renders its label accessory beside the label, so the
-      // caller's row controls are children of the mocked field too.
-      return createElement(
-        'FormField',
-        {
-          ...props,
-          nativeText: nativeText.current,
-          onChangeText: (value: string) => {
-            nativeText.current = value;
-            props.onChangeText?.(value);
-          },
+      return createElement('FormField', {
+        ...props,
+        nativeText: nativeText.current,
+        onChangeText: (value: string) => {
+          nativeText.current = value;
+          props.onChangeText?.(value);
         },
-        props.labelAccessory as never
-      );
+      });
     },
   };
 });

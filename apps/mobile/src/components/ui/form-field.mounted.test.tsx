@@ -230,39 +230,31 @@ describe('FormField direction-aware content alignment', () => {
   });
 });
 
-describe('FormField label row with an accessory', () => {
-  function mountLabelRow() {
+describe('FormField label-to-input gap', () => {
+  function mountField(gapClassName?: string) {
     act(() => {
       renderer = TestRenderer.create(
         createElement(FormField, {
           label: i18n.t('login.emailAddress'),
-          labelAccessory: createElement('Controls'),
+          ...(gapClassName === undefined ? {} : { gapClassName }),
         })
       );
     });
     if (!renderer) {
       throw new Error('renderer was not created');
     }
-    const labelRow = renderer.root
-      .findAllByType('View')
-      .find(node => String(node.props.className).includes('flex-row'));
-    if (labelRow === undefined) {
-      throw new Error('the label row was not rendered');
-    }
-    return labelRow;
+    return renderer.root.findByType('View');
   }
 
-  it('centres the copy on the accessory instead of stretching the row', () => {
-    // The label row is one `text-sm` line tall, so the label's own line sets the
-    // row height. The row centres the copy on the accessory's box, and the
-    // accessory floats its own box on the label line, so a taller control does
-    // not grow the row.
-    const classes = String(mountLabelRow().props.className);
+  it('keeps the compact default between the label row and the input', () => {
+    // An ordinary field's label row and input sit one small gap apart.
+    expect(String(mountField().props.className)).toContain('gap-1.5');
+  });
 
-    expect(classes).toContain('flex-row');
-    expect(classes).toContain('items-center');
-    expect(classes).toContain('gap-2');
-    expect(classes).not.toContain('min-h-[44px]');
-    expect(classes).not.toContain('items-stretch');
+  it('widens the gap when the caller passes a gap class', () => {
+    // A screen whose row controls hover over the label line passes
+    // COMMAND_ROW_FIELD_GAP_CLASS so the controls' touch band ends above the
+    // input's edge; the prop replaces the default exactly.
+    expect(String(mountField('gap-y-[16px]').props.className)).toBe('gap-y-[16px]');
   });
 });

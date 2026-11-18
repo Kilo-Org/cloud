@@ -30,7 +30,7 @@ import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-pro
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { COMMAND_ROW_FIELD_GAP_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 type CommandRow = Readonly<{ sequence: number; command: string }>;
 
@@ -218,8 +218,10 @@ export function ProfileCommandsScreen({
     // position the row's move and delete controls announce.
     const commandLabel = t('profiles.commandLabelPosition', { position });
     const rowHint = commandRowA11yLabel(index, commands.length);
-    // The controls share the field's label line as its accessory, so they stay
-    // out of the field's accessible name and keep their own positions.
+    // The controls stay out of the field's accessible name and keep their own
+    // positions. The controls are the card's own overlay band: the card
+    // positions them, so their touch area escapes the label row's bounds (a
+    // parent-bounds clip) and each control reaches 44 dp on both axes.
     const rowControls = canManage ? (
       <ProfileCommandRowControls
         color={colors.mutedForeground}
@@ -241,23 +243,31 @@ export function ProfileCommandsScreen({
       />
     ) : undefined;
     return (
-      <View key={`${generation}-${index}`} className="rounded-lg bg-secondary p-3">
-        <SetupCommandField
-          command={command}
-          label={commandLabel}
-          trailing={rowControls}
-          accessibilityHint={rowHint}
-          readOnly={!canManage}
-          onChangeText={value => {
-            setCommands(current => replaceCommand(current, index, value));
-          }}
-          onEndEditing={() => {
-            commit(index);
-          }}
-          onSubmitEditing={() => {
-            commit(index);
-          }}
-        />
+      // The card's 14 dp padding holds the control band's reach into the top
+      // edge; see tap-target.ts for the arithmetic. The band renders after the
+      // card so it paints on top of the card's opaque background and Android
+      // dispatches its touches last. The field's own block carries the widened
+      // label-to-field gap that keeps the band above the field.
+      <View key={`${generation}-${index}`} className="relative">
+        <View className="rounded-lg bg-secondary p-4">
+          <SetupCommandField
+            command={command}
+            label={commandLabel}
+            gapClassName={COMMAND_ROW_FIELD_GAP_CLASS}
+            accessibilityHint={rowHint}
+            readOnly={!canManage}
+            onChangeText={value => {
+              setCommands(current => replaceCommand(current, index, value));
+            }}
+            onEndEditing={() => {
+              commit(index);
+            }}
+            onSubmitEditing={() => {
+              commit(index);
+            }}
+          />
+        </View>
+        {rowControls}
       </View>
     );
   };

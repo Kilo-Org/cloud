@@ -11,6 +11,7 @@ import {
   CHIP_FRAME_DP,
   CHIP_HIT_SLOP,
   CHIP_HIT_SLOP_DP,
+  COMMAND_ROW_FIELD_GAP_CLASS,
   COMPACT_BUTTON_HIT_SLOP,
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
@@ -47,6 +48,8 @@ import {
   LEGAL_LINK_ROW_CLASS,
   LINE_ACTION_BOX_CLASS,
   LINE_ACTION_HIT_SLOP,
+  LINE_ACTION_OVERLAY_CLASS,
+  LINE_ACTION_REACH_DP,
   MIN_TAP_TARGET_DP,
   ROW_TARGET_CLASS,
   STATE_ACTION_CLASS,
@@ -470,6 +473,37 @@ describe('code-reviewer line-action geometry', () => {
     // The box floats over one line, so neither axis has a shorter side.
     expect(LINE_ACTION_HIT_SLOP.top).toBe(LINE_ACTION_HIT_SLOP.bottom);
     expect(LINE_ACTION_HIT_SLOP.left).toBe(LINE_ACTION_HIT_SLOP.right);
+  });
+
+  it('lays the command-card band out at the full slop reach', async () => {
+    // The band is the controls' parent, and React Native confines a touch
+    // area to the parent's bounds, so the band's height carries the whole
+    // box + top + bottom slop reach (LINE_ACTION_REACH_DP) — a one-text-line
+    // label row clips it to ~17.5dp, far under the target.
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain(`h-[${LINE_ACTION_REACH_DP}px]`);
+    expect(await compiledDp(LINE_ACTION_OVERLAY_CLASS, 'height')).toBe(LINE_ACTION_REACH_DP);
+    expect(tapTargetReachDp(MIN_TAP_TARGET_DP, LINE_ACTION_HIT_SLOP.top)).toBe(
+      LINE_ACTION_REACH_DP
+    );
+    // The band's horizontal padding holds each control's outer side slop
+    // (5dp), so the outer controls' slop extends inside the band's frame.
+    expect(await compiledDp(LINE_ACTION_OVERLAY_CLASS, 'paddingInline')).toBe(
+      LINE_ACTION_HIT_SLOP.left
+    );
+    // The band pins to the card's trailing content edge: the card's 14dp
+    // padding less the band's 5dp padding, so the control boxes' outer edge
+    // stays on the card's content edge.
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain('end-[9px]');
+    // The field gap clears the band's bottom edge: 14dp card padding + 17.5dp
+    // label line + 16dp gap = 47.5dp, more than a dp below the band's 46dp.
+    expect(COMMAND_ROW_FIELD_GAP_CLASS).toBe('gap-y-[16px]');
+    expect(await compiledDp(COMMAND_ROW_FIELD_GAP_CLASS, 'rowGap')).toBe(16);
+    expect(14 + 17.5 + 16 - LINE_ACTION_REACH_DP).toBeGreaterThanOrEqual(1);
+    // The band covers the label's tail, so it is touch-transparent itself:
+    // only the control boxes take taps.
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain('absolute');
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain('flex-row');
+    expect(LINE_ACTION_OVERLAY_CLASS).toContain('gap-3');
   });
 });
 

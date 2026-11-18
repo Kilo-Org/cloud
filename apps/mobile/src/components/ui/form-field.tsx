@@ -13,13 +13,12 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
     label: string;
     error?: string;
     /**
-     * Controls that belong to the field's own row, rendered at the end of the
-     * label line: the reorder and delete controls of a list a field sits in.
-     * The label keeps the line's remaining width and the row centres the copy
-     * on the accessory's own box, so the controls take no separate band under
-     * the input and the label stays level with them.
+     * The gap between the field's label row and its input. The default
+     * `gap-1.5` keeps the ordinary compact block; a screen whose row controls
+     * hover over the label line passes `COMMAND_ROW_FIELD_GAP_CLASS` so the
+     * controls' 46 dp touch band ends above the input's edge.
      */
-    labelAccessory?: React.ReactNode;
+    gapClassName?: string;
     /** Reserve the tallest localized message, including wrapping and font scaling. */
     reserveErrorMessages?: readonly string[];
     disabled?: boolean;
@@ -55,7 +54,7 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
  */
 function FormField({
   label,
-  labelAccessory,
+  gapClassName = 'gap-1.5',
   error,
   reserveErrorMessages,
   disabled,
@@ -89,8 +88,8 @@ function FormField({
   }, []);
 
   return (
-    <View className="gap-1.5" onLayout={containerOnLayout}>
-      <FormFieldLabel label={label} labelAccessory={labelAccessory} />
+    <View className={gapClassName} onLayout={containerOnLayout}>
+      <FormFieldLabel label={label} />
       <Input
         ref={instance => {
           nativeInput.current = instance;

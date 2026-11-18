@@ -1,4 +1,3 @@
-import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -17,8 +16,16 @@ type SetupCommandFieldProps = Readonly<{
   command: string;
   /** The field's label, which is also its accessible name. */
   label: string;
-  /** Controls that belong to this command's own row, at the end of its label line. */
-  trailing?: ReactNode;
+  /**
+   * The gap between the label row and the field. Undefined keeps the ordinary
+   * compact block (`gap-1.5` on the block and inside `FormField`); a card that
+   * renders row controls over the label line passes
+   * `COMMAND_ROW_FIELD_GAP_CLASS`, which lands on both levels: the block's own
+   * root (label to value box) and, in the editable branch, `FormField`'s root
+   * where the label row and the `Input` are siblings — the pair the controls'
+   * 46 dp touch band has to clear.
+   */
+  gapClassName?: string;
   /** The viewer cannot manage this row: render the command as read-only text. */
   readOnly?: boolean;
   /** The row is busy, not unmanageable: the field stays a field, dimmed. */
@@ -50,7 +57,7 @@ type SetupCommandFieldProps = Readonly<{
 export function SetupCommandField({
   command,
   label,
-  trailing,
+  gapClassName,
   readOnly = false,
   disabled = false,
   accessibilityHint,
@@ -62,8 +69,8 @@ export function SetupCommandField({
 
   if (readOnly) {
     return (
-      <View className="gap-1.5">
-        <FormFieldLabel label={label} labelAccessory={trailing} />
+      <View className={gapClassName ?? 'gap-1.5'}>
+        <FormFieldLabel label={label} />
         <View className="min-h-[44px] justify-center rounded-md border border-input bg-background px-3 py-2.5 dark:bg-[#FFFFFF0A]">
           <SelectableText
             accessibilityLabel={label}
@@ -84,10 +91,10 @@ export function SetupCommandField({
   const showsBound = !disabled && remaining <= 0;
 
   return (
-    <View className="gap-1.5">
+    <View className={gapClassName ?? 'gap-1.5'}>
       <FormField
         label={label}
-        labelAccessory={trailing}
+        gapClassName={gapClassName}
         defaultValue={command}
         placeholder={t('profiles.commandPlaceholder')}
         className="min-h-[44px] leading-[normal]"

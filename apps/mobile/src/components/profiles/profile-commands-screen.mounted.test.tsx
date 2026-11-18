@@ -18,15 +18,15 @@ import {
 } from '@/components/profiles/profile-commands-screen.test-helpers';
 import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
 import { i18n } from '@/i18n';
-import { act } from '@/test/renderer';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 import { resetFormDraftsForTests } from '@/lib/form-draft';
 import {
+  COMMAND_ROW_FIELD_GAP_CLASS,
   LINE_ACTION_BOX_CLASS,
   LINE_ACTION_HIT_SLOP,
-  MIN_TAP_TARGET_DP,
-  tapTargetReachDp,
-  TOUCH_TARGET_DP,
+  LINE_ACTION_OVERLAY_CLASS,
+  LINE_ACTION_REACH_DP,
 } from '@/lib/a11y/tap-target';
 
 const h = vi.hoisted(() => ({
@@ -91,25 +91,18 @@ vi.mock('@/components/ui/form-field', async () => {
   return {
     FormField: (props: {
       defaultValue?: string;
-      labelAccessory?: unknown;
       onChangeText?: (value: string) => void;
     }) => {
       // Native uncontrolled text only accepts defaultValue when mounted.
       const nativeText = useRef(props.defaultValue);
-      // The real field renders its label accessory beside the label, so the
-      // caller's row controls are children of the mocked field too.
-      return createElement(
-        'FormField',
-        {
-          ...props,
-          nativeText: nativeText.current,
-          onChangeText: (value: string) => {
-            nativeText.current = value;
-            props.onChangeText?.(value);
-          },
+      return createElement('FormField', {
+        ...props,
+        nativeText: nativeText.current,
+        onChangeText: (value: string) => {
+          nativeText.current = value;
+          props.onChangeText?.(value);
         },
-        props.labelAccessory as never
-      );
+      });
     },
   };
 });
@@ -335,7 +328,7 @@ describe('ProfileCommandsScreen', () => {
     unmount();
   });
 
-  it('floats each row control on the label line and reaches the touch target with slop', async () => {
+  it('reaches the touch target from the card-owned band without covering the input', async () => {
     h.query.data = testCommands(['a', 'b', 'c']);
     h.query.isPending = false;
 
@@ -349,38 +342,70 @@ describe('ProfileCommandsScreen', () => {
     // name them; the two cards below it keep their own.
     expect(controls.map(node => node.props.accessibilityLabel)).toEqual(labels);
 
+    // The band is the controls' parent, and the band's frame carries the
+    // whole slop reach: React Native confines a control's touch area to its
+    // parent's bounds, so the band's own height (LINE_ACTION_REACH_DP = box
+    // + top slop + bottom slop) and its padded width are what make both axes
+    // reach the 44 dp target. The mounted suite renders no layout engine, so
+    // it holds the contract at the tree's shape; the gate's frame dumps
+    // measure the rendered numbers. The test renderer keeps the wrapper
+    // components in the tree, so the walk climbs to the nearest host node,
+    // whose bounds are what Android clips the touch area to.
     for (const control of controls) {
-      // The box floats over the label's line instead of setting the row's
-      // height, so the card's top padding stays the screen's own gap.
+      let ancestor: ReactTestInstance | null = control.parent;
+      while (ancestor !== null && typeof ancestor.type !== 'string') {
+        ancestor = ancestor.parent;
+      }
+      expect(ancestor).not.toBeNull();
+      expect(String(ancestor?.props.className)).toBe(LINE_ACTION_OVERLAY_CLASS);
       for (const token of LINE_ACTION_BOX_CLASS.split(' ')) {
         expect(String(control.props.className)).toContain(token);
       }
       expect(control.props.hitSlop).toBe(LINE_ACTION_HIT_SLOP);
-      // A `min-h-[28px]` box measures 27.8dp on Android: the slop carries the
-      // reach the shortened box gives up on its own node.
-      expect(
-        tapTargetReachDp(MIN_TAP_TARGET_DP - 0.2, LINE_ACTION_HIT_SLOP.top)
-      ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
       // The icon is 20dp, below the audit floor, so the rect keeps a 36dp
-      // width, which measures 35.81dp on Android and still reaches 44dp across
-      // with its 5dp side slop.
+      // width, which measures 35.81dp on Android and still reaches 44dp
+      // across with its 5dp side slop inside the band.
       expect(String(control.props.className)).toContain('min-w-[36px]');
-      expect(tapTargetReachDp(35.81, LINE_ACTION_HIT_SLOP.left)).toBeGreaterThanOrEqual(
-        TOUCH_TARGET_DP
-      );
     }
-    // The control's own box floats over the accessory line, so the row draws
-    // no extra height around it and still passes no target-shaped flag to the
-    // field. What the row measures is what the design-gate cells read from
-    // real frames.
+
+    // Each band is the card's child and the field block's sibling, so the
+    // controls' parent is the card, not the one-text-line label row whose
+    // bounds clipped the slop before this shape.
+    const bands = findAll(renderer.root, 'View').filter(
+      node => String(node.props.className) === LINE_ACTION_OVERLAY_CLASS
+    );
+    expect(bands).toHaveLength(3);
+    for (const band of bands) {
+      // The band renders inside the ProfileCommandRowControls composite, so
+      // the card host sits one composite above the band's own node.
+      let card: ReactTestInstance | null = band.parent;
+      while (card !== null && typeof card.type !== 'string') {
+        card = card.parent;
+      }
+      expect(card).not.toBeNull();
+      expect(String(card?.props.className)).toBe('relative');
+      expect(card?.children).toHaveLength(2);
+      const fieldBlock = card?.children.find(child => {
+        if (child === band || typeof child !== 'object') {
+          return false;
+        }
+        return typeof (child as ReactTestInstance).props.className === 'string';
+      });
+      expect(String((fieldBlock as ReactTestInstance).props.className)).toContain('p-4');
+    }
+
+    // The field's gap prop reaches FormField's root, where the label row and
+    // the input are siblings, and is wide enough that the band's bottom edge
+    // (46dp from the card's top) stays above the input's top edge (the card's
+    // 14dp padding + the 17.5dp label line + this gap): 47.5 >= 46 + 1.
     const fields = findAll(renderer.root, 'FormField');
     expect(fields).toHaveLength(3);
     for (const field of fields) {
-      const targetFlags = Object.keys(field.props).filter(key =>
-        key.toLowerCase().includes('target')
-      );
-      expect(targetFlags).toEqual([]);
+      expect(field.props.gapClassName).toBe(COMMAND_ROW_FIELD_GAP_CLASS);
     }
+    // Band bottom above input top, with clearance, in dp: 14 + 17.5 + 16 = 47.5.
+    expect(14 + 17.5 + 16 - LINE_ACTION_REACH_DP).toBeGreaterThanOrEqual(1);
+
     unmount();
   });
 

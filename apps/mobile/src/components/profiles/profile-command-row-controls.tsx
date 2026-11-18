@@ -3,9 +3,13 @@ import { Pressable, View } from 'react-native';
 
 import { ChevronDown, ChevronUp, Trash2 } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
-import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
+import {
+  LINE_ACTION_BOX_CLASS,
+  LINE_ACTION_HIT_SLOP,
+  LINE_ACTION_OVERLAY_CLASS,
+} from '@/lib/a11y/tap-target';
 
-/** The box a row's control floats on the field's label line, at the 36 dp width floor. */
+/** The box a row's control renders in, at the 36 dp width floor. */
 const ROW_CONTROL_BOX_CLASS = cn(
   LINE_ACTION_BOX_CLASS,
   'min-w-[36px] items-center justify-center active:opacity-70'
@@ -24,8 +28,9 @@ function LineIconButton({
   onPress: () => void;
   children: ReactNode;
 }>) {
-  // The box floats a 28 dp high, 36 dp wide frame over the label line, so the
-  // row is one text line tall. The 5 dp side slop reaches 45.8 dp across.
+  // The 28 dp high, 36 dp wide box keeps the glyph centred on the label's
+  // line; its slop reaches past 44 dp each way inside the overlay band that
+  // parents this row (see LINE_ACTION_OVERLAY_CLASS).
   return (
     <Pressable
       className={cn(ROW_CONTROL_BOX_CLASS, disabled && 'opacity-40')}
@@ -42,12 +47,20 @@ function LineIconButton({
 }
 
 /**
- * A setup command field's reorder and delete controls. Each control floats the
- * shared line action box, with a 36 dp width floor, on the field's label line,
- * so the card's header row is the one 17.5 dp text line and the card's top
- * padding equals its bottom padding. The 5 dp side slop reaches 45.8 dp
- * across. The row's 10.66 dp gap keeps the neighbouring 5 dp slop bands apart
- * with 0.66 dp clearance, so a tap beside one control never reaches the next.
+ * A setup command field's reorder and delete controls, as the card's own
+ * overlay band: `ProfileCommandRowControls` mounts the absolutely positioned
+ * band ({@link LINE_ACTION_OVERLAY_CLASS}) whose parent is the card, and the
+ * card's sibling field block keeps its label row one text line tall. React
+ * Native confines a control's touch area to its parent's bounds, so the band
+ * — 46 dp tall, padded to the slop's reach — is what lets each control reach
+ * 44 dp on both axes without growing the label row: vertically the band
+ * reaches into the card's top padding, horizontally the card's padding
+ * contains the slop. The band's bottom edge stops above the field, whose gap
+ * from the label row the card widens with COMMAND_ROW_FIELD_GAP_CLASS, so a
+ * tap aimed at the field's top strip lands on the field. `box-none` keeps the
+ * band itself touch-transparent: only the control boxes and their slop take
+ * taps, and the label under the band's left tail stays pressable.
+ *
  * They still name their own position.
  */
 export function ProfileCommandRowControls({
@@ -74,7 +87,7 @@ export function ProfileCommandRowControls({
   onDelete: () => void;
 }>) {
   return (
-    <View className="flex-row items-center gap-3">
+    <View className={LINE_ACTION_OVERLAY_CLASS} pointerEvents="box-none">
       <LineIconButton label={upLabel} hint={hint} disabled={!canMoveUp} onPress={onMoveUp}>
         <ChevronUp size={20} color={color} />
       </LineIconButton>

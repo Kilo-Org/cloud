@@ -61,10 +61,7 @@ export function requestNeedsEgressPolicy(runtime: SessionRuntimeIntent | undefin
 }
 
 function selectableAllocations(candidates: (string | undefined)[]) {
-  return candidates
-    .filter((candidate): candidate is string => candidate !== undefined)
-    .map(candidate => candidate as SandboxAllocation)
-    .filter(isSelectableSandboxAllocation);
+  return candidates.filter(isSelectableSandboxAllocation);
 }
 
 function enforcesRequestedEgress(

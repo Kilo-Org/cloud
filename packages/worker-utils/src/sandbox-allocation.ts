@@ -188,7 +188,7 @@ export const sandboxDestinationSchema = z.union([
 export type SandboxDestination = z.infer<typeof sandboxDestinationSchema>;
 
 export function isSelectableSandboxAllocation(
-  allocation: SandboxAllocation | undefined
+  allocation: string | undefined
 ): allocation is SelectableSandboxAllocation {
   return (
     allocation !== undefined &&

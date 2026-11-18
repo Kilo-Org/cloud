@@ -162,41 +162,38 @@ describe('Switch', () => {
     expect(props.value).toBe(true);
     expect(props.trackColor).toEqual({
       false: lightColors.mutedSoft,
-      true: lightColors.primaryDisabled,
+      true: lightColors.mutedSoft,
     });
-    expect(props.thumbColor).toBe(lightColors.primaryForeground);
+    expect(props.thumbColor).toBe(lightColors.foreground);
     expect(props.trackColor?.true).not.toBe(lightColors.primary);
   });
 
-  it('paints the muted grip on a disabled off switch', () => {
+  it('paints the same muted pair on a disabled off switch', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ disabled: true, value: false }).root);
     expect(props.trackColor).toEqual({
       false: lightColors.mutedSoft,
-      true: lightColors.primaryDisabled,
+      true: lightColors.mutedSoft,
     });
-    expect(props.thumbColor).toBe(lightColors.mutedForeground);
+    expect(props.thumbColor).toBe(lightColors.foreground);
   });
 
-  it('keeps the disabled pair off the brand accent in dark mode', () => {
+  it('paints one disabled pair in dark mode too, off the brand accent', () => {
     native.os = 'android';
     native.scheme = 'dark';
     const on = nativeProps(renderSwitch({ disabled: true, value: true }).root);
     const off = nativeProps(renderSwitch({ disabled: true, value: false }).root);
     expect(on.trackColor).toEqual({
       false: darkColors.mutedSoft,
-      true: darkColors.primaryDisabled,
+      true: darkColors.mutedSoft,
     });
-    // The disabled on grip is the mid neutral, never the scheme's on ink. A
-    // light grip on the muted fill reads as a working control, and dark's
-    // `primaryForeground` is the card's own near-black: on the thumb's
-    // overhanging arc it is 1.1:1 with the row and the pill loses its right end.
-    expect(on.thumbColor).toBe(darkColors.mutedSoft);
+    // The thumb keeps the scheme's ink so the grey track still reads as a
+    // control in both themes; the position alone says on or off.
+    expect(on.thumbColor).toBe(darkColors.foreground);
     expect(on.thumbColor).not.toBe(darkColors.selectionForeground);
-    expect(on.thumbColor).not.toBe(darkColors.primaryForeground);
     expect(off.trackColor).toEqual(on.trackColor);
-    expect(off.thumbColor).toBe(darkColors.mutedForeground);
+    expect(off.thumbColor).toBe(on.thumbColor);
     expect(on.trackColor?.true).not.toBe(darkColors.primary);
   });
 
@@ -204,7 +201,7 @@ describe('Switch', () => {
     native.os = 'android';
     native.scheme = 'light';
     const props = nativeProps(renderSwitch({ accessibilityState: { disabled: true } }).root);
-    expect(props.trackColor?.true).toBe(lightColors.primaryDisabled);
+    expect(props.trackColor?.true).toBe(lightColors.mutedSoft);
   });
 
   it('leaves the pair to the platform on iOS, which fades a disabled switch itself', () => {

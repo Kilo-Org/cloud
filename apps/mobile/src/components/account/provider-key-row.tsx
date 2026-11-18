@@ -4,7 +4,7 @@ import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
@@ -56,14 +56,15 @@ export function ProviderKeyRow({
             </Text>
           ) : null}
         </View>
-        <Switch
-          value={providerKey.is_enabled}
-          disabled={!editable || busy}
-          onValueChange={onToggle}
-          accessibilityLabel={t('profile.providerKeys.enableKey', {
+        {renderRowTrailing({
+          kind: 'switch',
+          value: providerKey.is_enabled,
+          disabled: !editable || busy,
+          onValueChange: onToggle,
+          accessibilityLabel: t('profile.providerKeys.enableKey', {
             provider: providerKey.provider_name,
-          })}
-        />
+          }),
+        })}
       </View>
       <View className="flex-row flex-wrap items-center gap-2">
         <Button

@@ -192,6 +192,9 @@ vi.mock('@/components/ui/configure-row', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
+  Check: 'Check',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
   CircleDot: 'CircleDot',
   GitBranch: 'GitBranch',
   GitCommit: 'GitCommit',
@@ -199,7 +202,15 @@ vi.mock('@/components/ui/icons', () => ({
   MessageSquare: 'MessageSquare',
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://app.kilo.ai' }));
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  Switch: 'Switch',
+  View: 'View',
+  useColorScheme: () => 'light',
+}));
 vi.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'AnimatedView' },
@@ -241,8 +252,9 @@ function rowTitled(root: TestRenderer.ReactTestInstance, title: string) {
   return row;
 }
 
+/** The row's one action: a secondary button, or the trailing cell's text action. */
 function actionOf(row: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance | null {
-  return row.findAllByType('Button')[0] ?? null;
+  return row.findAllByType('Button')[0] ?? row.findAllByType('Pressable')[0] ?? null;
 }
 
 function texts(root: TestRenderer.ReactTestInstance): ReactNode[] {

@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
+import { ROW_FRAME_CONTENT_HIT_SLOP, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+
 import { ROW_FRAME_CLASS, ROW_FRAME_STACK_CLASS, RowFrame } from './row-frame';
 
 vi.mock('@/lib/haptics', () => ({ selectionHaptic: vi.fn() }));
@@ -187,6 +189,12 @@ describe('RowFrame interaction', () => {
     expect(classesOf(frame)).toEqual(expect.arrayContaining(['min-h-[48px]', 'px-4', 'py-3']));
     expect(content.props.accessible).toBe(false);
     expect(content.props.importantForAccessibility).toBe('no-hide-descendants');
+    // The frame already pads the row to its 48pt floor: a second floor on the
+    // content pressable made every preference row 69pt tall (27pt of text plus
+    // a 48pt box plus the frame's 21pt padding). The pressable fills the row's
+    // content band and reaches the touch target through `hitSlop` instead.
+    expect(classesOf(content)).not.toContain(ROW_TARGET_CLASS);
+    expect(content.props.hitSlop).toEqual(ROW_FRAME_CONTENT_HIT_SLOP);
     // The switch is the frame's child, not a child of the content press.
     expect(content.findAllByType('Switch' as never)).toHaveLength(0);
     expect(root.findAllByType('Switch' as never)).toHaveLength(1);

@@ -30,8 +30,8 @@ import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowFrame } from '@/components/ui/row-frame';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Section } from '@/components/ui/section';
-import { Switch } from '@/components/ui/switch';
 import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
 import { createSubmitLock } from '@/lib/submit-lock';
 import { ScreenHeader } from '@/components/screen-header';
@@ -679,29 +679,34 @@ export function NotificationsScreen() {
   } else if (!gateSettled) {
     masterTrailing = <Skeleton className="h-8 w-14 rounded-full" />;
   } else {
-    // The switch and the Enable card below are one control, not two: while push
-    // cannot work, the card carries the action, and the switch appears only once
-    // it does. Painting a dead switch beside the card offered the same state
-    // twice (`h-11` greys, 2026-11-18).
+    // The switch and the Enable notice below are one control, not two: while
+    // push cannot work, the notice carries the action, and the switch appears
+    // only once it does. Painting a dead switch beside the card offered the
+    // same state twice (`h-11` greys, 2026-11-18).
     masterTrailing = notificationsEnabled ? (
       <View className="flex-row items-center gap-2">
         {isMasterBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}
-        <Switch
-          value={notificationsEnabled}
-          disabled={isMasterBusy}
-          accessibilityLabel={t('notifications.deviceTitle')}
-          accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
-          onValueChange={value => {
+        {renderRowTrailing({
+          kind: 'switch',
+          value: notificationsEnabled,
+          disabled: isMasterBusy,
+          accessibilityLabel: t('notifications.deviceTitle'),
+          accessibilityState: { disabled: isMasterBusy, busy: isMasterBusy },
+          onValueChange: value => {
             if (value) {
               void handleEnableNotifications();
             } else {
               handleDisableNotifications();
             }
-          }}
-        />
+          },
+        })}
       </View>
     ) : null;
   }
+  // While the gate is settled and off, the row and the Enable card say the same
+  // state twice, so the section renders one notice instead: the row's title,
+  // subtitle and dead switch collapse into the card that owns the action.
+  const showEnableNotice = showEnableCta && gateSettled && !permissionLoading && !permissionError;
 
   return (
     <View className="flex-1 bg-background">
@@ -744,33 +749,35 @@ export function NotificationsScreen() {
 
         {/* Master gate */}
         <Section label={t('notifications.push')}>
-          <RowGroup>
-            <RowFrame
-              // The leading tile keeps its 30 dp frame in all three states, so
-              // the title never moves when the permission settles into "on" or
-              // "off". While it is unsettled the tile holds a neutral mark
-              // instead of the off bell: painting "off" before the answer would
-              // assert a state nobody has read yet.
-              icon={masterLeading === 'neutral' ? undefined : MASTER_GATE_ICON[masterLeading]}
-              iconContent={
-                masterLeading === 'neutral' ? <Skeleton className="h-4 w-4 rounded" /> : undefined
-              }
-              title={t('notifications.deviceTitle')}
-              subtitle={masterSubtitle === undefined ? undefined : { text: masterSubtitle }}
-              subtitlePlaceholder={
-                masterLeading === 'neutral' ? <Skeleton className="mt-0.5 h-4 w-52" /> : undefined
-              }
-              trailing={{ kind: 'node', node: masterTrailing }}
-            />
-          </RowGroup>
+          {/* While the gate reads, fails or is on, the row carries that state.
+              Once it has settled off, the row and the card below would describe
+              one state twice, so the card alone stands as the notice. */}
+          {showEnableNotice ? null : (
+            <RowGroup>
+              <RowFrame
+                // The leading tile keeps its 30 dp frame in all three states, so
+                // the title never moves when the permission settles into "on" or
+                // "off". While it is unsettled the tile holds a neutral mark
+                // instead of the off bell: painting "off" before the answer would
+                // assert a state nobody has read yet.
+                icon={masterLeading === 'neutral' ? undefined : MASTER_GATE_ICON[masterLeading]}
+                iconContent={
+                  masterLeading === 'neutral' ? <Skeleton className="h-4 w-4 rounded" /> : undefined
+                }
+                title={t('notifications.deviceTitle')}
+                subtitle={masterSubtitle === undefined ? undefined : { text: masterSubtitle }}
+                subtitlePlaceholder={
+                  masterLeading === 'neutral' ? <Skeleton className="mt-0.5 h-4 w-52" /> : undefined
+                }
+                trailing={{ kind: 'node', node: masterTrailing }}
+              />
+            </RowGroup>
+          )}
 
-          {/* Empty-state CTA: only shown when the master gate is closed and the
-              gate has settled (avoids a transient flash while token queries
-              resolve for an already-registered user). The retryable unhappy
-              path (a category mutation rejection) is handled by the toggle
-              itself — there is no terminal failure mode for these preferences,
-              so a non-retryable CTA is structurally absent. */}
-          {!permissionLoading && !permissionError && gateSettled && showEnableCta && (
+          {/* The one push notice while the gate is off: what the switch would
+              turn on, and the action that turns it on. It replaces the row that
+              used to repeat the same state above it. */}
+          {showEnableNotice && (
             <Card>
               <Text variant="caption">{t('notifications.enableDescription')}</Text>
               <Button
@@ -891,18 +898,22 @@ export function NotificationsScreen() {
                             }}
                           />
                         )}
-                        <Switch
-                          value={previewIsFull}
-                          disabled={previewDisabled}
-                          accessibilityLabel={t('notifications.showFullPreviews')}
-                          accessibilityState={{ disabled: previewDisabled, busy: isPreviewPending }}
-                          onValueChange={value => {
+                        {renderRowTrailing({
+                          kind: 'switch',
+                          value: previewIsFull,
+                          disabled: previewDisabled,
+                          accessibilityLabel: t('notifications.showFullPreviews'),
+                          accessibilityState: {
+                            disabled: previewDisabled,
+                            busy: isPreviewPending,
+                          },
+                          onValueChange: value => {
                             if (previewDisabled) {
                               return;
                             }
                             handlePreviewChange(value ? 'full' : 'generic');
-                          }}
-                        />
+                          },
+                        })}
                       </View>
                     }
                   />

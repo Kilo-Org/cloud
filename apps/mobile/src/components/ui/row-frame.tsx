@@ -14,7 +14,7 @@ import { type LucideProps } from '@/components/ui/icons';
 import { type RowEllipsizeMode } from '@/components/ui/row-value';
 import { renderRowTrailing, type RowTrailingSpec } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_FRAME_CONTENT_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { NEUTRAL_TINT, type Tint } from '@/lib/agent-color';
 import { cn } from '@/lib/utils';
 
@@ -243,9 +243,9 @@ export function RowFrame({
       <View testID={testID} className={frameClass} onLayout={onLayout}>
         <Pressable
           {...contentProps}
+          hitSlop={ROW_FRAME_CONTENT_HIT_SLOP}
           className={cn(
-            ROW_TARGET_CLASS,
-            'min-w-0 flex-1 flex-row items-center gap-3',
+            'min-w-0 flex-1 flex-row items-center gap-3 self-stretch',
             !disabled && 'active:opacity-70'
           )}
         >

@@ -13,7 +13,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Card } from '@/components/ui/card';
 import { Lock } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
@@ -192,12 +192,13 @@ export function SaveProfileSheet({
             <Text className="flex-1 text-sm font-medium text-foreground">
               {t('profiles.setAsDefault')}
             </Text>
-            <Switch
-              value={setAsDefault}
-              accessibilityLabel={t('profiles.setAsDefault')}
-              disabled={isSaving}
-              onValueChange={setSetAsDefault}
-            />
+            {renderRowTrailing({
+              kind: 'switch',
+              value: setAsDefault,
+              accessibilityLabel: t('profiles.setAsDefault'),
+              disabled: isSaving,
+              onValueChange: setSetAsDefault,
+            })}
           </View>
         </RowGroup>
 

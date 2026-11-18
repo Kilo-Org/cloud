@@ -3,7 +3,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, type ViewStyle } from 'react-native';
+import { ScrollView, View, type ViewStyle } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { NOTIFICATION_HISTORY_RETENTION_DAYS } from '@kilocode/notifications/schemas';
@@ -278,12 +278,15 @@ export function NotificationHistoryScreen() {
             <Skeleton className="h-8 w-20 rounded-full" />
           </View>
         ) : (
-          // The row wraps instead of scrolling: a fifth chip ran past the
-          // screen edge and was clipped to a sliver at every width, so a
-          // horizontal scroller hid a filter rather than offering it. Wrapping
-          // keeps every chip whole, with the page gutter on both ends in either
-          // direction.
-          <View accessibilityRole="tablist" className="flex-row flex-wrap gap-2 px-4">
+          // One row that scrolls sideways: every chip keeps its whole face and
+          // the row's own gutter sits at both ends, so the last chip is never
+          // clipped by the screen edge and no chip wraps onto a line of its own.
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            accessibilityRole="tablist"
+            contentContainerClassName="gap-2 px-4"
+          >
             {filters.map(filter => (
               <FilterChip
                 key={filter.category ?? 'all'}
@@ -297,7 +300,7 @@ export function NotificationHistoryScreen() {
                 }}
               />
             ))}
-          </View>
+          </ScrollView>
         )}
 
         <View className="mt-3 flex-1">

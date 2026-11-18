@@ -26,8 +26,6 @@ type BalanceBlockProps = Readonly<{
   readonly toggle: ReactNode;
   /** The expiry note. It reads the credit blocks, not the balance. */
   readonly note: ReactNode;
-  /** The purchase action, the same in every state so its slot never changes. */
-  readonly action: ReactNode;
   /** The visible failure line beside the retry action. */
   readonly failureLabel: string;
   readonly retryLabel: string;
@@ -43,7 +41,6 @@ export function BalanceBlock({
   toggle,
   note,
   failureLabel,
-  action,
   retryLabel,
   retryActionLabel,
   onRetry,
@@ -99,7 +96,6 @@ export function BalanceBlock({
     </View>
   );
 
-  const stackedAction = action == null ? null : <View className="items-end">{action}</View>;
   return (
     // The card takes no touch itself, so the account picker's hit slop above it
     // (the Credits header row) still reaches into the card's top padding; its
@@ -113,7 +109,6 @@ export function BalanceBlock({
         </View>
         {!stacked && visibilityControl}
       </Animated.View>
-      {stacked ? stackedAction : action}
     </Card>
   );
 }

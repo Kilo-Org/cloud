@@ -1,9 +1,12 @@
 /* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native regression tests. */
 
-// An uninstalled row's body has to start the same Connect action as its trailing
-// button: the row itself is the largest control on the screen, and a body that
-// swallowed the tap left the hub looking inert. Installed and pending rows must
-// stay inert — their action is destructive, or not known yet.
+// An uninstalled row offers one control: the trailing cell's Connect text
+// action. Four filled primary buttons on one screen read as four primary
+// actions, which the layout contract allows one of, so the row keeps the
+// action in its trailing cell and nothing else acts.
+//
+// Installed and pending rows stay inert: their action is destructive, or not
+// known yet.
 
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -21,20 +24,31 @@ const calls = vi.hoisted(() => ({
   retryConnection: vi.fn<() => void>(),
 }));
 
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+  I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  Switch: 'Switch',
+  View: 'View',
+  useColorScheme: () => 'light',
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({
   Text: (props: { children?: ReactNode }) => createElement('TextMock', null, props.children),
 }));
-// The shared row is a host element here, so the wrapper the row builds around it
-// is the only pressable above the row's content.
+// The shared row is a host element here; its trailing cell is the only control
+// the row renders, so the suite reads the cell rather than the row.
 vi.mock('@/components/ui/configure-row', () => ({
   ConfigureRow: (props: { title?: string; trailing?: ReactNode }) =>
     createElement('RowMock', { title: props.title }, props.trailing ?? null),
 }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
+  Check: 'Check',
+  ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
   CircleDot: 'CircleDot',
   GitBranch: 'GitBranch',
   GitCommit: 'GitCommit',
@@ -96,25 +110,9 @@ afterEach(() => {
   }
 });
 
-/** Whether the node is the row's own content, below the wrapper under test. */
-function insideContent(node: TestRenderer.ReactTestInstance): boolean {
-  for (let parent = node.parent; parent; parent = parent.parent) {
-    // The configured row is a host element here, so its type name is the only
-    // marker the renderer keeps.
-    if (String(parent.type) === 'RowMock') {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Every press handler the row renders above its content: the body wrapper when
- * it exists, and nothing else. Found by the prop, not by element type, so the
- * assertion holds whether the wrapper is a host view or a component.
- */
-function bodyPresses(root: TestRenderer.ReactTestInstance) {
-  return root.findAll(node => typeof node.props.onPress === 'function' && !insideContent(node));
+/** Every control the row renders, found by the handler it carries. */
+function controls(root: TestRenderer.ReactTestInstance) {
+  return root.findAll(node => typeof node.props.onPress === 'function');
 }
 
 /** Invokes a control the test found, matching the renderer's synchronous act. */
@@ -128,57 +126,50 @@ function press(node: TestRenderer.ReactTestInstance) {
   });
 }
 
-describe('IntegrationProviderRow body press', () => {
+describe('IntegrationProviderRow action cell', () => {
   it.each([
     { scope: 'personal' as const, role: undefined },
     { scope: 'organization' as const, role: 'owner' },
-  ])('starts Connect from the body of an uninstalled $scope row', ({ scope, role }) => {
+  ])('connects from the one trailing action of an uninstalled $scope row', ({ scope, role }) => {
     const root = renderRow({ row: integrationRow(), scope, role });
 
-    const bodies = bodyPresses(root);
-    expect(bodies).toHaveLength(1);
-    const [body] = bodies;
-    if (!body) {
-      throw new Error('the uninstalled row rendered no body press');
+    const rows = controls(root);
+    expect(rows).toHaveLength(1);
+    const [connect] = rows;
+    if (!connect) {
+      throw new Error('the uninstalled row rendered no action');
     }
-    press(body);
+    press(connect);
 
     expect(calls.connect).toHaveBeenCalledOnce();
     expect(calls.disconnect).not.toHaveBeenCalled();
     expect(calls.manageOnWeb).not.toHaveBeenCalled();
   });
 
-  it('makes the row the one named Connect control', () => {
+  it('names the trailing action after the provider it connects', () => {
     const root = renderRow({ row: integrationRow(), scope: 'personal' });
 
-    const [body] = bodyPresses(root);
-    if (!body) {
-      throw new Error('the uninstalled row rendered no body press');
-    }
-    // One stop, named and typed: the row spans the series and the trailing
-    // button is only its face, kept out of the tree.
-    expect(body.props.accessibilityRole).toBe('button');
-    expect(body.props.accessibilityLabel).toBe('Connect. GitHub');
-    expect(body.props.accessibilityState).toEqual({ disabled: false, busy: false });
+    const [connect] = controls(root);
+    expect(connect?.props.accessibilityLabel).toBe('Connect. GitHub');
+    expect(connect?.props.accessibilityRole).toBe('button');
   });
 
-  it('keeps the trailing button out of the tree where the row acts', () => {
+  it('carries the Connect label in the row cell', () => {
     const root = renderRow({ row: integrationRow(), scope: 'personal' });
 
-    const [button] = root.findAll(node => String(node.type) === 'Button');
-    expect(button?.props.importantForAccessibility).toBe('no-hide-descendants');
-    expect(button?.props.accessible).toBe(false);
+    expect(root.findAllByType('TextMock').map(node => node.props.children)).toContain('Connect');
   });
 
-  it('blocks a second mint while the launch is in flight', () => {
+  it('draws the launch in flight as a busy mark with no second control', () => {
     const root = renderRow({ row: integrationRow(), scope: 'personal', connecting: true });
 
-    const bodies = bodyPresses(root);
-    expect(bodies).toHaveLength(1);
-    expect(bodies[0]?.props.disabled).toBe(true);
+    expect(controls(root)).toHaveLength(0);
+    expect(root.findAllByType('TextMock').map(node => node.props.children)).not.toContain(
+      'Connect'
+    );
   });
 
-  it('leaves an installed row inert so a body press cannot disconnect', () => {
+  it('leaves an installed row inert so a stray press cannot disconnect', () => {
     const root = renderRow({
       row: integrationRow({
         installed: true,
@@ -189,14 +180,15 @@ describe('IntegrationProviderRow body press', () => {
       scope: 'personal',
     });
 
-    expect(bodyPresses(root)).toHaveLength(0);
-    expect(root.findAllByType('RowMock')).toHaveLength(1);
+    const [disconnect] = controls(root);
+    expect(disconnect?.props.accessibilityLabel).toBe('Disconnect. GitHub');
+    expect(calls.connect).not.toHaveBeenCalled();
   });
 
-  it('wraps nothing while the connections read has not landed', () => {
+  it('holds the action cell while the connections read has not landed', () => {
     const root = renderRow({ row: integrationRow({ actionPending: true }), scope: 'personal' });
 
-    expect(bodyPresses(root)).toHaveLength(0);
+    expect(controls(root)).toHaveLength(0);
     expect(root.findAllByType('Skeleton')).toHaveLength(1);
   });
 
@@ -217,7 +209,6 @@ describe('IntegrationProviderRow body press', () => {
       role: 'owner',
     });
 
-    expect(bodyPresses(root)).toHaveLength(0);
     const [retry] = root.findAll(node => String(node.type) === 'Button');
     if (!retry) {
       throw new Error('the unnamed row rendered no retry');

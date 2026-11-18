@@ -191,15 +191,12 @@ vi.mock('@/components/ui/text', () => ({
   EYEBROW_LATIN_DISPLAY: 'font-mono-medium text-[11px]',
 }));
 
-const addCreditsRowProps = vi.hoisted(() => ({
-  latest: undefined as { url?: string; onPress?: () => void } | undefined,
+const externalPurchase = vi.hoisted(() => ({ canLink: true }));
+vi.mock('@/lib/billing/external-purchase-link', () => ({
+  useCanLinkExternalPurchase: () => externalPurchase.canLink,
 }));
-vi.mock('@/components/add-credits-row', () => ({
-  AddCreditsRow: (props: { url?: string; onPress?: () => void }) => {
-    addCreditsRowProps.latest = props;
-    return 'ADD_CREDITS_ROW';
-  },
-}));
+const openExternalUrl = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/external-link', () => ({ openExternalUrl }));
 
 const kiloPassCardProps = vi.hoisted(() => ({
   latest: undefined as { hideLoadingSkeleton?: boolean } | undefined,
@@ -278,6 +275,13 @@ function addCreditsAction(renderer: ReactTestRenderer): ReactTestInstance {
   );
 }
 
+/** The purchase action when the scope offers one, without throwing when it does not. */
+function findPurchase(renderer: ReactTestRenderer): ReactTestInstance | undefined {
+  return renderer.root.findAll(
+    node => node.type === Pressable && node.props.accessibilityLabel === i18n.t('addCredits.cta')
+  )[0];
+}
+
 /** Switches the active account through the provider, as the header control does. */
 async function switchAccountTo(organizationId: string | null) {
   await act(() => {
@@ -352,7 +356,8 @@ beforeEach(() => {
   onlineManager.setOnline(true);
   savedMetadata.clear();
   saveCompletion = undefined;
-  addCreditsRowProps.latest = undefined;
+  externalPurchase.canLink = true;
+  openExternalUrl.mockReset();
   // The shared memberships the provider reads default to none; tests that
   // stage a stored selection set their own payload.
   listState.payload = [];
@@ -1052,7 +1057,7 @@ describe('CreditsCard add-credits entry point', () => {
     unmount();
   });
 
-  it('keeps the org payment-details URL for a money-role member', async () => {
+  it('puts an organization purchase in the credits header and opens its billing page', async () => {
     currentUser.userId = 'user-1';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
     const queryClient = createTestQueryClient();
@@ -1064,25 +1069,31 @@ describe('CreditsCard add-credits entry point', () => {
     // lost-membership recovery switches it to Personal before the card reads it.
     listState.payload = orgs;
 
-    const { texts, unmount } = await mountCard(queryClient, orgs);
-    await waitFor(() => addCreditsRowProps.latest?.url !== undefined);
+    const { renderer, unmount } = await mountCard(queryClient, orgs);
+    await switchAccountTo('org-a');
+    await waitFor(() => findPurchase(renderer) !== undefined);
 
-    expect(texts()).toContain('ADD_CREDITS_ROW');
-    expect(addCreditsRowProps.latest?.url).toBe(
-      'https://example.com/organizations/org-a/payment-details'
+    const action = addCreditsAction(renderer);
+    expect(action.props.accessibilityRole).toBe('button');
+    await act(() => {
+      (action.props.onPress as () => void)();
+    });
+    expect(openExternalUrl).toHaveBeenCalledWith(
+      'https://example.com/organizations/org-a/payment-details',
+      { label: i18n.t('addCredits.billingPage') }
     );
-    expect(addCreditsRowProps.latest?.onPress).toBeUndefined();
+    expect(routerPush).not.toHaveBeenCalled();
 
     unmount();
   });
 
-  it('paints the org purchase row before the balance read answers', async () => {
+  it('paints the organization purchase before the balance read answers', async () => {
     currentUser.userId = 'user-1';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
     // The balance read decides nothing about whether the organization has a
-    // purchase entry point, so the row must be part of the card's first paint:
-    // mounting it when the read lands moved every section below it (design
-    // gate, Profile, 2026-11-06).
+    // purchase entry point, so the action must be part of the card's first
+    // paint: mounting it when the read lands moved every section below it
+    // (design gate, Profile, 2026-11-06).
     const balance = Promise.withResolvers<{ balance: number }>();
     getContextBalanceQueryFn.mockReturnValue(balance.promise);
     const orgs = [
@@ -1090,18 +1101,16 @@ describe('CreditsCard add-credits entry point', () => {
     ] as OrgListEntry[];
     listState.payload = orgs;
 
-    const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
-    await waitFor(() => orgCreditBlocksQueryFn.mock.calls.length > 0);
+    const { renderer, unmount } = await mountCard(createTestQueryClient(), orgs);
+    await switchAccountTo('org-a');
+    await waitFor(() => findPurchase(renderer) !== undefined);
 
-    expect(texts()).toContain('ADD_CREDITS_ROW');
-    expect(addCreditsRowProps.latest?.url).toBe(
-      'https://example.com/organizations/org-a/payment-details'
-    );
+    expect(addCreditsAction(renderer).props.accessibilityRole).toBe('button');
 
     unmount();
   });
 
-  it('renders no row for a non-money-role org member', async () => {
+  it('offers no purchase to a non-money-role org member', async () => {
     currentUser.userId = 'user-1';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
     const queryClient = createTestQueryClient();
@@ -1112,17 +1121,20 @@ describe('CreditsCard add-credits entry point', () => {
     // Same seeding as the money-role case: keep the selection recoverable.
     listState.payload = orgs;
 
-    const { texts, unmount } = await mountCard(queryClient, orgs);
-    await waitFor(() => orgCreditBlocksQueryFn.mock.calls.length > 0);
+    const { renderer, texts, unmount } = await mountCard(queryClient, orgs);
+    await switchAccountTo('org-a');
+    await waitFor(() => texts().includes('$0.00'));
 
-    // The personal row may render before the stored org resolves; the settled
-    // tree must hold no row at all for a member who cannot manage billing.
-    expect(texts()).not.toContain('ADD_CREDITS_ROW');
+    // The personal action may render before the stored org resolves; the
+    // settled tree must hold no purchase control for a member who cannot
+    // manage billing.
+    expect(findPurchase(renderer)).toBeUndefined();
 
     unmount();
   });
 
-  it('keeps the org action on the balance card instead of a block below it', async () => {
+  it('shows no dead purchase label where the storefront may not link out', async () => {
+    externalPurchase.canLink = false;
     currentUser.userId = 'user-1';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
     const queryClient = createTestQueryClient();
@@ -1132,24 +1144,14 @@ describe('CreditsCard add-credits entry point', () => {
     ] as OrgListEntry[];
     listState.payload = orgs;
 
-    const { renderer, unmount } = await mountCard(queryClient, orgs);
-    await waitFor(
-      () => renderer.root.findAll(node => node.children.includes('ADD_CREDITS_ROW')).length > 0
-    );
+    const { renderer, texts, unmount } = await mountCard(queryClient, orgs);
+    await switchAccountTo('org-a');
+    await waitFor(() => texts().includes('$0.00'));
 
-    // The action shares the balance card, which is the row it tops up: a block
-    // of its own held nothing but the button once the copy beside it left.
-    const action = renderer.root.find(node => node.children.includes('ADD_CREDITS_ROW'));
-    let ancestor = action.parent;
-    let insideBalanceCard = false;
-    while (ancestor !== null) {
-      if (hasClasses(ancestor, ['min-h-16', 'rounded-xl', 'bg-secondary'])) {
-        insideBalanceCard = true;
-        break;
-      }
-      ancestor = ancestor.parent;
-    }
-    expect(insideBalanceCard).toBe(true);
+    // A plain muted label would read as a disabled action with nothing behind
+    // it; the organization's own screens carry the top-up on this storefront.
+    expect(findPurchase(renderer)).toBeUndefined();
+    expect(texts()).not.toContain(i18n.t('addCredits.cta'));
 
     unmount();
   });

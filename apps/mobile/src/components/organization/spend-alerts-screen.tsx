@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
-import { type ComponentProps, type ReactNode, useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 
@@ -39,9 +39,9 @@ import { RowChevron } from '@/components/ui/row-chevron';
 import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatList, formatNumber, formatPrefixedMoney } from '@/lib/format';
@@ -591,25 +591,33 @@ function SpendAlertsForm({
   );
 }
 
+type CardSwitchProps = Readonly<{
+  accessibilityLabel: string;
+  value: boolean;
+  onValueChange: (next: boolean) => void;
+}>;
+
 /**
- * The shared `Switch`, pulled out to sit level with the row's label.
+ * The card header's switch, in the shared trailing cell.
  *
  * The card ends its content at `px-3` = 10.5dp (the native rem here is 14dp),
  * and the label's ink starts about 10dp in. An unpulled switch's painted end
  * (the thumb at its travel limit, about 3dp past the track's own end) lands
  * about 14dp from the card edge, visibly deeper than the label. Pulling the
- * node out by one spacing unit (`-me-1` = 3.5dp) puts the painted thumb end
+ * cell out by one spacing unit (`-me-1` = 3.5dp) puts the painted thumb end
  * about 10–11dp from the edge, level with the label's start, and keeps about
  * 7dp of the node's hit area inside the card.
  *
  * The pull is on the END edge, so it stays logical: `marginInlineEnd` follows
  * the writing direction, where a hand-picked `-mr-1` would land on the label's
- * side under RTL.
+ * side under RTL. The control itself goes through `renderRowTrailing`, which
+ * cancels the node's 44pt floor down to a row's content band, so the card
+ * header keeps the height of its two text lines instead of the control's.
  */
-function CardSwitch(props: ComponentProps<typeof Switch>) {
+function CardSwitch({ accessibilityLabel, value, onValueChange }: CardSwitchProps) {
   return (
     <View className="-me-1">
-      <Switch {...props} />
+      {renderRowTrailing({ kind: 'switch', value, onValueChange, accessibilityLabel })}
     </View>
   );
 }

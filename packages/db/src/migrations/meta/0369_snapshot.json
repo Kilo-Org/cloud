@@ -1,5 +1,5 @@
 {
-  "id": "314d60f4-789f-4b6a-84d4-f34ecc3d1147",
+  "id": "0b342b04-a78b-4bef-b227-a8d0c6d452fd",
   "prevId": "11a2ce65-96d4-4bf6-a565-29a780abfd9e",
   "version": "7",
   "dialect": "postgresql",
@@ -9383,34 +9383,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_cloud_agent_worktrees_owner_activity": {
-          "name": "IDX_cloud_agent_worktrees_owner_activity",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "last_activity_at",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"cloud_agent_worktrees\".\"deletion_started_at\" IS NULL AND \"cloud_agent_worktrees\".\"deletion_completed_at\" IS NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

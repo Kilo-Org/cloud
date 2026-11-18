@@ -33,10 +33,6 @@ DROP INDEX CONCURRENTLY IF EXISTS "IDX_cloud_agent_session_runs_open";
 --> statement-breakpoint
 CREATE INDEX CONCURRENTLY "IDX_cloud_agent_session_runs_open" ON "cloud_agent_session_runs" USING btree ("cloud_agent_session_id","queued_at" DESC NULLS LAST,"message_id" DESC NULLS LAST) WHERE "cloud_agent_session_runs"."status" IN ('queued', 'accepted');
 --> statement-breakpoint
-DROP INDEX CONCURRENTLY IF EXISTS "IDX_cloud_agent_worktrees_owner_activity";
---> statement-breakpoint
-CREATE INDEX CONCURRENTLY "IDX_cloud_agent_worktrees_owner_activity" ON "cloud_agent_worktrees" USING btree ("kilo_user_id","organization_id","last_activity_at" DESC NULLS LAST) WHERE "cloud_agent_worktrees"."deletion_started_at" IS NULL AND "cloud_agent_worktrees"."deletion_completed_at" IS NULL;
---> statement-breakpoint
 RESET lock_timeout;
 --> statement-breakpoint
 RESET statement_timeout;

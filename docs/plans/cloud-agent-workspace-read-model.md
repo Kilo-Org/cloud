@@ -208,7 +208,7 @@ Verify the running local app and capture request counts.
 
 ### Implementation and local evidence
 
-- Migration `0363_workspace_read_model` adds tab state and activity. Its five concurrent indexes support workspace activity, active chats, and latest/open runs. Existing rows need no backfill because reads also use the newest root chat.
+- Migration `0369_workspace_read_model` adds tab state and activity. Its four concurrent indexes support workspace activity, active chats, and latest/open runs. Existing rows need no backfill because reads also use the newest root chat.
 - Workspace reads classify compact directory signals before loading selected tab summaries. PR reads run per workspace, not per chat.
 - Summary refresh reads status and run signals only for the requested connected stacks. Chat pagination uses creation time and the session ID, including PostgreSQL microseconds.
 - Summaries retain all open and closed tab summaries, as required. Payload size therefore depends on chats in selected workspaces, not hidden chat history.

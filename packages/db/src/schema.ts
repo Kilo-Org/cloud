@@ -6725,10 +6725,6 @@ export const cloud_agent_worktrees = pgTable(
   },
   table => [
     index('IDX_cloud_agent_worktrees_owner_scope').on(table.kilo_user_id, table.organization_id),
-    index('IDX_cloud_agent_worktrees_owner_activity')
-      .on(table.kilo_user_id, table.organization_id, table.last_activity_at.desc())
-      .where(sql`${table.deletion_started_at} IS NULL AND ${table.deletion_completed_at} IS NULL`)
-      .concurrently(),
     index('IDX_cloud_agent_worktrees_folder_id')
       .on(table.folder_id)
       .where(isNotNull(table.folder_id)),

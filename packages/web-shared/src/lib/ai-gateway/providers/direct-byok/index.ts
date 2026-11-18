@@ -235,16 +235,6 @@ export function directByokProvidersForKeys(
 }
 
 /**
- * Every provider whose model ids the owner of `keys` can request: every provider of
- * `DIRECT_BYOK_PROVIDERS`, and the owner's endpoints, whose ids only their owner can use.
- */
-export function directByokProvidersVisibleTo(
-  keys: ReadonlyArray<DirectByokKey>
-): DirectByokProvider[] {
-  return [...DIRECT_BYOK_PROVIDERS, ...getByokEndpointProviders(keys)];
-}
-
-/**
  * Catalog mode needs models.dev data to map upstream models to catalog ids. An organization's
  * endpoint names each model by the catalog id it serves in catalog mode.
  */

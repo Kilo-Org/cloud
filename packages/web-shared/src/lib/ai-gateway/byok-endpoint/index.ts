@@ -9,7 +9,6 @@ import {
   type ByokEndpointModel,
   type ByokEndpointProviderId,
   type CustomLlmApiKind,
-  type CustomLlmProvider,
   type ReasoningDetailsTransform,
 } from '@kilocode/db/schema-types';
 
@@ -26,26 +25,16 @@ export function generateByokEndpointProviderId(): ByokEndpointProviderId {
   return `${BYOK_ENDPOINT_PROVIDER_ID_PREFIX}${suffix}`;
 }
 
+/** The endpoint a model id such as `endpoint-a1b2c3d4e5/my-model` names, if it names one. */
+export function getByokEndpointProviderIdOfModel(modelId: string): ByokEndpointProviderId | null {
+  const slash = modelId.indexOf('/');
+  const providerId = slash === -1 ? null : modelId.slice(0, slash);
+  return isByokEndpointProviderId(providerId) ? providerId : null;
+}
+
 /** Whether a model id names an endpoint, such as `endpoint-a1b2c3d4e5/my-model`. */
 export function isByokEndpointModelId(modelId: string): boolean {
-  return parseByokEndpointModelId(modelId) !== null;
-}
-
-export function formatByokEndpointModelId(
-  providerId: ByokEndpointProviderId,
-  model: Pick<ByokEndpointModel, 'id'>
-): string {
-  return `${providerId}/${model.id}`;
-}
-
-export function parseByokEndpointModelId(
-  modelId: string
-): { providerId: ByokEndpointProviderId; modelId: string } | null {
-  const slash = modelId.indexOf('/');
-  if (slash === -1) return null;
-  const providerId = modelId.slice(0, slash);
-  if (!isByokEndpointProviderId(providerId)) return null;
-  return { providerId, modelId: modelId.slice(slash + 1) };
+  return getByokEndpointProviderIdOfModel(modelId) !== null;
 }
 
 /** The gateway APIs the endpoint serves `model` over. */
@@ -56,18 +45,12 @@ export function getByokEndpointModelApiKinds(
   return model.api_kinds ?? definition.api_kinds;
 }
 
-export function getByokEndpointModelClientProvider(
-  definition: ByokEndpointDefinition,
-  model: ByokEndpointModel
-): CustomLlmProvider {
-  return model.client_provider ?? definition.client_provider;
-}
-
+/** The gateway API clients use for `model`. */
 export function getByokEndpointModelClientApiKind(
   definition: ByokEndpointDefinition,
   model: ByokEndpointModel
 ): CustomLlmApiKind {
-  return getCustomLlmClientApiKind(getByokEndpointModelClientProvider(definition, model));
+  return getCustomLlmClientApiKind(model.client_provider ?? definition.client_provider);
 }
 
 export function getByokEndpointModelResponseTransform(

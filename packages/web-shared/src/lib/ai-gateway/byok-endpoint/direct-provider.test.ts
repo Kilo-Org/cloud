@@ -12,6 +12,7 @@ import {
   getDirectByokUpstreamModelId,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { isByokEndpointModelId } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 import {
   createByokEndpointDirectProvider,
   InvalidByokEndpointCredentialsError,
@@ -260,5 +261,14 @@ describe('endpoint model lists', () => {
         opencode: expect.objectContaining({ ai_sdk_provider: 'anthropic' }),
       }),
     ]);
+  });
+});
+
+describe('isByokEndpointModelId', () => {
+  it('matches a model id under an endpoint provider id only', () => {
+    expect(isByokEndpointModelId(`${PROVIDER_ID}/acme/coder`)).toBe(true);
+    expect(isByokEndpointModelId(PROVIDER_ID)).toBe(false);
+    expect(isByokEndpointModelId(`${PROVIDER_ID}x`)).toBe(false);
+    expect(isByokEndpointModelId('endpoint-short/acme/coder')).toBe(false);
   });
 });

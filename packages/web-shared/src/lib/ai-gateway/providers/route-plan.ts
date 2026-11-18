@@ -38,7 +38,7 @@ import {
 import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { isByokServableCatalogModelId } from '@kilocode/web-shared/lib/ai-gateway/byok/servable-catalog-model';
 import {
-  parseByokEndpointModelId,
+  getByokEndpointProviderIdOfModel,
   type ByokEndpointProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/byok-endpoint';
 
@@ -84,10 +84,9 @@ export async function classifyRequestedModel(
 ): Promise<RequestedModel> {
   const customLlm = await findCustomLlm(requestedModel);
   if (customLlm) return { kind: 'custom-llm', customLlm };
-  const endpointModelId = parseByokEndpointModelId(requestedModel);
-  if (endpointModelId) {
-    return classifyEndpointModel(requestedModel, endpointModelId.providerId, loadKeys);
-  }
+  const endpointProviderId = getByokEndpointProviderIdOfModel(requestedModel);
+  if (endpointProviderId)
+    return classifyEndpointModel(requestedModel, endpointProviderId, loadKeys);
   const { provider, model } = await getDirectByokModel(requestedModel);
   if (provider && model) return { kind: 'direct-byok-model', provider, model };
   return { kind: 'catalog' };

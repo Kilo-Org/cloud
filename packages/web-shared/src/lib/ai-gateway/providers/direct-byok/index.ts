@@ -16,9 +16,9 @@ import {
 import { getPrimaryCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/catalog-models';
 import {
   getOpenRouterModelsMetadataFromDatabase,
-  isValidOpenRouterModelId,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { isByokServableCatalogModelId } from '@kilocode/web-shared/lib/ai-gateway/byok/servable-catalog-model';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
@@ -155,7 +155,7 @@ export async function listDirectByokCatalogModels(
   if (!supportsCatalogMode(provider)) return [];
   const entries: DirectByokCatalogEntry[] = [];
   for (const [catalogModelId, model] of getPrimaryCatalogModels(await provider.models())) {
-    if (await isLiveCatalogModelId(catalogModelId)) entries.push({ catalogModelId, model });
+    if (await isByokServableCatalogModelId(catalogModelId)) entries.push({ catalogModelId, model });
   }
   return entries;
 }
@@ -185,15 +185,12 @@ function providersOfKeys(
   );
 }
 
-// The catalog can drift between syncs, so a stored mapping only counts while its id is current.
-async function isLiveCatalogModelId(catalogModelId: string): Promise<boolean> {
-  return isValidOpenRouterModelId(catalogModelId);
-}
-
 /** The catalog id that replaces `model`'s bespoke id in catalog mode, or null when unmapped. */
 export async function getDirectByokCatalogModelId(model: DirectByokModel): Promise<string | null> {
   const catalogModelId = model.catalog_model_id;
-  return catalogModelId && (await isLiveCatalogModelId(catalogModelId)) ? catalogModelId : null;
+  return catalogModelId && (await isByokServableCatalogModelId(catalogModelId))
+    ? catalogModelId
+    : null;
 }
 
 export type DirectByokCatalogModel = { provider: DirectByokProvider; model: DirectByokModel };
@@ -215,8 +212,9 @@ export async function findDirectByokCatalogModels(
     })
   );
   const found = candidates.flat();
-  if (found.length === 0 || !(await isLiveCatalogModelId(catalogModelId))) return [];
-  if (targetModelId !== catalogModelId && !(await isLiveCatalogModelId(targetModelId))) return [];
+  if (found.length === 0 || !(await isByokServableCatalogModelId(catalogModelId))) return [];
+  if (targetModelId !== catalogModelId && !(await isByokServableCatalogModelId(targetModelId)))
+    return [];
   return found;
 }
 
@@ -229,7 +227,11 @@ async function addLatestAliasModelIds(providersByModelId: CatalogModeProviders):
   for (const [modelId, storedModel] of Object.entries(storedModels)) {
     const targetModelId = storedModel.alias_target?.slug;
     const targetProviders = targetModelId ? providersByModelId.get(targetModelId) : undefined;
-    if (modelId.startsWith('~') && targetProviders && (await isLiveCatalogModelId(modelId))) {
+    if (
+      modelId.startsWith('~') &&
+      targetProviders &&
+      (await isByokServableCatalogModelId(modelId))
+    ) {
       providersByModelId.set(modelId, targetProviders);
     }
   }

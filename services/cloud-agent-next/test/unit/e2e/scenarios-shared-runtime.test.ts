@@ -39,7 +39,7 @@ import {
   startPacedHoldTurn,
   trackCreations,
   trackStartedSession,
-  waitForBootTerminal,
+  waitForTerminalWithReplay,
   waitForPresentAllocation,
   waitForPacedProgress,
   type ScenarioDeadline,
@@ -173,6 +173,21 @@ describe('sendTurn', () => {
     expect(stream.close).toHaveBeenCalled();
   });
 
+  it('recovers a completed warm turn by replay without sending the prompt again', async () => {
+    const completed = completedEvent('message_1');
+    const replay = fakeStream(completed);
+    mocks.openConnectedStream.mockResolvedValueOnce(droppedStream()).mockResolvedValueOnce(replay);
+    mocks.sendMessage.mockResolvedValue({ messageId: 'message_1' });
+    mocks.getMessageResult.mockResolvedValue({ status: 'completed' });
+
+    const deadline = createScenarioDeadline(Date.now(), 30_000);
+    const turn = await sendTurn(deadline, CONFIG, 'workspace_1', 'echo:x', 'turn', 1_000);
+
+    expect(mocks.openConnectedStream.mock.calls.map(call => call[2])).toEqual([false, true]);
+    expect(mocks.sendMessage).toHaveBeenCalledTimes(1);
+    expect(turn).toEqual({ messageId: 'message_1', terminal: completed, stream: replay });
+  });
+
   it('does not revive an exhausted turn budget for a later phase', async () => {
     vi.useFakeTimers();
     const stream = fakeStream();
@@ -259,7 +274,7 @@ describe('bootToCompletion', () => {
  * not exercise a real socket drop, real replayed history or real replayed text;
  * only an operator run against the deployed Worker does that.
  */
-describe('waitForBootTerminal', () => {
+describe('waitForTerminalWithReplay', () => {
   function bootInput(stream: FakeStream, budgetMs: number) {
     return {
       deadline: createScenarioDeadline(Date.now(), 60_000),
@@ -276,7 +291,7 @@ describe('waitForBootTerminal', () => {
     const completed = fakeStream(completedEvent('message_1'));
     mocks.openConnectedStream.mockResolvedValue(completed);
 
-    const result = await waitForBootTerminal(bootInput(droppedStream(), 60_000));
+    const result = await waitForTerminalWithReplay(bootInput(droppedStream(), 60_000));
 
     expect(mocks.openConnectedStream).toHaveBeenCalledTimes(1);
     // The replayed history repopulates the replacement stream's events.
@@ -289,7 +304,7 @@ describe('waitForBootTerminal', () => {
   it('does not reconnect a healthy socket that reached the boot budget', async () => {
     const healthy = fakeStream(null);
 
-    const result = await waitForBootTerminal(bootInput(healthy, 60_000));
+    const result = await waitForTerminalWithReplay(bootInput(healthy, 60_000));
 
     expect(result.terminal).toBeNull();
     expect(result.stream).toBe(healthy);
@@ -299,7 +314,7 @@ describe('waitForBootTerminal', () => {
   it('stops by the attempt cap and by the boot budget, recording every close', async () => {
     // Attempt-bound: a large boot budget, but every replacement socket drops.
     mocks.openConnectedStream.mockImplementation(async () => droppedStream());
-    const capped = await waitForBootTerminal(bootInput(droppedStream(), 60_000));
+    const capped = await waitForTerminalWithReplay(bootInput(droppedStream(), 60_000));
     expect(mocks.openConnectedStream).toHaveBeenCalledTimes(5);
     expect(capped.terminal).toBeNull();
     // The original stream plus one close per reconnect: every drop is recorded.
@@ -328,7 +343,7 @@ describe('waitForBootTerminal', () => {
 
     const startedAt = Date.now();
     let settledAt: number | undefined;
-    const pending = waitForBootTerminal(bootInput(delayedDrop(), budgetMs)).then(result => {
+    const pending = waitForTerminalWithReplay(bootInput(delayedDrop(), budgetMs)).then(result => {
       settledAt = Date.now();
       return result;
     });
@@ -370,7 +385,7 @@ describe('waitForBootTerminal', () => {
 
     const startedAt = Date.now();
     let rejectedAt: number | undefined;
-    const failure = waitForBootTerminal(bootInput(initial, budgetMs)).then(
+    const failure = waitForTerminalWithReplay(bootInput(initial, budgetMs)).then(
       () => {
         throw new Error('expected the helper to reject');
       },
@@ -394,7 +409,7 @@ describe('waitForBootTerminal', () => {
     const establishment = new Error('Stream did not connect for workspace_1');
     mocks.openConnectedStream.mockRejectedValue(establishment);
 
-    const error = await waitForBootTerminal(bootInput(droppedStream(), 60_000)).then(
+    const error = await waitForTerminalWithReplay(bootInput(droppedStream(), 60_000)).then(
       () => null,
       (reason: unknown) => reason as Error
     );
@@ -414,7 +429,7 @@ describe('waitForBootTerminal', () => {
       .mockResolvedValueOnce(droppedStream())
       .mockResolvedValueOnce(completed);
 
-    const result = await waitForBootTerminal(bootInput(droppedStream(), 60_000));
+    const result = await waitForTerminalWithReplay(bootInput(droppedStream(), 60_000));
 
     expect(mocks.openConnectedStream).toHaveBeenCalledTimes(2);
     expect(result.stream).toBe(completed);

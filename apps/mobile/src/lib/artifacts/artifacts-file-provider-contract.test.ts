@@ -393,8 +393,16 @@ describe('artifacts provider iOS module contract', () => {
   it('exposes exactly the entry points the JS bridge calls', () => {
     expect(providerBridgeSource).toContain('registerArtifactsProviderDomain');
     expect(providerBridgeSource).toContain('notifyArtifactsChanged');
-    expect(providerModuleSource).toContain('Function("registerArtifactsProviderDomain")');
+    // The registration entry point is async: the mount awaits it and reports a
+    // rejection through Sentry instead of a silent no-op. A sync `Function`
+    // cannot reject, and an `AsyncFunction`-typed bridge entry point is what
+    // Expo maps to a JS promise.
+    expect(providerModuleSource).toContain('AsyncFunction("registerArtifactsProviderDomain")');
+    // `AsyncFunction(` contains `Function(` as a substring, so the sync
+    // declaration's absence is asserted line-anchored, not by substring.
+    expect(providerModuleSource).not.toMatch(/^\s*Function\("registerArtifactsProviderDomain"\)/m);
     expect(providerModuleSource).toContain('Function("notifyArtifactsChanged")');
+    expect(providerBridgeSource).toContain('registerArtifactsProviderDomain?: () => Promise<void>');
   });
 
   it('registers the domain idempotently and signals the root after a sync', () => {
@@ -424,6 +432,22 @@ describe('artifacts provider iOS module contract', () => {
     expect(providerModuleSource).toContain('NSFileProviderManager.add(domain)');
     expect(providerModuleSource).not.toContain('domainAlreadyExists');
     expect(providerModuleSource).toContain('signalEnumerator(for: .rootContainer)');
+    // Registration is `async` and bridges each completion handler with a
+    // continuation, so the mount can await the outcome and reject to Sentry
+    // instead of failing silently.
+    expect(providerModuleSource).toContain('private func registerProviderDomain() async throws');
+    expect(providerModuleSource).toContain('withCheckedThrowingContinuation');
+    expect(providerModuleSource).toContain('continuation.resume(throwing: error)');
+    // A missing File Provider manager is not a silent no-op: notify logs the
+    // case and re-registers the domain (once, without blocking the sync), then
+    // signals the root so a domain that appeared after the sync still reaches
+    // the Files app.
+    expect(providerModuleSource).toContain(
+      '[ArtifactsProvider] File Provider manager unavailable; registering the domain again'
+    );
+    expect(
+      swiftFunctionBody('private func notifyArtifactsChanged() {', providerModuleSource)
+    ).toContain('registerProviderDomain()');
   });
 });
 
@@ -439,20 +463,20 @@ describe('artifacts provider iOS module contract', () => {
 // algorithm is exercised in JS.
 
 /** One `... {` header's body, matched by brace depth so a clause is read from the function it belongs to. */
-function swiftFunctionBody(signature: string): string {
-  const start = extensionSource.indexOf(signature);
+function swiftFunctionBody(signature: string, source: string = extensionSource): string {
+  const start = source.indexOf(signature);
   if (start === -1) {
-    throw new Error(`${TARGET_NAME}Extension.swift declares no "${signature}"`);
+    throw new Error(`Swift source declares no "${signature}"`);
   }
   let depth = 0;
-  for (let index = start + signature.length - 1; index < extensionSource.length; index += 1) {
-    const character = extensionSource[index];
+  for (let index = start + signature.length - 1; index < source.length; index += 1) {
+    const character = source[index];
     if (character === '{') {
       depth += 1;
     } else if (character === '}') {
       depth -= 1;
       if (depth === 0) {
-        return extensionSource.slice(start + signature.length, index);
+        return source.slice(start + signature.length, index);
       }
     }
   }

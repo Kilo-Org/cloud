@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
@@ -137,8 +138,23 @@ function useArtifactMirrorSync(): void {
     }
 
     // Registration is idempotent and a no-op on Android and without the native
-    // module; the domain it registers outlives the session.
-    registerArtifactsProviderDomain();
+    // module; the domain it registers outlives the session. A failure must not
+    // fail the effect or block the mirror run, and is not retried here: the
+    // next signed-in run of this effect (auth epoch, foreground remount)
+    // registers again. The Files app's location only exists while the domain
+    // does, so a silent failure is worth one clear Sentry report.
+    void (async () => {
+      try {
+        await registerArtifactsProviderDomain();
+      } catch {
+        Sentry.captureException(new Error('Artifact File Provider registration failed'), {
+          tags: {
+            'error.subsystem': 'artifact-mirror',
+            'error.operation': 'register-file-provider-domain',
+          },
+        });
+      }
+    })();
 
     lastRunAt.current = Date.now();
     void syncArtifactMirror({ force: true });

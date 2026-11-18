@@ -12,8 +12,11 @@ import { requireOptionalNativeModule } from 'expo';
 
 type ArtifactsProviderModule = {
   notifyArtifactsChanged: () => void;
-  /** Registers the iOS File Provider domain; Android has no domain to register. */
-  registerArtifactsProviderDomain?: () => void;
+  /**
+   * Registers the iOS File Provider domain; Android has no domain to register.
+   * The promise rejects when the domain could not be read or added.
+   */
+  registerArtifactsProviderDomain?: () => Promise<void>;
 };
 
 const nativeModule = requireOptionalNativeModule<ArtifactsProviderModule>('ArtifactsProvider');
@@ -27,9 +30,11 @@ export function notifyArtifactsChanged(): void {
 }
 
 /**
- * Register the iOS File Provider domain that exposes the mirror. No-op when the
- * module or the entry point is absent.
+ * Register the iOS File Provider domain that exposes the mirror. A waiting
+ * promise resolves once the domain is readable (or already registered) and
+ * rejects when it could not be read or added. No-op — a promise that resolves
+ * — when the module or the entry point is absent (Android, JS-only builds).
  */
-export function registerArtifactsProviderDomain(): void {
-  nativeModule?.registerArtifactsProviderDomain?.();
+export function registerArtifactsProviderDomain(): Promise<void> {
+  return nativeModule?.registerArtifactsProviderDomain?.() ?? Promise.resolve();
 }

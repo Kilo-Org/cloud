@@ -56,11 +56,15 @@ const user = vi.hoisted(() => ({
 
 const mocks = vi.hoisted(() => ({
   MIRROR_SYNC_MIN_INTERVAL_MS: 5 * 60 * 1000,
+  captureException: vi.fn(),
   registerArtifactsProviderDomain: vi.fn(),
   syncArtifactMirror: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({ AppState: { addEventListener: appState.register } }));
+// The same way `notifyArtifactsChanged` is mocked elsewhere: the module mock is
+// the registration seam this suite drives.
+vi.mock('@sentry/react-native', () => ({ captureException: mocks.captureException }));
 vi.mock('@/lib/artifacts/artifact-mirror-sync', () => ({
   MIRROR_SYNC_MIN_INTERVAL_MS: mocks.MIRROR_SYNC_MIN_INTERVAL_MS,
   syncArtifactMirror: mocks.syncArtifactMirror,
@@ -79,7 +83,7 @@ type PendingRendererRef = { current: TestRenderer.ReactTestRenderer | undefined 
 
 const mounted: TestRenderer.ReactTestRenderer[] = [];
 
-async function mount(): Promise<void> {
+async function mountReturning(): Promise<TestRenderer.ReactTestRenderer> {
   const ref: PendingRendererRef = { current: undefined };
   await act(async () => {
     ref.current = TestRenderer.create(createElement(ArtifactMirrorSyncMount));
@@ -97,6 +101,11 @@ async function mount(): Promise<void> {
     throw new Error('ArtifactMirrorSyncMount did not mount');
   }
   mounted.push(renderer);
+  return renderer;
+}
+
+async function mount(): Promise<void> {
+  await mountReturning();
 }
 
 function unmountAll(): void {
@@ -107,6 +116,9 @@ function unmountAll(): void {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The bridge hands back a promise now; tests that need a failure override
+  // this per case.
+  mocks.registerArtifactsProviderDomain.mockResolvedValue(undefined);
   vi.useFakeTimers();
   clock.now = MOUNT_TIME;
   vi.spyOn(Date, 'now').mockImplementation(() => clock.now);
@@ -200,5 +212,66 @@ describe('ArtifactMirrorSyncMount', () => {
     unmountAll();
 
     expect(appState.count()).toBe(0);
+  });
+
+  it('reports a failed registration to Sentry without an unhandled rejection', async () => {
+    mocks.registerArtifactsProviderDomain.mockRejectedValue(new Error('no file provider domain'));
+
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => {
+      unhandledRejections.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandledRejection);
+    try {
+      await mount();
+
+      // The failure is absorbed by the mount itself and reported once, with
+      // the artifact-mirror tags; the signed-in run proceeds regardless.
+      expect(mocks.captureException).toHaveBeenCalledTimes(1);
+      const [reported, options] = mocks.captureException.mock.calls[0] ?? [];
+      expect(reported).toBeInstanceOf(Error);
+      expect((reported as Error).message).toBe('Artifact File Provider registration failed');
+      expect(options).toEqual({
+        tags: {
+          'error.subsystem': 'artifact-mirror',
+          'error.operation': 'register-file-provider-domain',
+        },
+      });
+      expect(mocks.syncArtifactMirror).toHaveBeenCalledTimes(1);
+      // Wait out the burst settle so the fire-and-forget await lands inside
+      // the fake timers' run; nothing else scheduled rejected.
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(unhandledRejections).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection);
+    }
+  });
+
+  it('registers again on the next signed-in run after a failure', async () => {
+    mocks.registerArtifactsProviderDomain.mockRejectedValue(new Error('no file provider domain'));
+    const renderer = await mountReturning();
+    expect(mocks.registerArtifactsProviderDomain).toHaveBeenCalledTimes(1);
+
+    // There is no retry timer: time alone never re-runs the effect.
+    await act(async () => {
+      vi.advanceTimersByTime(mocks.MIRROR_SYNC_MIN_INTERVAL_MS * 2);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mocks.registerArtifactsProviderDomain).toHaveBeenCalledTimes(1);
+
+    // A new signed-in context (auth epoch) re-runs the effect.
+    auth.value = { authEpoch: 1, isLoading: false, isSigningOut: false, token: 'token-1' };
+    await act(async () => {
+      renderer.update(createElement(ArtifactMirrorSyncMount));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mocks.registerArtifactsProviderDomain).toHaveBeenCalledTimes(2);
+    expect(mocks.captureException).toHaveBeenCalledTimes(2);
   });
 });

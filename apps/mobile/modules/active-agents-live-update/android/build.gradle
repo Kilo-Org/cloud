@@ -32,7 +32,6 @@ dependencies {
   // The headless worker and the headless task service beside it name
   // com.facebook.react.** classes, so the module needs react-android on its
   // own Kotlin compile classpath. The app's React Gradle plugin puts the
-  // runtime copy on the classpath, so compileOnly is enough — the same
-  // declaration expo-asset's build.gradle carries.
+  // runtime copy on the classpath, so compileOnly is enough.
   compileOnly 'com.facebook.react:react-android'
 }

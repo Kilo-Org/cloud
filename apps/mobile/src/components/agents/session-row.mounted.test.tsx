@@ -430,7 +430,6 @@ describe('StoredSessionRow live speech', () => {
             selectedId = selected.session_id;
           },
           onRetry: () => undefined,
-          onDismiss: () => undefined,
           instances: [],
           spawningConnectionId: null,
           instanceRowsDisabled: false,

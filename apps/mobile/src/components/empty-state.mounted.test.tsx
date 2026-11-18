@@ -276,7 +276,7 @@ describe('EmptyState presentation', () => {
 // collapses to a ring and the reader can still tell what is running. The
 // control announces the wait and admits no press until it clears.
 async function mountAction(loading?: boolean) {
-  const onPress = vi.fn();
+  const onPress = vi.fn<() => void>();
   const mounted = await renderWithProviders(
     <StateAction label="Try again" icon={SearchX} onPress={onPress} loading={loading} />
   );

@@ -879,7 +879,7 @@ describe('AgentSessionListContent liveness', () => {
     expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(1);
     expect(
       retry?.findAll(node => {
-        if (node.type !== 'Text') {
+        if (!isHost(node, 'Text')) {
           return false;
         }
         const { children } = node.props;

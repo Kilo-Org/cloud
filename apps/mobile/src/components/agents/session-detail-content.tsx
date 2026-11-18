@@ -3391,22 +3391,21 @@ export function SessionDetailContent({
 
   function renderContent() {
     if (shownTerminalError) {
-      const error = shownTerminalError;
       return (
         <QueryError
-          variant={error.variant}
-          title={error.title}
-          message={error.message}
+          variant={shownTerminalError.variant}
+          title={shownTerminalError.title}
+          message={shownTerminalError.message}
           isRetrying={terminalRetryPending}
           action={
             <View className="flex-row items-center gap-3">
-              {error.retryable ? (
+              {shownTerminalError.retryable ? (
                 <StateAction
                   label={t('common.retry')}
                   icon={RotateCcw}
                   loading={terminalRetryPending}
                   onPress={() => {
-                    handleTerminalRetry(error);
+                    handleTerminalRetry(shownTerminalError);
                   }}
                 />
               ) : null}

@@ -344,7 +344,7 @@
       "insufficient_evidence",
       "check_needed"
     ],
-    "providers": ["Cloudflare", "Cloudflare Containers", "Vercel", "AWS", "Unknown"],
+    "providers": ["Cloudflare", "Cloudflare Containers", "Vercel", "Unknown"],
     "deletionStates": ["active", "deleting", "deleted"],
     "deletionPhases": ["not_started", "runtime_cleanup", "finalizing", "completed"],
     "wakeBlockedReasons": ["deleting", "deleted", "billing_blocked", "billing_status_unavailable"]

@@ -4,14 +4,7 @@ import { useEffect, useState, type ComponentProps, type MouseEvent } from 'react
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Archive, CloudOff, Download, FileText, RefreshCw, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -187,15 +180,13 @@ export function WorkspaceArtifactsView({
         overlayClassName="absolute"
         dismissibleOverlay
         showCloseButton={false}
+        aria-describedby={undefined}
         className="absolute inset-y-0 right-0 h-full w-full gap-0 border-l p-0 sm:max-w-xl lg:max-w-2xl"
         onCloseAutoFocus={onCloseAutoFocus}
         onInteractOutside={event => event.preventDefault()}
       >
         <SheetHeader className="flex-row items-center justify-between gap-2 border-b px-4 py-2">
-          <div>
-            <SheetTitle className="text-base">Artifacts</SheetTitle>
-            <SheetDescription>Saved from /artifacts</SheetDescription>
-          </div>
+          <SheetTitle className="text-base">Artifacts</SheetTitle>
           <SheetClose asChild>
             <Button
               type="button"

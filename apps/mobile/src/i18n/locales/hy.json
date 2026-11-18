@@ -3461,7 +3461,7 @@
         "groupMembersSet_other": "{{name}} խմբի համար սահմանվել է {{count}} անդամ",
         "groupMemberGroupsSet_one": "Կազմակերպության անդամի համար սահմանվել է {{count}} խումբ",
         "groupMemberGroupsSet_other": "Կազմակերպության անդամի համար սահմանվել է {{count}} խումբ",
-        "fundsDistributed_one": "Բաշխվել է {{amount}} {{count}} դուստր կազմակերպությունների միջև",
+        "fundsDistributed_one": "Բաշխվել է {{amount}} {{count}} դուստր կազմակերպության միջև",
         "fundsDistributed_other": "Բաշխվել է {{amount}} {{count}} դուստր կազմակերպությունների միջև",
         "modeCreated": "Ստեղծվել է {{name}} ռեժիմը",
         "modeDeleted": "Ջնջվել է {{name}} ռեժիմը",

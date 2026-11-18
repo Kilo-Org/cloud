@@ -989,6 +989,13 @@ describe('cliSessionsV2 workspace read model', () => {
     const caller = sessionCaller();
     const scope = { organizationId: null, worktreeId: worktree };
     const open = await caller.workspaceChats({ ...scope, tabState: 'open', limit: 50 });
+    await expect(
+      caller.workspaceChats({
+        ...scope,
+        tabState: 'open',
+        cursor: { createdAt: '2026-04-29T01:16:12.945Z', sessionId: openIds[0] },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining('position') });
     const more = await caller.workspaceChats({
       ...scope,
       tabState: 'open',

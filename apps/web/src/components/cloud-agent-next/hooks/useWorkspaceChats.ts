@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { skipToken, useInfiniteQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
@@ -15,6 +15,30 @@ export type ChatTabPages = {
   error: boolean;
   loadMore: () => void;
 };
+
+function useChatTabPages(
+  {
+    hasNextPage,
+    isFetching,
+    isError,
+    data,
+    fetchNextPage,
+    refetch,
+  }: ReturnType<typeof useInfiniteQuery>,
+  enabled = true
+): ChatTabPages {
+  const hasData = data !== undefined;
+  const loadMore = useCallback(() => {
+    if (!enabled || isFetching) return;
+    if (hasData && hasNextPage) void fetchNextPage();
+    else void refetch();
+  }, [enabled, fetchNextPage, hasData, hasNextPage, isFetching, refetch]);
+
+  return useMemo(
+    () => ({ hasMore: hasNextPage, loading: !enabled || isFetching, error: isError, loadMore }),
+    [enabled, hasNextPage, isFetching, isError, loadMore]
+  );
+}
 
 export function mergeWorkspaceChats(
   worktreeId: string | null,
@@ -46,6 +70,7 @@ export function useWorkspaceChats({
   const scope = worktreeId ? { organizationId, worktreeId } : null;
   const scopeKey = scope ? JSON.stringify(scope) : null;
   const historyRequested = scopeKey !== null && requestedHistory === scopeKey;
+  const requestClosedHistory = useCallback(() => setRequestedHistory(scopeKey), [scopeKey]);
   const open = useInfiniteQuery({
     ...trpc.cliSessionsV2.workspaceChats.infiniteQueryOptions(
       scope ? { ...scope, tabState: 'open', limit: OPEN_CHAT_TAB_PAGE_SIZE } : skipToken,
@@ -64,19 +89,20 @@ export function useWorkspaceChats({
   const currentInOpen = open.data?.pages.some(page =>
     page.chats.some(chat => chat.sessionId === currentSessionId)
   );
+  const needsCurrent = currentInOpen === false || (currentInOpen === undefined && open.isError);
   const current = useInfiniteQuery({
     ...trpc.cliSessionsV2.workspaceChats.infiniteQueryOptions(
       scope && currentSessionId ? { ...scope, sessionId: currentSessionId, limit: 1 } : skipToken,
       { getNextPageParam: () => undefined }
     ),
-    enabled: scope !== null && currentSessionId !== null && !currentInOpen,
+    enabled: scope !== null && currentSessionId !== null && needsCurrent,
     staleTime: 5_000,
   });
   const { openChats, closedChats } = useMemo(() => {
     const openChats = open.data?.pages.flatMap(page => page.chats) ?? [];
     const closedChats = closed.data?.pages.flatMap(page => page.chats) ?? [];
     const active = current.data?.pages[0]?.chats[0];
-    if (active && !currentInOpen) {
+    if (active && needsCurrent) {
       if (!active.tabClosed) openChats.push(active);
       else if (!closedChats.some(chat => chat.sessionId === active.sessionId))
         closedChats.push(active);
@@ -86,7 +112,7 @@ export function useWorkspaceChats({
       openChats,
       closedChats: closedChats.filter(chat => !openIds.has(chat.sessionId)),
     };
-  }, [open.data, closed.data, current.data, currentInOpen]);
+  }, [open.data, closed.data, current.data, needsCurrent]);
   const serverChats = useMemo(
     () =>
       workspace
@@ -98,30 +124,8 @@ export function useWorkspaceChats({
     serverChats,
     openChats,
     closedChats,
-    closedHistoryIds: useMemo(
-      () => new Set(closed.data?.pages.flatMap(page => page.chats.map(chat => chat.sessionId))),
-      [closed.data]
-    ),
-    requestClosedHistory: () => setRequestedHistory(scopeKey),
-    openPages: {
-      hasMore: open.hasNextPage,
-      loading: open.isFetching,
-      error: open.isError,
-      loadMore: () => {
-        if (open.isFetching) return;
-        if (open.data) void open.fetchNextPage();
-        else void open.refetch();
-      },
-    },
-    closedPages: {
-      hasMore: closed.hasNextPage,
-      loading: !historyRequested || closed.isFetching,
-      error: closed.isError,
-      loadMore: () => {
-        if (closed.isFetching) return;
-        if (closed.data) void closed.fetchNextPage();
-        else void closed.refetch();
-      },
-    },
+    requestClosedHistory,
+    openPages: useChatTabPages(open),
+    closedPages: useChatTabPages(closed, historyRequested),
   };
 }

@@ -499,7 +499,6 @@ function CloudSidebarLayoutContent({
     serverChats: serverWorkspaceChats,
     openChats,
     closedChats,
-    closedHistoryIds,
     openPages: openChatPages,
     closedPages: closedChatPages,
     requestClosedHistory,
@@ -584,14 +583,10 @@ function CloudSidebarLayoutContent({
     return getClosedWorktreeChatSessionIds([...sessionsById.keys()], closedSessionIds).flatMap(
       sessionId => {
         const session = sessionsById.get(sessionId);
-        return session &&
-          (closedHistoryIds.has(sessionId) ||
-            !closedChats.some(chat => chat.sessionId === sessionId))
-          ? [session]
-          : [];
+        return session ? [session] : [];
       }
     );
-  }, [closedChats, closedHistoryIds, closedSessionIds, worktreeChats]);
+  }, [closedSessionIds, worktreeChats]);
 
   useEffect(() => {
     if (localSessions.length === 0) return;

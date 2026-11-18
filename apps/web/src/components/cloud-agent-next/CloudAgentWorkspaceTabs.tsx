@@ -160,6 +160,7 @@ export function CloudAgentWorkspaceTabs({
     visibleChatSessions[OPEN_CHAT_TAB_PAGE_SIZE - 1] = activeChat;
   }
   const visibleChatIds = new Set(visibleChatSessions.map(session => session.sessionId));
+  const visibleChatKey = JSON.stringify([...visibleChatIds]);
   const moreChatSessions = openChatSessions.filter(
     session => !visibleChatIds.has(session.sessionId)
   );
@@ -217,7 +218,7 @@ export function CloudAgentWorkspaceTabs({
     resizeObserver.observe(tabList);
     if (activeTabWrapperRef.current) resizeObserver.observe(activeTabWrapperRef.current);
     return () => resizeObserver.disconnect();
-  }, [selectedValue, visibleChatSessions.length, terminals.length, files.length, selectedTabRef]);
+  }, [selectedValue, visibleChatKey, terminals.length, files.length, selectedTabRef]);
 
   const handleStartRename = (session: StoredSession, trigger: HTMLButtonElement) => {
     if (

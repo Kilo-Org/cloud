@@ -25,6 +25,7 @@ const OLDER = '2026-11-16T12:00:01.000Z';
 type Options = Parameters<typeof useSidebarLiveUpdates>[0];
 type SessionRow = UserWebSessionEventData<'session.created'>['session'];
 const mockNetwork = {
+  get: jest.fn(),
   list: jest.fn(),
   search: jest.fn(),
   listWorkspaces: jest.fn(),
@@ -51,6 +52,7 @@ function mockProcedure(name: ProcedureName) {
 
 const mockTrpc = {
   cliSessionsV2: {
+    get: mockProcedure('get'),
     list: mockProcedure('list'),
     search: mockProcedure('search'),
     listWorkspaces: mockProcedure('listWorkspaces'),
@@ -617,6 +619,42 @@ describe('useSidebarLiveUpdates', () => {
       expect(mockNetwork.listWorkspaces).not.toHaveBeenCalled();
     }
   );
+
+  it('looks up a short root status event outside the loaded navigation and tab IDs', async () => {
+    const options = scope();
+    const first = workspace();
+    options.workspaces = [first];
+    const key = observe(
+      'listWorkspaces',
+      options.workspaceListInput,
+      workspacePages([first]),
+      true
+    );
+    mockNetwork.get.mockResolvedValue({
+      organization_id: ORGANIZATION,
+      parent_session_id: null,
+      cloud_agent_worktree_id: WORKTREE_A,
+    });
+    mockNetwork.workspaceSummaries.mockResolvedValue({
+      workspaces: [{ ...first, name: 'Refreshed' }],
+    });
+    await render(options);
+    await act(async () => {
+      emit('session.status.updated', {
+        source: 'v2',
+        sessionId: 'ses_off_page',
+        previousStatus: 'idle',
+        status: 'busy',
+        statusUpdatedAt: NEWER,
+        changedAt: NEWER,
+      });
+    });
+    await advance(300);
+    expect(mockNetwork.get).toHaveBeenCalledWith({ session_id: 'ses_off_page' });
+    expect(queryClient.getQueryData(key)).toMatchObject({
+      pages: [{ workspaces: [{ name: 'Refreshed' }] }],
+    });
+  });
 
   it.each(['full', 'short'] as const)(
     'does not regress list, search, or chat caches when a newer %s status precedes older events',

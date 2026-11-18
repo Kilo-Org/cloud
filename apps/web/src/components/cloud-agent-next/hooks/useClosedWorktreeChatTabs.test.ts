@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import {
   QueryClient,
   QueryClientProvider,
+  QueryObserver,
   useQuery,
   type InfiniteData,
 } from '@tanstack/react-query';
@@ -257,7 +258,8 @@ describe('server-backed workspace chat tabs', () => {
     await act(async () => probe?.closeChatTab('b'));
     await flush();
     expect(invalidate).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['workspaceChats'] })
+      expect.objectContaining({ queryKey: ['workspaceChats'] }),
+      { throwOnError: true }
     );
     expect(queryClient.getQueryState(TAB_KEY)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryData(SUMMARY_KEY)).toMatchObject({
@@ -373,7 +375,7 @@ describe('server-backed workspace chat tabs', () => {
     });
   });
 
-  it('keeps an explicit reopen when it cancels a stale close reconciliation', async () => {
+  it('keeps an explicit reopen visible and waits for the previous close reconciliation', async () => {
     let finishRefresh: (value: { workspaces: WorkspaceChatTabSummary[] }) => void = () => undefined;
     mockSummaries
       .mockReturnValueOnce(
@@ -387,11 +389,36 @@ describe('server-backed workspace chat tabs', () => {
     await flush();
     await act(async () => probe?.openChatTab('a'));
     expect(probe?.closedSessionIds).not.toContain('a');
-    expect(mockReopen).toHaveBeenCalledTimes(1);
+    expect(mockReopen).not.toHaveBeenCalled();
     await act(async () => finishRefresh({ workspaces: [summary(['b'], ['a', 'closed'])] }));
     await flush();
     expect(mockReopen).toHaveBeenCalledTimes(1);
     expect(probe?.closedSessionIds).not.toContain('a');
+  });
+
+  it('keeps an accepted close when the active tab query fails to refresh', async () => {
+    await render();
+    const observer = new QueryObserver(queryClient, {
+      queryKey: TAB_KEY,
+      queryFn: async () => {
+        throw new Error('offline');
+      },
+      initialData: { chats: [{ sessionId: 'a' }] },
+      staleTime: Infinity,
+    });
+    const unsubscribe = observer.subscribe(() => undefined);
+    try {
+      await act(async () => probe?.closeChatTab('a'));
+      await flush();
+      expect(mockClose).toHaveBeenCalledTimes(1);
+      expect(observer.getCurrentResult().isRefetchError).toBe(true);
+      expect(mockError).toHaveBeenCalledWith(
+        'Could not refresh chat tabs. Reload to see saved changes.'
+      );
+      expect(probe?.closedSessionIds).toContain('a');
+    } finally {
+      unsubscribe();
+    }
   });
 
   it('deletes the legacy key only after successful import and does not import it twice', async () => {

@@ -221,7 +221,7 @@ it('loads open tabs immediately and only requests 20 closed tabs at a time after
       organizationId: null,
       worktreeId: cloudAgentWorktreeIdSchema.parse(summary.worktreeId),
       workspace: summary,
-      currentSessionId: null,
+      currentSessionId: chat.sessionId,
     });
     return null;
   });

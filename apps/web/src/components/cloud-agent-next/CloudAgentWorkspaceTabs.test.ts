@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createRequire } from 'node:module';
 import { Button } from '@/components/ui/button';
-import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import type * as DropdownMenuComponents from '@/components/ui/dropdown-menu';
 import type * as DropdownMenuPrimitives from '@radix-ui/react-dropdown-menu';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
@@ -30,8 +30,9 @@ jest.mock('@/components/ui/dropdown-menu', () => {
 
   return {
     ...actual,
-    DropdownMenu: (props: ComponentProps<typeof actual.DropdownMenu>) =>
-      createElement(actual.DropdownMenu, { ...props, defaultOpen: mockRenderOpenMenus }),
+    DropdownMenu: jest.fn((props: ComponentProps<typeof actual.DropdownMenu>) =>
+      createElement(actual.DropdownMenu, { ...props, defaultOpen: mockRenderOpenMenus })
+    ),
     DropdownMenuContent: (props: ComponentProps<typeof actual.DropdownMenuContent>) =>
       createElement(primitives.Content, props),
     DropdownMenuItem: jest.fn(actual.DropdownMenuItem),
@@ -67,6 +68,7 @@ function renderWorkspaceTabs(
 ): string {
   mockRenderOpenMenus = openMenus;
   jest.mocked(Button).mockClear();
+  jest.mocked(DropdownMenu).mockClear();
   jest.mocked(DropdownMenuItem).mockClear();
   const session = makeSession('ses_first', 'First worktree chat');
   const props: WorkspaceTabsProps = {
@@ -119,6 +121,37 @@ function findMenuItemMarkup(html: string, text: string): string {
   expect(item).toBeDefined();
   return item ?? '';
 }
+
+it.each([false, true])(
+  'requests Sessions history on open and handles pagination errors (%s)',
+  error => {
+    const requestClosedHistory = jest.fn();
+    const loadMore = jest.fn();
+    const html = renderWorkspaceTabs(
+      {
+        requestClosedHistory,
+        closedChatPages: { hasMore: !error, loading: false, error, loadMore },
+      },
+      true
+    );
+    const label = error ? 'Retry loading tabs' : 'Load more';
+    expect(html).toContain('Sessions');
+    expect(findMenuItemMarkup(html, label)).toBeTruthy();
+    expect(requestClosedHistory).not.toHaveBeenCalled();
+    const [menu] = jest.mocked(DropdownMenu).mock.calls[0];
+    menu.onOpenChange?.(false);
+    expect(requestClosedHistory).not.toHaveBeenCalled();
+    menu.onOpenChange?.(true);
+    expect(requestClosedHistory).toHaveBeenCalledTimes(1);
+    const action = jest
+      .mocked(DropdownMenuItem)
+      .mock.calls.find(([props]) => props.children === label);
+    const event = new Event('select', { cancelable: true });
+    action?.[0].onSelect?.(event);
+    expect(loadMore).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+  }
+);
 
 it('keeps the active overflow chat visible without changing saved tab order', () => {
   const chatSessions = Array.from({ length: 53 }, (_, index) =>

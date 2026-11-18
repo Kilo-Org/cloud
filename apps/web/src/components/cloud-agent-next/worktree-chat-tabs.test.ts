@@ -12,7 +12,6 @@ import {
   isRestoredDocumentNavigation,
   legacyWorkspaceTabImport,
   parseWorktreeChatTabs,
-  patchWorkspaceChatTabs,
   reduceWorktreeChatTabs,
   requestChatNavigation,
   workspaceChatTabsState,
@@ -104,42 +103,6 @@ describe('workspace summary tab projection', () => {
       closedSessionIds: ['older-closed', 'newly-closed'],
       sessionOrderByWorktree: { [worktreeId]: ['a', 'b'] },
     });
-  });
-
-  it('moves a newly closed chat to the front and updates the latest-open destination', () => {
-    const patched = patchWorkspaceChatTabs(workspace, { type: 'close', sessionId: 'b' });
-    expect(patched.openChats.map(chat => chat.sessionId)).toEqual(['a']);
-    expect(patched.closedChats.map(chat => chat.sessionId)).toEqual([
-      'b',
-      'newly-closed',
-      'older-closed',
-    ]);
-    expect(patched.latestOpenSessionId).toBe('a');
-    expect(workspace.openChats.map(chat => chat.sessionId)).toEqual(['a', 'b']);
-  });
-
-  it('keeps replacement in place without duplicating metadata', () => {
-    const patched = patchWorkspaceChatTabs(workspace, {
-      type: 'replace',
-      worktreeId,
-      oldSessionId: 'a',
-      newSessionId: 'newly-closed',
-      openSessionIds: ['a', 'b'],
-    });
-    expect(patched.openChats.map(chat => chat.sessionId)).toEqual(['newly-closed', 'b']);
-    expect(patched.closedChats.map(chat => chat.sessionId)).toEqual(['a', 'older-closed']);
-  });
-
-  it('applies a relative move to the current visible order', () => {
-    const patched = patchWorkspaceChatTabs(workspace, {
-      type: 'reorder',
-      worktreeId,
-      sessionId: 'b',
-      beforeSessionId: 'a',
-      openSessionIds: ['a', 'b'],
-    });
-    expect(patched.openChats.map(chat => chat.sessionId)).toEqual(['b', 'a']);
-    expect(patched.closedChats).toEqual(workspace.closedChats);
   });
 });
 

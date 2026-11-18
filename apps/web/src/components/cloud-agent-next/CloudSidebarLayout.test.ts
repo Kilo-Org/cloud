@@ -197,7 +197,6 @@ jest.mock('./hooks/useWorkspaceChats', () => ({
     serverChats: [],
     openChats: [],
     closedChats: [],
-    closedHistoryIds: new Set(),
   }),
 }));
 

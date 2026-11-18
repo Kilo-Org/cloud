@@ -283,8 +283,21 @@ export function useSidebarLiveUpdates(options: Options): void {
               ? (data?.workspaces ?? [])
               : []
           )
-          .find(hasSession)?.worktreeId;
+          .find(hasSession)?.worktreeId ??
+        queryClient
+          .getQueriesData<InfiniteData<Outputs['workspaceChats']>>(
+            trpc.cliSessionsV2.workspaceChats.pathFilter()
+          )
+          .flatMap(([key, data]) => {
+            const input = sidebarQueryInput(key);
+            return input?.organizationId === scope.organizationId &&
+              typeof input.worktreeId === 'string' &&
+              data?.pages.some(page => page.chats.some(chat => chat.sessionId === sessionId))
+              ? [input.worktreeId]
+              : [];
+          })[0];
       if (workspaceId) refresh.current?.schedule(workspaceId);
+      return workspaceId;
     };
     const patchRow = (row: SessionRow, metadataChanged: boolean) => {
       const scope = current.current;
@@ -422,7 +435,24 @@ export function useSidebarLiveUpdates(options: Options): void {
           return;
         }
         const scope = current.current;
-        refreshSessionWorkspace(event.sessionId);
+        if (!refreshSessionWorkspace(event.sessionId) && scope.workspaces.length > 0) {
+          void queryClient
+            .fetchQuery({
+              ...trpc.cliSessionsV2.get.queryOptions({ session_id: event.sessionId }),
+              staleTime: 5_000,
+              retry: false,
+            })
+            .then(session => {
+              if (
+                current.current.organizationId === scope.organizationId &&
+                session.organization_id === scope.organizationId &&
+                !session.parent_session_id &&
+                session.cloud_agent_worktree_id
+              )
+                refresh.current?.schedule(session.cloud_agent_worktree_id);
+            })
+            .catch(() => undefined);
+        }
         const incoming = {
           statusUpdatedAt: event.statusUpdatedAt,
           updatedAt: event.updatedAt ?? event.changedAt,
@@ -493,8 +523,8 @@ export function useSidebarLiveUpdates(options: Options): void {
         const scope = current.current;
         if (event.organizationId !== scope.organizationId) return;
         if (!event.parentSessionId) {
-          refreshSessionWorkspace(event.sessionId, event.worktreeId);
-          if (event.worktreeId) refreshTabs(event.worktreeId);
+          const worktreeId = refreshSessionWorkspace(event.sessionId, event.worktreeId);
+          if (worktreeId) refreshTabs(worktreeId);
         }
         queryClient.setQueryData<Outputs['list']>(
           trpc.cliSessionsV2.list.queryKey(scope.listInput),

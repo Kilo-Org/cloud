@@ -1,12 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import {
-  isCancelledError,
-  useMutation,
-  useQueryClient,
-  type InfiniteData,
-} from '@tanstack/react-query';
+import { useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -104,7 +99,7 @@ export function useClosedWorktreeChatTabs(
   });
   const nextId = useRef(0);
   const dispatched = useRef(new Set<number>());
-  const activeMutations = useRef(new Map<string, number>());
+  const appliedActions = useRef(new Map<string, Set<number>>());
   const writes = useRef(new Map<string, Promise<void>>());
   const current = useRef({ workspaces, onChanged, scopeKey });
   current.current = { workspaces, onChanged, scopeKey };
@@ -115,15 +110,18 @@ export function useClosedWorktreeChatTabs(
   const refresh = useCallback(
     async (worktreeIds: readonly string[]) => {
       const ids = [...new Set(worktreeIds)].map(id => cloudAgentWorktreeIdSchema.parse(id));
-      await queryClient.invalidateQueries({
-        ...trpc.cliSessionsV2.workspaceChats.pathFilter(),
-        predicate: query => {
-          const input = sidebarQueryInput(query.queryKey);
-          return (
-            input?.organizationId === organizationId && ids.some(id => id === input.worktreeId)
-          );
+      await queryClient.invalidateQueries(
+        {
+          ...trpc.cliSessionsV2.workspaceChats.pathFilter(),
+          predicate: query => {
+            const input = sidebarQueryInput(query.queryKey);
+            return (
+              input?.organizationId === organizationId && ids.some(id => id === input.worktreeId)
+            );
+          },
         },
-      });
+        { throwOnError: true }
+      );
       for (let offset = 0; offset < ids.length; offset += 200) {
         const options = {
           ...trpc.cliSessionsV2.workspaceSummaries.queryOptions({
@@ -133,11 +131,7 @@ export function useClosedWorktreeChatTabs(
           staleTime: 0,
         };
         await queryClient.cancelQueries({ queryKey: options.queryKey, exact: true });
-        const result = await queryClient.fetchQuery(options).catch(error => {
-          if (isCancelledError(error)) return undefined;
-          throw error;
-        });
-        if (!result) continue;
+        const result = await queryClient.fetchQuery(options);
         const byId = new Map(result.workspaces.map(workspace => [workspace.worktreeId, workspace]));
         for (const filter of [
           trpc.cliSessionsV2.listWorkspaces.pathFilter(),
@@ -159,55 +153,68 @@ export function useClosedWorktreeChatTabs(
   );
 
   const run = useCallback(
-    async (action: TabAction, workspace: WorkspaceChatTabSummary) => {
+    async ({ action, id }: PendingAction, workspace: WorkspaceChatTabSummary) => {
       const worktreeId = cloudAgentWorktreeIdSchema.parse(workspace.worktreeId);
-      const mutationKey = `${organizationId}:${worktreeId}`;
-      activeMutations.current.set(mutationKey, (activeMutations.current.get(mutationKey) ?? 0) + 1);
-      const finishMutation = async () => {
-        const remaining = (activeMutations.current.get(mutationKey) ?? 1) - 1;
-        if (remaining > 0) activeMutations.current.set(mutationKey, remaining);
-        else {
-          activeMutations.current.delete(mutationKey);
-          await refresh([worktreeId]).catch(() => undefined);
-        }
+      const mutationKey = JSON.stringify([scopeKey, worktreeId]);
+      const removePending = (ids: ReadonlySet<number>) => {
+        for (const id of ids) dispatched.current.delete(id);
+        setPending(value =>
+          value.scopeKey === scopeKey
+            ? { scopeKey, actions: value.actions.filter(entry => !ids.has(entry.id)) }
+            : value
+        );
       };
-      let write: Promise<void> | undefined;
+      const base = { organizationId, worktreeId };
+      const write = (writes.current.get(mutationKey) ?? Promise.resolve()).then(async () => {
+        try {
+          await imports.current.get(scopeKey);
+          switch (action.type) {
+            case 'close':
+              await closeTab({ ...base, sessionId: action.sessionId });
+              break;
+            case 'open':
+              await reopenTab({ ...base, sessionId: action.sessionId });
+              break;
+            case 'reorder':
+              await reorderTab({
+                ...base,
+                sessionId: action.sessionId,
+                beforeSessionId: action.beforeSessionId,
+              });
+              break;
+            case 'replace':
+              await replaceTab({
+                ...base,
+                oldSessionId: action.oldSessionId,
+                newSessionId: action.newSessionId,
+              });
+              break;
+          }
+          const applied = appliedActions.current.get(mutationKey) ?? new Set<number>();
+          applied.add(id);
+          appliedActions.current.set(mutationKey, applied);
+        } catch {
+          toast.error('Could not save chat tabs. Please try again.');
+          removePending(new Set([id]));
+        }
+        if (writes.current.get(mutationKey) !== write) return;
+        try {
+          await refresh([worktreeId]);
+        } catch {
+          toast.error('Could not refresh chat tabs. Reload to see saved changes.');
+          return;
+        }
+        const applied = appliedActions.current.get(mutationKey);
+        if (applied) {
+          removePending(applied);
+          appliedActions.current.delete(mutationKey);
+        }
+      });
+      writes.current.set(mutationKey, write);
       try {
-        const base = { organizationId, worktreeId };
-        write = (writes.current.get(mutationKey) ?? Promise.resolve())
-          .catch(() => undefined)
-          .then(async () => {
-            await imports.current.get(scopeKey);
-            switch (action.type) {
-              case 'close':
-                await closeTab({ ...base, sessionId: action.sessionId });
-                break;
-              case 'open':
-                await reopenTab({ ...base, sessionId: action.sessionId });
-                break;
-              case 'reorder':
-                await reorderTab({
-                  ...base,
-                  sessionId: action.sessionId,
-                  beforeSessionId: action.beforeSessionId,
-                });
-                break;
-              case 'replace':
-                await replaceTab({
-                  ...base,
-                  oldSessionId: action.oldSessionId,
-                  newSessionId: action.newSessionId,
-                });
-                break;
-            }
-          });
-        writes.current.set(mutationKey, write);
         await write;
-      } catch {
-        toast.error('Could not save chat tabs. Please try again.');
       } finally {
         if (writes.current.get(mutationKey) === write) writes.current.delete(mutationKey);
-        await finishMutation();
       }
     },
     [closeTab, organizationId, refresh, reopenTab, reorderTab, replaceTab, scopeKey]
@@ -263,17 +270,7 @@ export function useClosedWorktreeChatTabs(
       const workspace = actionWorkspace(entry, workspaces, syncedWorktreeBySessionId);
       if (!workspace) continue;
       dispatched.current.add(entry.id);
-      void run(entry.action, workspace).finally(() => {
-        dispatched.current.delete(entry.id);
-        setPending(value =>
-          value.scopeKey === scopeKey
-            ? {
-                scopeKey,
-                actions: value.actions.filter(action => action.id !== entry.id),
-              }
-            : value
-        );
-      });
+      void run(entry, workspace);
     }
   }, [pending, run, scopeKey, syncedWorktreeBySessionId, workspaces]);
 
@@ -314,7 +311,11 @@ export function useClosedWorktreeChatTabs(
   useEffect(() => {
     const onPageShow = (event: PageTransitionEvent) => {
       if (event.persisted)
-        void refresh(current.current.workspaces.map(workspace => workspace.worktreeId));
+        void refresh(current.current.workspaces.map(workspace => workspace.worktreeId)).catch(
+          () => {
+            toast.error('Could not refresh chat tabs. Reload to see saved changes.');
+          }
+        );
     };
     window.addEventListener('pageshow', onPageShow);
     return () => window.removeEventListener('pageshow', onPageShow);

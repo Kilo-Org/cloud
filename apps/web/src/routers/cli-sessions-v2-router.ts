@@ -601,6 +601,9 @@ const WorkspaceChatsInputSchema = WorktreeInputSchema.extend({
     .optional(),
   tabState: z.enum(['open', 'closed']).optional(),
   sessionId: z.string().min(1).max(200).optional(),
+}).refine(({ tabState, cursor }) => !tabState || !cursor || cursor.position !== undefined, {
+  path: ['cursor', 'position'],
+  message: 'Tab pagination requires the position from nextCursor',
 });
 const ListSessionsInputSchema = z.object({
   cursor: z.iso.datetime().optional(),

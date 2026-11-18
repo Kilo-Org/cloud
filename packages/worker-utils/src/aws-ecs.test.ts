@@ -41,6 +41,8 @@ describe('independent AWS ECS configuration', () => {
     'runtime:latest',
     'public.ecr.aws/runtime@sha256:' + 'c'.repeat(64),
     '123456789012.dkr.ecr.us-east-1.amazonaws.com/runtime/../other@sha256:' + 'c'.repeat(64),
+    '123456789012.dkr.ecr.us-east-1.amazonaws.com/repo.amazonaws.com/../other@sha256:' +
+      'c'.repeat(64),
   ])('rejects an unpinned or invalid runtime image', runtimeImage => {
     expect(awsEcsByocConfigurationSchema.safeParse({ ...config(), runtimeImage }).success).toBe(
       false

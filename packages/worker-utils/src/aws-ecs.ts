@@ -50,7 +50,9 @@ export const awsEcsResourceConfigurationSchema = z
           message: 'ECS resources must belong to the customer account',
         });
     }
-    const repository = value.runtimeImage.split('.amazonaws.com/')[1]?.split('@')[0];
+    const repository = value.runtimeImage
+      .replace(/^\d{12}\.dkr\.ecr\.us-east-1\.amazonaws\.com\//, '')
+      .split('@')[0];
     if (!repository || repository.split('/').some(part => !part || part === '.' || part === '..')) {
       context.addIssue({
         code: 'custom',

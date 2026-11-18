@@ -306,7 +306,7 @@ export function checkGutter(tree: LayoutTree): Finding[] {
     // A chat turn's failure actions are placed by the message's own
     // end-aligned column, not the page; the row's container names the subtree.
     if (
-      nodes.some(candidate => candidate.probe.testID?.startsWith(MESSAGE_ACTIONS_TEST_ID) === true)
+      nodes.some(candidate => candidate.probe.testID?.includes(MESSAGE_ACTIONS_TEST_ID) === true)
     )
       continue;
     if (fullBleed(node, page)) continue;

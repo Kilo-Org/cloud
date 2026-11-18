@@ -1471,7 +1471,9 @@
       "offDescription": "Organisaation laskutusroolit voivat ottaa analytiikan käyttöön asetuksissa verkossa, jotta analytiikka tallentaa valmiit katselmoinnit.",
       "couldNotLoad": "Analytiikan lataaminen epäonnistui",
       "trackedReviewsCaption": "Valmiit katselmoinnit, jotka valmistuivat tällä jaksolla analytiikan ollessa käytössä. Käynnissä olevia ja epäonnistuneita katselmointeja ei koskaan lasketa.",
-      "trackedReviewsUncounted": "{{displayCount}} organisaation {{displayTotal}} valmiista katselmoinnista jää laskematta: niiden tuloksia ei saatu talteen."
+      "trackedReviewsUncounted": "Laskematta: {{displayCount}} / {{displayTotal}} organisaation valmiista katselmoinneista ilman tallennettua tulosta.",
+      "trackedReviewsUncounted_one": "Laskematta: {{displayCount}} / {{displayTotal}} organisaation valmiista katselmoinneista ilman tallennettua tulosta.",
+      "trackedReviewsUncounted_other": "Laskematta: {{displayCount}} / {{displayTotal}} organisaation valmiista katselmoinneista ilman tallennettua tulosta."
     },
     "council": {
       "title": "Neuvostokatselmointi",

@@ -928,7 +928,9 @@
       "offDescription": "組織的帳務角色（擁有者、管理員與帳務管理員）可在網頁版的組織設定中啟用分析，以記錄已完成的審查。",
       "couldNotLoad": "無法載入分析資料",
       "trackedReviewsCaption": "此期間內在啟用分析的狀態下完成的審查。執行中與失敗的審查一律不計入。",
-      "trackedReviewsUncounted": "組織共有 {{displayTotal}} 筆已完成的審查，其中 {{displayCount}} 筆未被計入，因為系統未記錄其結果。"
+      "trackedReviewsUncounted": "未計入：組織共有 {{displayTotal}} 筆已完成的審查，其中 {{displayCount}} 筆未擷取結果。",
+      "trackedReviewsUncounted_one": "未計入：組織共有 {{displayTotal}} 筆已完成的審查，其中 {{displayCount}} 筆未擷取結果。",
+      "trackedReviewsUncounted_other": "未計入：組織共有 {{displayTotal}} 筆已完成的審查，其中 {{displayCount}} 筆未擷取結果。"
     },
     "council": {
       "title": "審查小組審查",

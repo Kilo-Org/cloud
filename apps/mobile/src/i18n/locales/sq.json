@@ -1471,7 +1471,9 @@
       "offDescription": "Pronarët, administratorët dhe menaxherët e faturimit të organizatës mund t'i aktivizojnë statistikat te cilësimet e organizatës në web për të regjistruar shqyrtimet e përfunduara.",
       "couldNotLoad": "Statistikat nuk mund të ngarkoheshin",
       "trackedReviewsCaption": "Shqyrtimet e përfunduara gjatë kësaj periudhe me statistikat aktive. Shqyrtimet në zhvillim dhe të dështuarat nuk numërohen kurrë.",
-      "trackedReviewsUncounted": "{{displayCount}} nga {{displayTotal}} shqyrtimet e përfunduara të organizatës nuk numërohen: rezultati i tyre nuk u regjistrua."
+      "trackedReviewsUncounted": "Nuk numërohen: {{displayCount}} nga {{displayTotal}} shqyrtimet e përfunduara të organizatës, rezultati i tyre nuk u regjistrua.",
+      "trackedReviewsUncounted_one": "Nuk numërohen: {{displayCount}} nga {{displayTotal}} shqyrtimet e përfunduara të organizatës, rezultati i tyre nuk u regjistrua.",
+      "trackedReviewsUncounted_other": "Nuk numërohen: {{displayCount}} nga {{displayTotal}} shqyrtimet e përfunduara të organizatës, rezultati i tyre nuk u regjistrua."
     },
     "council": {
       "title": "Shqyrtimi nga këshilli",

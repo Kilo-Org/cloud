@@ -928,7 +928,9 @@
       "offDescription": "Personen mit Abrechnungsrollen der Organisation (Owner, Admins und Billing-Manager) können Analysen in den Organisationseinstellungen im Web aktivieren, um abgeschlossene Reviews zu erfassen.",
       "couldNotLoad": "Analysen konnten nicht geladen werden",
       "trackedReviewsCaption": "Reviews, die in diesem Zeitraum bei aktivierten Analysen abgeschlossen wurden. Laufende und fehlgeschlagene Reviews werden nie gezählt.",
-      "trackedReviewsUncounted": "{{displayCount}} der {{displayTotal}} abgeschlossenen Reviews der Organisation werden nicht gezählt: ihr Ergebnis wurde nicht erfasst."
+      "trackedReviewsUncounted": "Nicht gezählt: {{displayCount}} von {{displayTotal}} abgeschlossenen Reviews der Organisation ohne erfasstes Ergebnis.",
+      "trackedReviewsUncounted_one": "Nicht gezählt: {{displayCount}} von {{displayTotal}} abgeschlossenen Reviews der Organisation ohne erfasstes Ergebnis.",
+      "trackedReviewsUncounted_other": "Nicht gezählt: {{displayCount}} von {{displayTotal}} abgeschlossenen Reviews der Organisation ohne erfasstes Ergebnis."
     },
     "council": {
       "title": "Gremium-Review",

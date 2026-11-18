@@ -1471,7 +1471,9 @@
       "offDescription": "Tashkilotning billing rollari — egalar, administratorlar va billing menejerlari — tugallangan koʻrib chiqishlarni qayd etish uchun statistikani vebdagi tashkilot sozlamalarida yoqishi mumkin.",
       "couldNotLoad": "Statistikani yuklab boʻlmadi",
       "trackedReviewsCaption": "Bu davrda statistika yoqilgan holda tugallangan koʻrib chiqishlar. Jarayondagi va muvaffaqiyatsiz yakunlangan koʻrib chiqishlar hech qachon hisobga olinmaydi.",
-      "trackedReviewsUncounted": "Tashkilotdagi {{displayTotal}} ta tugallangan koʻrib chiqishning {{displayCount}} tasi hisobga olinmagan: ularning natijasi qayd etilmagan."
+      "trackedReviewsUncounted": "Hisobga olinmagan: {{displayCount}} / {{displayTotal}} tashkilotdagi tugallangan ko’rib chiqishning, ularning natijasi qayd etilmagan.",
+      "trackedReviewsUncounted_one": "Hisobga olinmagan: {{displayCount}} / {{displayTotal}} tashkilotdagi tugallangan ko’rib chiqishning, ularning natijasi qayd etilmagan.",
+      "trackedReviewsUncounted_other": "Hisobga olinmagan: {{displayCount}} / {{displayTotal}} tashkilotdagi tugallangan ko’rib chiqishning, ularning natijasi qayd etilmagan."
     },
     "council": {
       "title": "Kengash koʻrib chiqishi",

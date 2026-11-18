@@ -1471,7 +1471,9 @@
       "offDescription": "Ka taea e ngā tūranga utu o te rōpū (arā, ngā kaipupuri, ngā kaiwhakahaere me ngā kaiwhakahaere utu) te whakahohe i ngā tātaritanga i te tautohutohu o te rōpū i te tukatuku, kia tuhia ai ngā arotake kua oti.",
       "couldNotLoad": "Kāore i taea te uta i ngā tātaritanga",
       "trackedReviewsCaption": "Ngā arotake kua oti i roto i tēnei wā i te wā e whakahohea ana te tātaritanga. Kāore ngā arotake e haere ana, me ērā kua taka, e tatauhia rawa.",
-      "trackedReviewsUncounted": "{{displayCount}} o te {{displayTotal}} arotake kua oti o te rōpū kāore e tatauhia: kāore te hua o ērā i hopukia."
+      "trackedReviewsUncounted": "Kāore e tatauhia: {{displayCount}} o te {{displayTotal}} arotake kua oti o te rōpū, kāore te hua o ērā i hopukia.",
+      "trackedReviewsUncounted_one": "Kāore e tatauhia: {{displayCount}} o te {{displayTotal}} arotake kua oti o te rōpū, kāore te hua o ērā i hopukia.",
+      "trackedReviewsUncounted_other": "Kāore e tatauhia: {{displayCount}} o te {{displayTotal}} arotake kua oti o te rōpū, kāore te hua o ērā i hopukia."
     },
     "council": {
       "title": "Arotake kaunihera",

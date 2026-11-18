@@ -1495,7 +1495,10 @@
       "offDescription": "Proprietarii, administratorii și managerii de facturare ai organizației pot activa statisticile în setările organizației de pe web, pentru a înregistra revizuirile finalizate.",
       "couldNotLoad": "Statisticile nu au putut fi încărcate",
       "trackedReviewsCaption": "Revizuirile finalizate în această perioadă, cât timp statisticile erau activate. Revizuirile în derulare și cele eșuate nu se numără niciodată.",
-      "trackedReviewsUncounted": "{{displayCount}} din cele {{displayTotal}} revizuiri finalizate pe care le are organizația nu sunt numărate: rezultatul lor nu a fost înregistrat."
+      "trackedReviewsUncounted": "Nenumărate: {{displayCount}} din cele {{displayTotal}} revizuiri finalizate pe care le are organizația, cu rezultatul neînregistrat.",
+      "trackedReviewsUncounted_few": "Nenumărate: {{displayCount}} din cele {{displayTotal}} revizuiri finalizate pe care le are organizația, cu rezultatul neînregistrat.",
+      "trackedReviewsUncounted_one": "Nenumărate: {{displayCount}} din cele {{displayTotal}} revizuiri finalizate pe care le are organizația, cu rezultatul neînregistrat.",
+      "trackedReviewsUncounted_other": "Nenumărate: {{displayCount}} din cele {{displayTotal}} revizuiri finalizate pe care le are organizația, cu rezultatul neînregistrat."
     },
     "council": {
       "title": "Revizuire în consiliu",

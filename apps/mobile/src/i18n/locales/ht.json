@@ -1471,7 +1471,9 @@
       "offDescription": "Wòl faktirasyon òganizasyon an (pwopriyetè, administratè ak manadjè faktirasyon) ka aktive estatistik nan paramèt òganizasyon an sou wèb la pou anrejistre revizyon ki fini.",
       "couldNotLoad": "Nou pa t ka chaje estatistik yo",
       "trackedReviewsCaption": "Revizyon ki fini nan peryòd sa a pandan estatistik yo te aktive. Revizyon k ap kouri ak revizyon ki echwe pa janm konte.",
-      "trackedReviewsUncounted": "{{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen pa konte: rezilta yo pa te kaptire."
+      "trackedReviewsUncounted": "Pa konte: {{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen, rezilta yo pa te kaptire.",
+      "trackedReviewsUncounted_one": "Pa konte: {{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen, rezilta yo pa te kaptire.",
+      "trackedReviewsUncounted_other": "Pa konte: {{displayCount}} sou {{displayTotal}} revizyon ki fini òganizasyon an genyen, rezilta yo pa te kaptire."
     },
     "council": {
       "title": "Revizyon konsèy",

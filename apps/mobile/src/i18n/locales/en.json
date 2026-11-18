@@ -1530,6 +1530,8 @@
       "trackedReviews": "Reviews tracked",
       "trackedReviewsCaption": "Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.",
       "trackedReviewsUncounted": "Not counted: {{displayCount}} of {{displayTotal}} finished reviews without a captured result.",
+      "trackedReviewsUncounted_one": "Not counted: {{displayCount}} of {{displayTotal}} finished reviews without a captured result.",
+      "trackedReviewsUncounted_other": "Not counted: {{displayCount}} of {{displayTotal}} finished reviews without a captured result.",
       "findingsRaised": "Findings raised",
       "highImpactChanges": "High-impact changes",
       "impactPoints": "Impact points",

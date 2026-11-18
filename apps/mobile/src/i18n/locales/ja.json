@@ -928,7 +928,9 @@
       "offDescription": "分析をオンにできるのは、組織のオーナー、管理者、請求マネージャーといった請求ロールです。Web 上の組織設定からオンにすると、完了したレビューが記録されます。",
       "couldNotLoad": "分析を読み込めませんでした",
       "trackedReviewsCaption": "分析が有効な状態でこの期間内に完了したレビューです。実行中のレビューと失敗したレビューは決してカウントされません。",
-      "trackedReviewsUncounted": "この組織の終了済みレビュー {{displayTotal}} 件のうち、{{displayCount}} 件はカウントされていません。レビュー結果が記録されなかったためです。"
+      "trackedReviewsUncounted": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。",
+      "trackedReviewsUncounted_one": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。",
+      "trackedReviewsUncounted_other": "カウント対象外：この組織の終了済みレビュー {{displayTotal}} 件のうち {{displayCount}} 件は、結果が記録されていません。"
     },
     "council": {
       "title": "合議レビュー",

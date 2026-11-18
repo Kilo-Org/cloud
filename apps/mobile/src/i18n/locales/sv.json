@@ -1471,7 +1471,9 @@
       "offDescription": "Organisationens faktureringsroller (ägare, administratörer och fakturahanterare) kan aktivera statistiken i organisationens inställningar på webben för att registrera slutförda granskningar.",
       "couldNotLoad": "Det gick inte att läsa in statistiken",
       "trackedReviewsCaption": "Slutförda granskningar som avslutades under den här perioden medan statistiken var aktiverad. Pågående och misslyckade granskningar räknas aldrig.",
-      "trackedReviewsUncounted": "{{displayCount}} av organisationens {{displayTotal}} avslutade granskningar räknas inte: deras resultat registrerades inte."
+      "trackedReviewsUncounted": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat.",
+      "trackedReviewsUncounted_one": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat.",
+      "trackedReviewsUncounted_other": "Räknas inte: {{displayCount}} av organisationens {{displayTotal}} avslutade granskningar utan registrerat resultat."
     },
     "council": {
       "title": "Rådsgranskning",

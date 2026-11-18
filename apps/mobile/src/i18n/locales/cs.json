@@ -1519,7 +1519,11 @@
       "offDescription": "Organizační role pro fakturaci mohou zapnout analytiku v nastavení organizace na webu, aby se zaznamenávaly dokončené kontroly.",
       "couldNotLoad": "Analytiku se nepodařilo načíst",
       "trackedReviewsCaption": "Dokončené kontroly, které v tomto období skončily se zapnutou analytikou. Probíhající a neúspěšné kontroly se nikdy nepočítají.",
-      "trackedReviewsUncounted": "{{displayCount}} z {{displayTotal}} dokončených kontrol, které má organizace, se nepočítá: jejich výsledek nebyl zachycen."
+      "trackedReviewsUncounted": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_few": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_many": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_one": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen.",
+      "trackedReviewsUncounted_other": "Nezapočítáno: {{displayCount}} z {{displayTotal}} dokončených kontrol organizace, jejichž výsledek nebyl zachycen."
     },
     "council": {
       "title": "Kontrola radou",

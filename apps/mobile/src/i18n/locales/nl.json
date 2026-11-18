@@ -928,7 +928,9 @@
       "offDescription": "De facturatierollen van de organisatie (eigenaren, beheerders en facturatiemanagers) kunnen statistieken inschakelen in de organisatie-instellingen op het web om afgeronde reviews vast te leggen.",
       "couldNotLoad": "Kan statistieken niet laden",
       "trackedReviewsCaption": "Reviews die in deze periode zijn afgerond terwijl statistieken waren ingeschakeld. Lopende en mislukte reviews worden nooit meegeteld.",
-      "trackedReviewsUncounted": "{{displayCount}} van de {{displayTotal}} afgeronde reviews die de organisatie heeft, worden niet meegeteld: hun resultaat is niet vastgelegd."
+      "trackedReviewsUncounted": "Niet meegeteld: {{displayCount}} van de {{displayTotal}} afgeronde reviews van de organisatie, zonder vastgelegd resultaat.",
+      "trackedReviewsUncounted_one": "Niet meegeteld: {{displayCount}} van de {{displayTotal}} afgeronde reviews van de organisatie, zonder vastgelegd resultaat.",
+      "trackedReviewsUncounted_other": "Niet meegeteld: {{displayCount}} van de {{displayTotal}} afgeronde reviews van de organisatie, zonder vastgelegd resultaat."
     },
     "council": {
       "title": "Panelbeoordeling",

@@ -1543,7 +1543,12 @@
       "offDescription": "Is féidir le huinéirí, riarthóirí agus bainisteoirí billíochta — róil billíochta na heagraíochta — an anailísíocht a chumasú i socruithe na heagraíochta ar an ngréasán chun athbhreithnithe críochnaithe a thaifeadadh.",
       "couldNotLoad": "Níorbh fhéidir an anailísíocht a lódáil",
       "trackedReviewsCaption": "Athbhreithnithe críochnaithe a tháinig chun deiridh sa tréimhse seo leis an anailísíocht chumasaithe. Ní áirítear ariamh athbhreithnithe atá ar siúl ná cinn a theip orthu.",
-      "trackedReviewsUncounted": "Ní áirítear {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht: níor taifeadadh a dtorthaí."
+      "trackedReviewsUncounted": "Ní áirítear: {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht níor taifeadadh a dtorthaí.",
+      "trackedReviewsUncounted_few": "Ní áirítear: {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht níor taifeadadh a dtorthaí.",
+      "trackedReviewsUncounted_many": "Ní áirítear: {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht níor taifeadadh a dtorthaí.",
+      "trackedReviewsUncounted_one": "Ní áirítear: {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht níor taifeadadh a dtorthaí.",
+      "trackedReviewsUncounted_other": "Ní áirítear: {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht níor taifeadadh a dtorthaí.",
+      "trackedReviewsUncounted_two": "Ní áirítear: {{displayCount}} de na {{displayTotal}} athbhreithniú críochnaithe atá ag an eagraíocht níor taifeadadh a dtorthaí."
     },
     "council": {
       "title": "Athbhreithniú comhairle",

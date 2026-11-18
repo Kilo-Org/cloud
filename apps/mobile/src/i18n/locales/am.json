@@ -1471,7 +1471,9 @@
       "offDescription": "የተጠናቀቁ ግምገማዎችን ለመመዝገብ፣ ድርጅቱ የክፍያ ኃላፊነት ያላቸው ሚናዎች ትንታኔን በድር ላይ ባሉት የድርጅት ቅንብሮች ውስጥ ማብራት ይችላሉ።",
       "couldNotLoad": "ትንታኔን መጫን አልተቻለም",
       "trackedReviewsCaption": "ትንታኔ ለድርጅቱ ነቅቶ እያለ በዚህ ጊዜ ውስጥ የተጠናቀቁ ግምገማዎች። እየተከናወኑ ያሉ እና ያልተሳኩ ግምገማዎች በጭራሽ አይቆጠሩም።",
-      "trackedReviewsUncounted": "ከድርጅቱ ያሉት {{displayTotal}} የተጠናቀቁ ግምገማዎች ውስጥ {{displayCount}} አይቆጠሩም፦ ውጤታቸው አልተመዘገበም።"
+      "trackedReviewsUncounted": "አልተቆጠሩም: ከድርጅቱ ያሉት {{displayTotal}} የተጠናቀቁ ግምገማዎች ውስጥ {{displayCount}} ውጤታቸው አልተመዘገበም።",
+      "trackedReviewsUncounted_one": "አልተቆጠሩም: ከድርጅቱ ያሉት {{displayTotal}} የተጠናቀቁ ግምገማዎች ውስጥ {{displayCount}} ውጤታቸው አልተመዘገበም።",
+      "trackedReviewsUncounted_other": "አልተቆጠሩም: ከድርጅቱ ያሉት {{displayTotal}} የተጠናቀቁ ግምገማዎች ውስጥ {{displayCount}} ውጤታቸው አልተመዘገበም።"
     },
     "council": {
       "title": "የጉባኤ ግምገማ",

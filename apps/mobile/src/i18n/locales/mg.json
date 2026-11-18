@@ -1471,7 +1471,9 @@
       "offDescription": "Ny andraikitra momba ny faktiora ao amin'ny fikambanana (tompony, mpitantana ary mpitantana ny faktiora) no afaka mamelona ny antontan'isa ao amin'ny fandrindrana ny fikambanana eo amin'ny tranonkala, mba hirakitra ny fandinihana vita.",
       "couldNotLoad": "Tsy afaka nampiditra ny antontan'isa",
       "trackedReviewsCaption": "Ny fandinihana vita nifarana tao anatin'io vanim-potoana io rehefa velona ny antontan'isa. Ny fandinihana mandeha sy ny fandinihana tsy nahomby dia tsy isaina mihitsy.",
-      "trackedReviewsUncounted": "Tsy isaina: {{displayCount}} amin'ny {{displayTotal}} fandinihana vitan'ny fikambanana no tsy voarakitra ny antontan'isany."
+      "trackedReviewsUncounted": "Tsy isaina: {{displayCount}} amin’ny {{displayTotal}} fandinihana vitan’ny fikambanana, no tsy voarakitra ny antontan’isany.",
+      "trackedReviewsUncounted_one": "Tsy isaina: {{displayCount}} amin’ny {{displayTotal}} fandinihana vitan’ny fikambanana, no tsy voarakitra ny antontan’isany.",
+      "trackedReviewsUncounted_other": "Tsy isaina: {{displayCount}} amin’ny {{displayTotal}} fandinihana vitan’ny fikambanana, no tsy voarakitra ny antontan’isany."
     },
     "council": {
       "title": "Fandinihan'ny filankevitra",

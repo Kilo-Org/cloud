@@ -1471,7 +1471,9 @@
       "offDescription": "Pemilik, pentadbir dan pengurus pengebilan organisasi boleh menghidupkan analitik dalam tetapan organisasi di web untuk merekodkan semakan yang selesai.",
       "couldNotLoad": "Tidak dapat memuatkan analitik",
       "trackedReviewsCaption": "Semakan yang selesai dalam tempoh ini semasa analitik dihidupkan. Semakan yang sedang berjalan dan yang gagal tidak pernah dikira.",
-      "trackedReviewsUncounted": "{{displayCount}} daripada {{displayTotal}} semakan yang selesai yang dimiliki oleh organisasi tidak dikira: hasilnya tidak direkodkan."
+      "trackedReviewsUncounted": "Tidak dikira: {{displayCount}} daripada {{displayTotal}} semakan yang selesai milik organisasi, hasilnya tidak direkodkan.",
+      "trackedReviewsUncounted_one": "Tidak dikira: {{displayCount}} daripada {{displayTotal}} semakan yang selesai milik organisasi, hasilnya tidak direkodkan.",
+      "trackedReviewsUncounted_other": "Tidak dikira: {{displayCount}} daripada {{displayTotal}} semakan yang selesai milik organisasi, hasilnya tidak direkodkan."
     },
     "council": {
       "title": "Semakan panel",

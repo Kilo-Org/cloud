@@ -1567,7 +1567,13 @@
       "offDescription": "Gall rolau bilio'r sefydliad droi'r dadansoddeg ymlaen yng ngosodiadau'r sefydliad ar y we i gofnodi adolygiadau a gwblhawyd.",
       "couldNotLoad": "Methwyd llwytho'r dadansoddeg",
       "trackedReviewsCaption": "Adolygiadau a gwblhawyd yn y cyfnod hwn gyda'r dadansoddeg wedi'i troi ymlaen. Ni chyfrir adolygiadau sy'n rhedeg neu wedi methu erioed.",
-      "trackedReviewsUncounted": "Mae {{displayCount}} o'r {{displayTotal}} adolygiadau a gwblhawyd sydd gan y sefydliad heb eu cyfri: ni gafodd eu canlyniadau eu cofnodi."
+      "trackedReviewsUncounted": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad.",
+      "trackedReviewsUncounted_few": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad.",
+      "trackedReviewsUncounted_many": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad.",
+      "trackedReviewsUncounted_one": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad.",
+      "trackedReviewsUncounted_other": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad.",
+      "trackedReviewsUncounted_two": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad.",
+      "trackedReviewsUncounted_zero": "Heb ei chyfrif: {{displayCount}} o’r {{displayTotal}} adolygiadau a gwblhawyd y sefydliad heb eu canlyniad."
     },
     "council": {
       "title": "Adolygiad cyngor",

@@ -1495,7 +1495,10 @@
       "offDescription": "Uloge naplate u organizaciji (vlasnici, administratori i upravitelji naplate) mogu uključiti analitiku u postavkama organizacije na webu kako bi se bilježili dovršeni pregledi.",
       "couldNotLoad": "Nije moguće učitati analitiku",
       "trackedReviewsCaption": "Dovršeni pregledi koji su završili u ovom razdoblju dok je analitika bila uključena. Pregledi u tijeku i neuspjeli pregledi se nikada ne računaju.",
-      "trackedReviewsUncounted": "{{displayCount}} od {{displayTotal}} dovršenih pregleda koje organizacija ima nije uračunato: njihov rezultat nije bio zabilježen."
+      "trackedReviewsUncounted": "Nije uračunato: {{displayCount}} od {{displayTotal}} dovršenih pregleda koje organizacija ima, čiji rezultat nije bio zabilježen.",
+      "trackedReviewsUncounted_few": "Nije uračunato: {{displayCount}} od {{displayTotal}} dovršenih pregleda koje organizacija ima, čiji rezultat nije bio zabilježen.",
+      "trackedReviewsUncounted_one": "Nije uračunato: {{displayCount}} od {{displayTotal}} dovršenih pregleda koje organizacija ima, čiji rezultat nije bio zabilježen.",
+      "trackedReviewsUncounted_other": "Nije uračunato: {{displayCount}} od {{displayTotal}} dovršenih pregleda koje organizacija ima, čiji rezultat nije bio zabilježen."
     },
     "council": {
       "title": "Pregled vijeća",

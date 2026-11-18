@@ -1495,7 +1495,10 @@
       "offDescription": "Uloge za naplatu u organizaciji mogu uključiti analitiku u postavkama organizacije na webu da bilježi završene preglede.",
       "couldNotLoad": "Učitavanje analitike nije uspjelo",
       "trackedReviewsCaption": "Završeni pregledi koji su okončani u ovom periodu dok je analitika bila uključena. Pregledi u toku i neuspjeli pregledi nikada se ne računaju.",
-      "trackedReviewsUncounted": "{{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima nije uračunato: njihov rezultat nije zabilježen."
+      "trackedReviewsUncounted": "Nije uračunato: {{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima nije zabilježilo svoj rezultat.",
+      "trackedReviewsUncounted_few": "Nije uračunato: {{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima nije zabilježilo svoj rezultat.",
+      "trackedReviewsUncounted_one": "Nije uračunato: {{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima nije zabilježilo svoj rezultat.",
+      "trackedReviewsUncounted_other": "Nije uračunato: {{displayCount}} od {{displayTotal}} završenih pregleda koje organizacija ima nije zabilježilo svoj rezultat."
     },
     "council": {
       "title": "Pregled vijeća",

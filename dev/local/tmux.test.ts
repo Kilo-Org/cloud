@@ -105,7 +105,8 @@ test(
         undefined,
         `pwd > ${JSON.stringify(marker)}`
       );
-      for (let i = 0; i < 20 && !fs.existsSync(marker); i++) await sleep(50);
+      const markerDeadline = startupDeadline();
+      while (!fs.existsSync(marker) && Date.now() < markerDeadline) await sleep(50);
       assert.equal(fs.readFileSync(marker, 'utf8').trim(), repoRoot);
       assert.doesNotMatch(
         tmuxOutput('capture-pane', '-p', '-J', '-t', `${sessionName}:${windowIndex}.0`),
@@ -158,6 +159,16 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Bound startup polls by wall clock, not by an iteration count. Starting a tmux
+// server, a login-shell wrapper, a pty client or a fixture process can take far
+// longer than a handful of polls on a loaded CI machine, which turned those
+// fixed counts into flakes.
+const STARTUP_DEADLINE_MS = 15_000;
+
+function startupDeadline(): number {
+  return Date.now() + STARTUP_DEADLINE_MS;
+}
+
 test(
   'captureServicePane follows a service after the dashboard moves its pane',
   { skip: !hasTmux },
@@ -192,14 +203,13 @@ test(
       assert.match(captureServicePane(sessionName, serviceName, 20), /worktree-mobile-pane/);
       pipeServicePane(sessionName, serviceName, buildFollowLogPipeCommand(output, followOutput));
       tmux('send-keys', '-t', `${sessionName}:0.1`, 'printf "followed-pane\\n"', 'Enter');
-      for (
-        let i = 0;
-        i < 60 &&
+      const followDeadline = startupDeadline();
+      while (
         (!fs.existsSync(followOutput) ||
           !fs.readFileSync(followOutput, 'utf8').includes('followed-pane') ||
           !fs.existsSync(output) ||
-          !fs.readFileSync(output, 'utf8').includes('followed-pane'));
-        i++
+          !fs.readFileSync(output, 'utf8').includes('followed-pane')) &&
+        Date.now() < followDeadline
       ) {
         execFileSync('sleep', ['0.05']);
       }
@@ -207,11 +217,10 @@ test(
       assert.match(fs.readFileSync(followOutput, 'utf8'), /followed-pane/);
       pipeServicePane(sessionName, serviceName, buildLogPipeCommand(output));
       tmux('send-keys', '-t', `${sessionName}:0.1`, 'printf "replacement-pane\\n"', 'Enter');
-      for (
-        let i = 0;
-        i < 60 &&
-        (!fs.existsSync(output) || !fs.readFileSync(output, 'utf8').includes('replacement-pane'));
-        i++
+      const replacementDeadline = startupDeadline();
+      while (
+        (!fs.existsSync(output) || !fs.readFileSync(output, 'utf8').includes('replacement-pane')) &&
+        Date.now() < replacementDeadline
       ) {
         execFileSync('sleep', ['0.05']);
       }
@@ -306,7 +315,7 @@ test(
 test(
   'breakPane creates the window in the requested session when a real foreign client is attached',
   { skip: !hasTmux || !hasScript },
-  () => {
+  async () => {
     const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
     const decoySession = `kilo-tmux-test-decoy-${process.pid}-${Date.now()}`;
     const serviceName = 'nextjs';
@@ -344,9 +353,17 @@ test(
 
     const savedTmux = process.env.TMUX;
     try {
-      // Wait for the decoy client to attach (up to 2 s).
+      // Wait for the decoy client to attach, bounded by wall clock rather than
+      // a loop count: starting script, tmux and the client can take seconds on
+      // a loaded machine.
       let clientReady = false;
-      for (let i = 0; i < 20 && !clientReady; i++) {
+      const clientDeadline = startupDeadline();
+      while (!clientReady && Date.now() < clientDeadline) {
+        if (clientProc.exitCode !== null || clientProc.signalCode !== null) {
+          assert.fail(
+            `decoy tmux client exited (code ${clientProc.exitCode}, signal ${clientProc.signalCode}) before attaching to ${decoySession}`
+          );
+        }
         try {
           const attached = tmuxOutput(
             'display-message',
@@ -359,7 +376,7 @@ test(
         } catch {
           // Session not yet visible.
         }
-        if (!clientReady) execFileSync('sleep', ['0.1']);
+        if (!clientReady) await sleep(100);
       }
       assert.ok(clientReady, 'decoy session must have an attached client');
 
@@ -524,7 +541,8 @@ test(
         'Enter'
       );
       let fixtureUp = false;
-      for (let i = 0; i < 20 && !fixtureUp; i++) {
+      const fixtureDeadline = startupDeadline();
+      while (!fixtureUp && Date.now() < fixtureDeadline) {
         const panePid = execFileSync(
           'tmux',
           ['display-message', '-p', '-t', `${sessionName}:${serviceWindow.index}.0`, '#{pane_pid}'],
@@ -546,7 +564,8 @@ test(
       });
 
       assert.equal(outcome, 'relaunched');
-      for (let i = 0; i < 20 && !fs.existsSync(marker); i++) await sleep(50);
+      const envMarkerDeadline = startupDeadline();
+      while (!fs.existsSync(marker) && Date.now() < envMarkerDeadline) await sleep(50);
       assert.equal(fs.readFileSync(marker, 'utf-8'), envValue);
     } finally {
       fs.rmSync(tempDir, { force: true, recursive: true });
@@ -623,7 +642,8 @@ process.stdin.on('data', d => {
       // Anchor the pattern to the node binary — the wrapper shell's own
       // cmdline also contains the script path and must not match.
       let fixtureUp = false;
-      for (let i = 0; i < 40 && !fixtureUp; i++) {
+      const slowFixtureDeadline = startupDeadline();
+      while (!fixtureUp && Date.now() < slowFixtureDeadline) {
         try {
           execFileSync('pgrep', ['-f', `^${process.execPath} .*${script}`], { stdio: 'ignore' });
           fixtureUp = true;
@@ -658,7 +678,8 @@ process.stdin.on('data', d => {
         'relaunch keystrokes must not be fed to the still-running process'
       );
       let relaunchRan = false;
-      for (let i = 0; i < 40 && !relaunchRan; i++) {
+      const relaunchDeadline = startupDeadline();
+      while (!relaunchRan && Date.now() < relaunchDeadline) {
         relaunchRan = fs.existsSync(relaunchMarker);
         if (!relaunchRan) await sleep(250);
       }
@@ -743,7 +764,8 @@ test(
       // Leftover login shell, exactly what an interrupted service leaves behind.
       tmux('send-keys', '-t', paneTarget, '/bin/sh -l', 'Enter');
       let leftoverShellUp = false;
-      for (let i = 0; i < 40 && !leftoverShellUp; i++) {
+      const leftoverShellDeadline = startupDeadline();
+      while (!leftoverShellUp && Date.now() < leftoverShellDeadline) {
         const panePid = execFileSync(
           'tmux',
           ['display-message', '-p', '-t', paneTarget, '#{pane_pid}'],

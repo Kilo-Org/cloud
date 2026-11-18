@@ -760,12 +760,6 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
           throw new VercelSandboxRestError('request_failed', 'get-session');
         }
         if (session.status !== 'running') throw new Error('validator_not_running');
-        // The ready projection records the deployed base digest, so prove that this
-        // snapshot, which older code may have installed, has the base tools.
-        await this.runCommand(state, client, validatorSessionId, 'bash', [
-          '-lc',
-          VERCEL_BASE_VERIFICATION,
-        ]);
         const credential = generateSandboxCredential();
         const credentialHash = await this.external(state, () => hashSandboxCredential(credential));
         const allocationId = state.build_generation;
@@ -917,9 +911,17 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
             .warn('BYOC Vercel snapshot build check failed');
           throw new Error('validator_call_home_failed');
         }
-        return status.connection === 'ready'
-          ? this.next(state, { step: 'stop_validator' })
-          : this.next(state, { step: 'verify_validator_call_home' });
+        if (status.connection !== 'ready') {
+          return this.next(state, { step: 'verify_validator_call_home' });
+        }
+        // The ready projection records the deployed base digest. Every build, including
+        // one that older code started and that resumes after its wrapper launch, passes
+        // here, so prove on this snapshot that it has the base tools.
+        await this.runCommand(state, client, validatorSessionId, 'bash', [
+          '-lc',
+          VERCEL_BASE_VERIFICATION,
+        ]);
+        return this.next(state, { step: 'stop_validator' });
       }
       case 'stop_validator': {
         const validatorSessionId = requiredBuildField(

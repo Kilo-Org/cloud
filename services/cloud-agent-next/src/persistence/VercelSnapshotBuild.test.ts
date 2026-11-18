@@ -1863,8 +1863,7 @@ describe('VercelSnapshotBuild runtime preparation', () => {
         validator_control_id: `ses-byoc-validator-${FIRST_GENERATION.replaceAll('-', '')}`,
         validator_wrapper_requested: 0,
       });
-      expect(baseChecks()).toHaveLength(1);
-      expect(wrapperLaunches()).toHaveLength(0);
+      expect(mocks.client.executeCommand).not.toHaveBeenCalled();
     });
 
     await fixture.build.alarm();
@@ -1968,38 +1967,89 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     expect(mocks.client.executeCommand).not.toHaveBeenCalled();
     await runNextAlarm(fixture);
     expect(mocks.control.initializeSnapshotValidator).toHaveBeenCalledOnce();
-    expect(baseChecks()).toHaveLength(1);
-    expect(wrapperLaunches()).toHaveLength(1);
+    expect(mocks.client.executeCommand).toHaveBeenCalledOnce();
   });
 
-  it('checks the validator snapshot for the base tools before it registers the wrapper', async () => {
+  it.each([
+    {
+      name: 'a launched wrapper',
+      row: {
+        step: 'verify_validator_call_home',
+        validator_control_id: 'validator-control',
+        validator_wrapper_command_id: 'validator-command',
+      },
+    },
+    {
+      name: 'a resumed launch with a recorded command',
+      row: { step: 'launch_validator_wrapper', validator_wrapper_command_id: 'validator-command' },
+    },
+    {
+      name: 'a resumed launch without a recorded command',
+      row: { step: 'launch_validator_wrapper', validator_wrapper_requested: 1 },
+    },
+  ] as const)(
+    'checks the validator snapshot for the base tools after $name calls home',
+    async ({ row }) => {
+      const fixture = createFixture();
+      await fixture.build.start(startInput());
+      updateRow(fixture, {
+        snapshot_id: 'snapshot-validator',
+        validator_session_id: 'validator-session',
+        ...row,
+      });
+      mocks.client.listCommands.mockResolvedValue([
+        { id: 'validator-command', args: [`exec supervisor # byoc-call-home:${FIRST_GENERATION}`] },
+      ]);
+      mocks.client.getCommand.mockResolvedValue({ exitCode: null });
+
+      await fixture.build.alarm();
+      if (storedRow(fixture)?.step === 'verify_validator_call_home') await runNextAlarm(fixture);
+
+      expect(storedRow(fixture)).toMatchObject({ step: 'stop_validator' });
+      const [check, ...others] = baseChecks();
+      expect(others).toHaveLength(0);
+      expect(check?.[0]).toBe('validator-session');
+      expect(check?.[1]).toMatchObject({
+        command: 'bash',
+        args: ['-lc', VERCEL_BASE_VERIFICATION],
+      });
+      expect(wrapperLaunches()).toHaveLength(0);
+    }
+  );
+
+  it('does not check the validator snapshot while the wrapper has not called home', async () => {
     const fixture = createFixture();
     await fixture.build.start(startInput());
     updateRow(fixture, {
-      step: 'launch_validator_wrapper',
+      step: 'verify_validator_call_home',
       snapshot_id: 'snapshot-validator',
       validator_session_id: 'validator-session',
+      validator_control_id: 'validator-control',
+      validator_wrapper_command_id: 'validator-command',
+    });
+    mocks.client.getCommand.mockResolvedValue({ exitCode: null });
+    mocks.control.getSnapshotValidatorStatus.mockResolvedValueOnce({
+      physical: 'running',
+      connection: 'disconnected',
     });
 
     await fixture.build.alarm();
 
-    const [check] = baseChecks();
-    expect(check?.[0]).toBe('validator-session');
-    expect(check?.[1]).toMatchObject({ command: 'bash', args: ['-lc', VERCEL_BASE_VERIFICATION] });
-    expect(mocks.client.executeCommand.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.control.initializeSnapshotValidator.mock.invocationCallOrder[0] ?? 0
-    );
-    expect(wrapperLaunches()).toHaveLength(1);
+    expect(storedRow(fixture)).toMatchObject({ step: 'verify_validator_call_home' });
+    expect(mocks.client.executeCommand).not.toHaveBeenCalled();
   });
 
   it('fails the build when the validator snapshot lacks a base tool', async () => {
     const fixture = createFixture();
     await fixture.build.start(startInput());
     updateRow(fixture, {
-      step: 'launch_validator_wrapper',
+      step: 'verify_validator_call_home',
       snapshot_id: 'snapshot-validator',
       validator_session_id: 'validator-session',
+      validator_control_id: 'validator-control',
+      validator_wrapper_command_id: 'validator-command',
     });
+    mocks.client.getCommand.mockResolvedValue({ exitCode: null });
     mocks.client.executeCommand.mockResolvedValueOnce({
       command: { id: 'check-command', exitCode: null },
       finished: { id: 'check-command', exitCode: 1 },
@@ -2007,12 +2057,11 @@ describe('VercelSnapshotBuild runtime preparation', () => {
 
     await fixture.build.alarm();
 
+    expect(baseChecks()).toHaveLength(1);
     expect(storedRow(fixture)).toMatchObject({
       step: 'project_failure',
       last_error: 'setup_command_failed',
     });
-    expect(mocks.control.initializeSnapshotValidator).not.toHaveBeenCalled();
-    expect(wrapperLaunches()).toHaveLength(0);
   });
 
   it('cleans up a validator whose control failed readiness even while its command still runs', async () => {
@@ -2061,7 +2110,6 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     await runNextAlarm(fixture);
 
     expect(mocks.control.initializeSnapshotValidator).toHaveBeenCalledOnce();
-    expect(baseChecks()).toHaveLength(1);
     expect(wrapperLaunches()).toHaveLength(1);
     expect(mocks.client.createSandbox).not.toHaveBeenCalled();
     expect(storedRow(fixture)).toMatchObject({

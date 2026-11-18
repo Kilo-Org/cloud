@@ -1937,13 +1937,15 @@ transform; every other listed host keeps its credential rules and ends with a fo
 be built creates no sandbox and sends no update. The route then:
 
 1. reads the target from the `vercel-forwarded-*` headers;
-2. admits the request: the Vercel OIDC token (issuer, audience, team, project, sandbox name,
-   `exp`), then the live allocation (owner, allocation id, provider ref, not stopping or stopped),
-   then the pin policy. A bad or expired token, or a token of another sandbox, gives 401;
+2. admits the request: the pin policy, then the live allocation (owner, allocation id, provider
+   ref, not stopping or stopped), then the Vercel OIDC token (issuer, audience, team, project,
+   sandbox name, `exp`). An unavailable allocation gives 403 `allocation_unavailable` before the
+   token check. A bad or expired token, or a token of another sandbox, gives 401;
 3. strips every `vercel-*`, `x-vercel-*` and `x-forwarded-*` header, the token and hop-by-hop
    headers. It keeps `upgrade` only on a WebSocket upgrade;
 4. runs the core with the pin allowlist minus the Worker host, so the Worker host, another port,
-   userinfo, `http` and an IP literal give 403 with a `denied` row;
+   userinfo, `http` and an IP literal give 403. The core writes a `denied` row only when the pin
+   has audit;
 5. sends an unmanaged request with `fetch`, and a managed SCM credential through the SCM admission.
 
 A Vercel sandbox without an allowlist keeps the SCM forward path unchanged. The route never

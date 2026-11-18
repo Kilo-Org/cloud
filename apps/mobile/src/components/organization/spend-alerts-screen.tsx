@@ -19,9 +19,11 @@ import {
   DISABLED_THRESHOLD_USD,
   multiplierBasisPoints,
   multiplierError,
+  multiplierErrorMessages,
   parseMultiplier,
   parseThreshold,
   thresholdError,
+  thresholdErrorMessages,
   thresholdPlaceholder,
   toWindowHours,
 } from '@/components/organization/spend-alert-validators';
@@ -504,10 +506,12 @@ function SpendAlertsForm({
             <FormField
               label={t('spendAlerts.limitLabel')}
               required={thresholdEnabled}
+              validateWhileTyping
               placeholder={thresholdPlaceholder()}
               keyboardType="decimal-pad"
               defaultValue={thresholdRef.current || undefined}
               validate={thresholdEnabled ? thresholdError : undefined}
+              reserveErrorMessages={thresholdEnabled ? thresholdErrorMessages() : undefined}
               onChangeText={value => {
                 thresholdRef.current = value;
                 revalidate();
@@ -557,10 +561,12 @@ function SpendAlertsForm({
             <FormField
               label={t('spendAlerts.multiplierLabel')}
               required={anomalyEnabled}
+              validateWhileTyping
               placeholder={String(DEFAULT_MULTIPLIER)}
               keyboardType="decimal-pad"
               defaultValue={multiplierRef.current || undefined}
               validate={anomalyEnabled ? multiplierError : undefined}
+              reserveErrorMessages={anomalyEnabled ? multiplierErrorMessages() : undefined}
               onChangeText={value => {
                 multiplierRef.current = value;
                 revalidate();

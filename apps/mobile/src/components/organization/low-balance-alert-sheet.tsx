@@ -8,10 +8,12 @@ import { View } from 'react-native';
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import {
   emailsError,
+  emailsErrorMessages,
   parseEmails,
   parseThreshold,
   saveErrorCopy,
   thresholdError,
+  thresholdErrorMessages,
 } from '@/components/organization/low-balance-alert-validators';
 import { PermissionDenied } from '@/components/organization/permission-denied';
 import { QueryError } from '@/components/query-error';
@@ -151,6 +153,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
             keyboardType="decimal-pad"
             defaultValue={thresholdRef.current || undefined}
             validate={thresholdError}
+            reserveErrorMessages={thresholdErrorMessages()}
             error={draftThresholdError ?? undefined}
             onChangeText={value => {
               thresholdRef.current = value;
@@ -164,12 +167,14 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
             <FormField
               label={t('organization.lowBalanceAlert.notifyEmailsLabel')}
               required
+              validateWhileTyping
               placeholder={t('organization.inviteMember.emailPlaceholder')}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               defaultValue={emailsRef.current || undefined}
               validate={emailsError}
+              reserveErrorMessages={emailsErrorMessages()}
               onChangeText={value => {
                 emailsRef.current = value;
                 revalidate(enabled, thresholdRef.current, value);

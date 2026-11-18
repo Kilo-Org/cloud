@@ -16,6 +16,7 @@ const HEAVY: Partial<ControlPlaneRouteSpec> = {
     { name: 'profile-proof', content: 'SYNTHETIC_ENABLED_PROFILE_INSTRUCTION' },
   ],
   runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
+  modelContextLimits: { 'openai/gpt-6.1-sol': 300_000 },
   kiloCommands: [{ name: 'review', template: 'Review the change' }],
 };
 
@@ -45,6 +46,7 @@ describe('workspace config', () => {
     expect(attachment).not.toHaveProperty('runtimeSkills');
     expect(attachment).not.toHaveProperty('runtimeInstructions');
     expect(attachment).not.toHaveProperty('runtimeAgents');
+    expect(attachment).not.toHaveProperty('modelContextLimits');
     expect(attachment).not.toHaveProperty('kiloCommands');
     expect(attachment).not.toHaveProperty('mcp');
     expect(attachment).not.toHaveProperty('env');

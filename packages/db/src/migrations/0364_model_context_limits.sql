@@ -1,0 +1,1 @@
+ALTER TABLE "cloud_agent_user_settings" ADD COLUMN "model_context_limits" jsonb DEFAULT '{}'::jsonb NOT NULL;

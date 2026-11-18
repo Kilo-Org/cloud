@@ -9182,6 +9182,10 @@ export type CloudAgentBuiltinAgentOverrides = Record<
   { model?: string | null; variant?: string; disable?: boolean }
 >;
 
+// Map of gateway model id (for example `openai/gpt-6.1-sol`) to a context-window
+// token cap. See ModelContextLimitsSchema in `@kilocode/cloud-agent-profile`.
+export type CloudAgentModelContextLimits = Record<string, number>;
+
 export const cloud_agent_user_settings = pgTable(
   'cloud_agent_user_settings',
   {
@@ -9190,6 +9194,7 @@ export const cloud_agent_user_settings = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     workspace_order: text().$type<'manual' | 'created' | 'activity'>().notNull().default('manual'),
     builtin_agents: jsonb().$type<CloudAgentBuiltinAgentOverrides>().notNull().default({}),
+    model_context_limits: jsonb().$type<CloudAgentModelContextLimits>().notNull().default({}),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

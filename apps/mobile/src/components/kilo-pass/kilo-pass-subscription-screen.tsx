@@ -187,7 +187,7 @@ function KiloPassMessageBody({ message }: { message: string }) {
   return (
     <KiloPassFrame>
       <View className="flex-1 justify-center">
-        <EmptyState placement="static" icon={Crown} title={message} />
+        <EmptyState placement="static" inset="gutter" icon={Crown} title={message} />
       </View>
     </KiloPassFrame>
   );

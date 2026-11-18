@@ -153,6 +153,76 @@ describe('installBillingHeartbeat', () => {
     expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
   });
 
+  it.each(['stop', 'warn'] as const)('surfaces a failed budget %s action', async verdict => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const error = new Error('budget action failed');
+    const budgetAction = vi.fn(async () => {
+      throw error;
+    });
+    const schedule = vi.fn();
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules: vi.fn(),
+        getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+        schedule: schedule as Container['schedule'],
+      },
+      {
+        client: usageClient(verdict),
+        storage,
+        enforceBudgetStop: budgetAction,
+        onBudgetWarning: budgetAction,
+      }
+    );
+
+    await expect(controller.billingHeartbeatTick()).rejects.toBe(error);
+    expect(budgetAction).toHaveBeenCalledOnce();
+    expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
+    expect((await getBillingContext(storage))?.nextSeq).toBe(2);
+  });
+
+  it('surfaces a failed post-ack write and keeps the pending heartbeat', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const error = new Error('heartbeat acknowledgement write failed');
+    const put = storage.put;
+    vi.spyOn(storage, 'put').mockImplementation(async (key, value) => {
+      if ((value as BillingContext).nextSeq === 2) throw error;
+      await put(key, value);
+    });
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules: vi.fn(),
+        getState: vi.fn(async () => ({ status: 'running' as const, lastChange: Date.now() })),
+        schedule: vi.fn() as Container['schedule'],
+      },
+      { client: usageClient('continue'), storage, enforceBudgetStop: vi.fn() }
+    );
+
+    await expect(controller.billingHeartbeatTick()).rejects.toBe(error);
+    expect((await getBillingContext(storage))?.pendingHeartbeat?.seq).toBe(1);
+  });
+
+  it('surfaces a failed stop acknowledgement cleanup without cancelling the alarm', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const error = new Error('billing context cleanup failed');
+    vi.spyOn(storage, 'delete').mockRejectedValue(error);
+    const deleteSchedules = vi.fn();
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules,
+        getState: vi.fn(async () => ({ status: 'stopped' as const, lastChange: Date.now() })),
+        schedule: vi.fn() as Container['schedule'],
+      },
+      { client: usageClient('continue'), storage, enforceBudgetStop: vi.fn() }
+    );
+
+    await expect(controller.billingHeartbeatTick()).rejects.toBe(error);
+    expect(deleteSchedules).not.toHaveBeenCalled();
+    expect((await getBillingContext(storage))?.pendingStop).toBeDefined();
+  });
+
   it('treats an unreadable heartbeat verdict as a budget stop and settles the generation', async () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(1_000);
     try {

@@ -1904,22 +1904,17 @@ describe('ContainersBilling heartbeat timeout resilience', () => {
     });
 
     container.running = false;
-    let abandoned = false;
-    for (let tick = 0; tick < 20 && !abandoned; tick += 1) {
+    for (let tick = 0; tick < 20 && readGeneration(storage) !== undefined; tick += 1) {
       const due = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs;
-      if (due === undefined) {
-        abandoned = true;
-        break;
-      }
+      if (due === undefined) break;
       vi.setSystemTime(due);
       const alarmRun = instance.alarm();
       await vi.advanceTimersByTimeAsync(31_000);
       await expect(alarmRun).resolves.toBeUndefined();
       await flushPending(pendingTasks);
-      abandoned = readGeneration(storage) === undefined;
     }
 
-    expect(abandoned).toBe(true);
+    expect(storage.map.has(BILLING_CONTEXT_KEY)).toBe(false);
     expect(readSchedules(storage)?.billingHeartbeatTick).toBeUndefined();
     expect(meter.recordStopInputs.length).toBeGreaterThan(0);
     expect(meter.recordStopInputs.every(input => input.seq === 1)).toBe(true);

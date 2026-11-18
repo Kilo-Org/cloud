@@ -14,6 +14,7 @@
 import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
+import type * as EmptyStateModule from '@/components/empty-state';
 import '@/i18n';
 import { CREATE_ORGANIZATION_HREF } from '@/lib/organization-navigation';
 import { act } from '@/test/renderer';
@@ -162,18 +163,25 @@ vi.mock('@/components/code-reviewer/reviewer-error-screen', () => ({
   ReviewerErrorScreen: 'ReviewerErrorScreen',
 }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
-vi.mock('@/components/empty-state', () => ({
-  // The real state wraps its title and description in `Text` nodes; the mock
-  // mirrors that, so the suite's rendered-text assertions read both.
-  EmptyState: (props: { title?: string; description?: string; action?: ReactNode }) =>
-    createElement(
-      'EmptyState',
-      null,
-      props.title === undefined ? null : createElement('Text', null, props.title),
-      props.description === undefined ? null : createElement('Text', null, props.description),
-      props.action ?? null
-    ),
-}));
+vi.mock('@/components/empty-state', async () => {
+  // The refusal's one action is what this suite presses, so it renders the real
+  // `StateAction`; only the state body is stubbed, because the real one lays
+  // out inside a measured scroller this suite does not mount.
+  const actual = await vi.importActual<typeof EmptyStateModule>('@/components/empty-state');
+  return {
+    StateAction: actual.StateAction,
+    // The real state wraps its title and description in `Text` nodes; the stub
+    // mirrors that, so the suite's rendered-text assertions read both.
+    EmptyState: (props: { title?: string; description?: string; action?: ReactNode }) =>
+      createElement(
+        'EmptyState',
+        null,
+        props.title === undefined ? null : createElement('Text', null, props.title),
+        props.description === undefined ? null : createElement('Text', null, props.description),
+        props.action ?? null
+      ),
+  };
+});
 vi.mock('@/components/ui/preference-row', () => ({
   PreferenceRow: (props: ToggleProps) => {
     state.toggleProps.push(props);
@@ -181,8 +189,10 @@ vi.mock('@/components/ui/preference-row', () => ({
   },
 }));
 vi.mock('@/components/ui/icons', () => ({
+  ArrowRight: 'ArrowRight',
   Building2: 'Building2',
   Lock: 'Lock',
+  Plus: 'Plus',
   Users: 'Users',
   ShieldCheck: 'ShieldCheck',
 }));

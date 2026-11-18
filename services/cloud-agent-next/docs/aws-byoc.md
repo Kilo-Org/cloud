@@ -123,7 +123,7 @@ Both engines require eight hours of certificate validity before a new allocation
 This reserve checks certificate health; it does not set an ECS compute deadline.
 Proxy policy refresh still checks current allocation, owner, connection, generation and lifecycle authority.
 Policy admission and durable storage now support both engines through shared components.
-ECS selection, preview, egress proxy and prepared environments are enabled. ECS workspace snapshots remain disabled.
+ECS selection, preview, egress proxy and prepared environments are enabled. ECS workspace snapshots and metered billing remain disabled.
 Live ECS runtime acceptance remains unverified.
 
 Certificate renewal and allocation draining remain operator tasks. This MVP does not promise uninterrupted sessions across certificate rotation.
@@ -183,7 +183,7 @@ It returns the ZIP byte count and SHA256. Publish only to private storage after 
 
 These controls make ZIP bytes deterministic for the same input. Debian package updates can change resulting image contents.
 Publish and retain the resulting immutable MicroVM image version; do not claim reproducible image builds.
-Prepared-environment activation remains disabled until its authenticated builder and restore paths pass provider verification.
+MicroVM prepared-environment activation remains disabled until its authenticated builder and restore paths pass provider verification.
 
 ## Build preparation and repository denial
 

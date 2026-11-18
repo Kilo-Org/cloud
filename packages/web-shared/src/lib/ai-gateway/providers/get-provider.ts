@@ -173,7 +173,6 @@ async function directByokRoute(
   directByok: DirectByokProvider,
   directByokModel: DirectByokModel,
   credential: BYOKResult,
-  requestedModel: string,
   request: GatewayRequest,
   servesCatalogId: boolean
 ): Promise<ProviderRoute> {
@@ -186,7 +185,9 @@ async function directByokRoute(
   return {
     provider: createDirectByokGatewayProvider(directByok, directByokModel, upstream),
     userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId: credential.providerId }],
-    isFree: isFreeModel(requestedModel),
+    // The key's owner pays its upstream, never Kilo, whatever the id looks like: a bespoke id is
+    // named by its provider or organization, and catalog-mode keys never serve free models.
+    isFree: false,
     // Organization model and provider policies cover catalog ids. A bespoke id is only served by a
     // key outside catalog mode, which stays exempt as before.
     bypassAccessCheck: !servesCatalogId,
@@ -223,7 +224,7 @@ function rejectEndpointModel(
 async function resolveDirectByokModel(
   directByok: DirectByokProvider,
   directByokModel: DirectByokModel,
-  { user, organizationId, requestedModel, request }: GetProviderInput,
+  { user, organizationId, request }: GetProviderInput,
   decision: RoutingDecisionRecorder
 ): Promise<GetProviderResult | null> {
   const providerId = directByok.id;
@@ -258,14 +259,7 @@ async function resolveDirectByokModel(
   }
   let route: ProviderRoute;
   try {
-    route = await directByokRoute(
-      directByok,
-      directByokModel,
-      credential,
-      requestedModel,
-      request,
-      false
-    );
+    route = await directByokRoute(directByok, directByokModel, credential, request, false);
   } catch (error) {
     if (!(error instanceof InvalidByokEndpointCredentialsError)) throw error;
     console.error('[getProvider] Endpoint credentials are invalid', { providerId });
@@ -581,14 +575,7 @@ async function selectProvider(
     const credential = await decryptKey(step);
     switch (step.route) {
       case 'direct-byok':
-        return directByokRoute(
-          step.provider,
-          step.model,
-          credential,
-          requestedModel,
-          request,
-          true
-        );
+        return directByokRoute(step.provider, step.model, credential, request, true);
       case 'vercel-byok':
       case 'gateway-byok':
         return gatewayRoutedByokRoute(step, credential, requestedModel);

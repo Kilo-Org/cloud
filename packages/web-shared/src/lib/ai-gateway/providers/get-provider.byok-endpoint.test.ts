@@ -203,6 +203,26 @@ describe('getProvider for an endpoint model id', () => {
     });
   });
 
+  test('never reports a request the endpoint pays for as free, whatever the model id', async () => {
+    const user = await insertTestUser();
+    const base = endpoint();
+    const organizationId = await organizationWithKeys(user, [
+      {
+        providerId: ENDPOINT_ID,
+        endpoint: endpoint({ models: [{ ...base.models[0], id: 'acme/coder-free' }] }),
+      },
+    ]);
+
+    const { result, decision } = await route(
+      user,
+      organizationId,
+      `${ENDPOINT_ID}/acme/coder-free`
+    );
+
+    expect(await onlyRoute(result)).toMatchObject({ isFree: false });
+    expect(decision.result).toMatchObject({ is_free: false });
+  });
+
   test.each([
     {
       name: 'a personal request',

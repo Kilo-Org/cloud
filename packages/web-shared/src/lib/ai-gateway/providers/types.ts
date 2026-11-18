@@ -69,6 +69,9 @@ export type SecureProxyRoute = {
 export type Provider = {
   type: ProviderType;
   inferenceProviderId?: string;
+  /** The catalog model a partner serves. Usage records it rather than the upstream's own model id
+   * or a `~` latest alias the request named. */
+  catalogModelId?: string;
   /**
    * The ChatGPT connection that serves this provider. Set only on the delegated
    * "Sign in with ChatGPT" route, and it names the exact connection that paid

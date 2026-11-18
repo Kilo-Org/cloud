@@ -63,12 +63,21 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   checkOpenAiChatGptByok: jest.fn(),
   getOpenAiChatGptCandidateModel: jest.fn(async () => null),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  ...jest.requireActual<object>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+  ),
+  resolveOpenRouterModelAlias: jest.fn(async (model: string) =>
+    model === '~moonshotai/kimi-latest' ? 'moonshotai/kimi-k2.6' : model
+  ),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: jest.fn(),
   shouldRouteToVercel: jest.fn(),
 }));
 
 const MODEL = 'moonshotai/kimi-k2.6';
+const LATEST_ALIAS = '~moonshotai/kimi-latest';
 const PARTNER_PROVIDER = 'acme-ai';
 const PARTNER_URL = 'https://partner.example.com/v1';
 const pricing: CustomPricingTiers = [
@@ -483,6 +492,21 @@ describe('getProvider skips the partner', () => {
       { getAllowedProviders: async () => new Set(['other']) },
       'provider-settings'
     );
+  });
+
+  test('for a latest alias that points at the partner model', async () => {
+    await insertPartner();
+
+    const { result, decision } = await routeAndRecord({ requestedModel: LATEST_ALIAS });
+
+    expect(result.routes).toHaveLength(2);
+    const partnerRoute = await result.routes[0]();
+    expect(partnerRoute.provider).toMatchObject({ type: 'partner', catalogModelId: MODEL });
+    expect(partnerRoute.customLlmPricing).toEqual(pricing);
+    expect(decision.steps.at(-1)).toMatchObject({
+      step: 'kilo',
+      partner_inference_provider: PARTNER_PROVIDER,
+    });
   });
 
   test('not when only lists the partner in another case', async () => {

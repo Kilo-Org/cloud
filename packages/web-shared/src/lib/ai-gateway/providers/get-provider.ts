@@ -67,7 +67,10 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { checkClaudeBilling } from '@kilocode/web-shared/lib/ai-gateway/claude-billing/routing';
-import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  isValidOpenRouterModelId,
+  resolveOpenRouterModelAlias,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import * as z from 'zod';
 import {
   CustomLlmCredentialsSchema,
@@ -412,6 +415,7 @@ async function resolvePartnerRoute(
     provider: {
       ...buildDirectProvider('partner', getCustomLlmApiKinds(definition), definition, auth),
       inferenceProviderId: definition.partner.inference_provider,
+      catalogModelId: partner.public_id,
     },
     userByok: null,
     isFree: isFreeModel(input.requestedModel),
@@ -744,7 +748,10 @@ async function selectProvider(
           bounded_spending: boundedSpending,
           kilo_ignored_providers: kiloIgnoredProviders,
         } as const;
-        const partner = await findPartnerCustomLlm(requestedModel);
+        // A `~` latest alias reaches the partner of the catalog model it currently points at.
+        const partner = await findPartnerCustomLlm(
+          await resolveOpenRouterModelAlias(requestedModel)
+        );
         if (!partner) {
           decision.step(kiloStep);
           return servedBy(kiloRoute);

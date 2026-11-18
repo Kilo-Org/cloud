@@ -1005,8 +1005,8 @@ describe('agent browser calls', () => {
       'Input.dispatchMouseEvent': () => {
         if (announcing) {
           announcing = false;
-          // The item is created once the click's own command has returned, so the stream never names it in time;
-          // by the time the guard looks for it, the small file is already complete.
+          // The item is created once the click's own command has returned, so the stream never names it in time.
+          // By the time the guard looks for it, the small file is already complete.
           downloads.record({
             filename: '/home/me/Downloads/report.txt',
             id: 47,
@@ -1205,6 +1205,157 @@ describe('agent browser calls', () => {
     await vi.waitFor(() => {
       expect(downloads.cancelled).toStrictEqual([71]);
     });
+  });
+
+  it('keeps the file of an approved repeat that starts inside an earlier call\u2019s linger', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    const pending: { id: number | undefined } = { id: undefined };
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        // A click is a press and a release; the browser names the download once, while the command is in flight.
+        if (pending.id !== undefined) {
+          downloads.emit({
+            filename: '/home/me/Downloads/report.txt',
+            id: pending.id,
+            tabId: TAB_ID,
+          });
+          pending.id = undefined;
+        }
+
+        return {};
+      },
+    });
+
+    const click = (sensitive: readonly string[] = []) =>
+      runtime.runTool({
+        agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+        arguments: { target: '#pay' },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_click',
+      });
+
+    // A guarded click that starts nothing leaves its listener armed for a late download.
+    await click();
+    expect(downloads.live()).toBe(1);
+
+    // The next call starts inside that window, and its own guard refuses the download it started.
+    pending.id = 72;
+    const refused = await click();
+
+    expect(refused).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+
+    // The approved repeat starts inside the earlier call's window too: its file must be nobody's to cancel.
+    pending.id = 73;
+    const approved = await click([expectStepToken(refused)]);
+
+    expect(approved.kind).toBe('result');
+    // Only the refused call's file was cancelled, and no file was deleted: one file remains, the approved one.
+    expect([downloads.cancelled, downloads.removed]).toStrictEqual([[72], []]);
+  });
+
+  it('reports a download the tab announced after the click’s own command returned', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    const announcing: { pending: boolean } = { pending: true };
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        if (announcing.pending) {
+          announcing.pending = false;
+          // The tab names the download a moment after the click's own command returned, before the item exists.
+          cdp.emit('Browser.downloadWillBegin', {
+            guid: 'download-77',
+            suggestedFilename: 'report.txt',
+            url: `${MAIN_ORIGIN}/report.txt`,
+          });
+        }
+
+        return {};
+      },
+    });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    // The call reports what it caused even though the item itself is created after it answered.
+    expect(outcome).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+    expect(downloads.cancelled).toStrictEqual([]);
+
+    downloads.emit({ id: 77, tabId: TAB_ID });
+
+    // The listener it left behind deletes the file that lands, so nothing is kept unapproved.
+    await vi.waitFor(() => {
+      expect(downloads.cancelled).toStrictEqual([77]);
+    });
+  });
+
+  it('still deletes a late file that lands after the call, when no later call interrupts', async () => {
+    // `cancel` is too late for an item the browser already finished, so only a deleted file proves the guard acted.
+    const downloads = createFakeDownloads({ cancelRejects: true });
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    const outcome = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    expect([outcome.kind, downloads.live()]).toStrictEqual(['result', 1]);
+
+    downloads.emit({
+      filename: '/home/me/Downloads/late.bin',
+      id: 75,
+      state: 'complete',
+      tabId: TAB_ID,
+    });
+
+    await vi.waitFor(() => {
+      expect(downloads.removed).toStrictEqual([75]);
+    });
+  });
+
+  it('ends the earlier call\u2019s linger when a screenshot starts, instead of waiting it out', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({ 'Input.dispatchMouseEvent': () => ({}) });
+
+    await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: { target: '#pay' },
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_click',
+    });
+
+    expect(downloads.live()).toBe(1);
+
+    const startedAt = Date.now();
+    const shot = await runtime.runTool({
+      agent: { authorized: [readGrant, actGrant] },
+      arguments: {},
+      caller: agent(),
+      tabId: TAB_ID,
+      toolName: 'browser_take_screenshot',
+    });
+
+    // A read starts no download, so it runs no guard of its own; the earlier listener is gone before it runs.
+    expect(shot.kind).toBe('result');
+    expect(downloads.live()).toBe(0);
+    // It ends the linger at once rather than paying the earlier call's window.
+    expect(Date.now() - startedAt).toBeLessThan(1000);
   });
 
   it('disarms the guard when the tool fails', async () => {

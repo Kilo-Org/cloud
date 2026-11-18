@@ -33,6 +33,22 @@ type FakeRuntime = {
 const callerKey = (caller: BrowserCaller): string =>
   caller.kind === 'agent' ? `${caller.controllerId}:${caller.sessionHandle}` : caller.kind;
 
+/** A fake runtime's outcomes in call order: a refusal, then the same call's approved repeat. */
+const outcomesInOrder = (...outcomes: readonly BrowserToolRunOutcome[]) => {
+  let next = 0;
+
+  return (): BrowserToolRunOutcome => {
+    const answer = outcomes[next] ?? outcomes.at(-1);
+    next += 1;
+
+    if (answer === undefined) {
+      throw new Error('the fake runtime was asked for more outcomes than it has');
+    }
+
+    return answer;
+  };
+};
+
 const createFakeRuntime = (
   options: {
     readonly outcome?: ((input: BrowserToolRunInput) => BrowserToolRunOutcome) | undefined;
@@ -386,26 +402,23 @@ describe('local agent browser bridge', () => {
   });
 
   it('runs the approved repeat of browser_tabs new as the navigate it asked for', async () => {
-    let calls = 0;
     const fake = createFakeRuntime({
-      outcome: () => {
-        calls += 1;
-
-        return calls === 1
-          ? {
-              afterAction: true,
-              items: [
-                {
-                  class: 'sensitive',
-                  origin: 'https://app.example.com',
-                  reason: SENSITIVE_REASON.download,
-                },
-              ],
-              kind: 'needs_permission',
-              stepToken: APPROVAL_TOKEN,
-            }
-          : { kind: 'result', result: { ok: true, value: 'report.txt: The file was downloaded.' } };
-      },
+      outcome: outcomesInOrder(
+        {
+          afterAction: true,
+          items: [
+            {
+              class: 'sensitive',
+              origin: 'https://app.example.com',
+              reason: SENSITIVE_REASON.download,
+            },
+          ],
+          kind: 'needs_permission',
+          result: { ok: true, value: '' },
+          stepToken: APPROVAL_TOKEN,
+        },
+        { kind: 'result', result: { ok: true, value: 'report.txt: The file was downloaded.' } }
+      ),
     });
     const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
 

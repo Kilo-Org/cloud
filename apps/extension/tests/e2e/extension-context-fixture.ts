@@ -173,12 +173,16 @@ const copyExtensionWithGrantedPermissions = async (granted: readonly string[]): 
     return existing;
   }
 
-  const copy = buildGrantedExtensionCopy(granted).catch((error: unknown) => {
-    // A copy that failed is not cached: the next launch retries instead of replaying this error for the worker's life.
-    grantedExtensionCopies.delete(key);
+  const copy = (async (): Promise<string> => {
+    try {
+      return await buildGrantedExtensionCopy(granted);
+    } catch (error) {
+      // A copy that failed is not cached: the next launch retries instead of replaying this error for the worker's life.
+      grantedExtensionCopies.delete(key);
 
-    throw error;
-  });
+      throw error;
+    }
+  })();
 
   grantedExtensionCopies.set(key, copy);
   extensionCopiesOnDisk.add(await copy);

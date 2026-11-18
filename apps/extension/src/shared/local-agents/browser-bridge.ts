@@ -138,6 +138,9 @@ const textContent = (text: string): JsonRpcResult => ({
 
 const textValueSchema = z.string();
 
+/** The `_meta` a tool result may carry: withheld-frame lists travel here, not in the model's text. */
+const metaSchema = z.record(z.string(), z.unknown());
+
 /**
  * One runtime result as MCP content. A screenshot leaves as an image plus its
  * text line; every other value is the text the tool already produced, and an
@@ -460,7 +463,7 @@ export const createRuntimeBrowserBridge = ({
           tabId: opened.tabId,
           title: info?.title ?? opened.title,
           // Chrome withholds the url of an `about:blank` tab without the `tabs` permission, so an empty one falls back.
-          url: info?.url || opened.url,
+          url: info?.url === undefined || info.url === '' ? opened.url : info.url,
         })
       );
 
@@ -473,7 +476,7 @@ export const createRuntimeBrowserBridge = ({
         return navigated;
       }
 
-      const meta = z.record(z.string(), z.unknown()).safeParse(navigated['_meta']);
+      const meta = metaSchema.safeParse(navigated['_meta']);
 
       return meta.success ? { ...payload, _meta: meta.data } : payload;
     }

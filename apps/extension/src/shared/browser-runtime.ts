@@ -262,6 +262,19 @@ const DOWNLOAD_SETTLE_POLLS = 20;
 const DOWNLOAD_OBSERVE_POLL_MS = 10;
 const DOWNLOAD_OBSERVE_POLLS = 10;
 
+/**
+ * How long an act call waits for a download its own command started. A click
+ * that started no navigation pays only the start grace: no document can turn
+ * into a file. A navigation holds the call open while it is unanswered, and an
+ * announced download for a short grace while the browser names the item,
+ * because a file the model was never told about must not appear. All of it is
+ * bounded.
+ */
+const DOWNLOAD_START_GRACE_MS = 40;
+const DOWNLOAD_ANNOUNCE_GRACE_MS = 250;
+const DOWNLOAD_ANNOUNCE_POLL_MS = 10;
+const DOWNLOAD_ANNOUNCE_POLLS = 120;
+
 /** One download this call stopped: its file is gone, still being written, or kept under a name. */
 type DiscardOutcome =
   | { readonly kind: 'kept'; readonly filename: string }
@@ -549,6 +562,41 @@ interface DownloadAttribution {
   readonly tab: { readonly tabId: number; readonly url: string };
   /** Tabs this call owns, including one it opened. */
   readonly tabIds: () => readonly number[];
+  /** What the tab says about the download this call started; absent when there is nothing to watch. */
+  readonly witness?: DownloadWitness | undefined;
+}
+
+/**
+ * What the tab shows about the download a call's own command started: the
+ * browser announces a download (`Browser.downloadWillBegin`) and records the
+ * navigation that produced it. A call that started no navigation cannot have
+ * started one of these, so it never waits for a file.
+ */
+interface DownloadWitness {
+  /** Downloads the tab announced since the last read, drained so each is counted once. */
+  readonly announced: () => number;
+  /**
+   * Navigations this call started that the browser has not answered yet. Only a
+   * document can turn into a download; an ordinary click's `fetch` must not
+   * hold the call open.
+   */
+  readonly pendingNavigation: () => number;
+  /** Whether a response this call received was served as an attachment, which is a download on its way. */
+  readonly attachmentResponse: () => boolean;
+}
+
+/**
+ * Where a call's linger goes. A guard that started no download stays armed
+ * briefly for a late one, but it outlives its call: the runtime keeps the
+ * linger per tab and the next call on that tab ends it first, so an already
+ * answered guard never cancels a download a later call — an approved repeat
+ * above all — started.
+ */
+interface LingerSink {
+  /** A linger is now armed for this tab; `end` stops it acting on any download that starts later. */
+  readonly armed: (end: () => void) => void;
+  /** The linger ended, by its own window or by the runtime: the tab no longer holds one. */
+  readonly ended: () => void;
 }
 
 /**
@@ -588,6 +636,73 @@ const observeDownloads = async ({
   return [];
 };
 
+/** Whether a response was served as an attachment: the one answer that becomes a download instead of a page. */
+const isAttachment = (request: { readonly responseHeaders?: Record<string, string> }): boolean =>
+  Object.entries(request.responseHeaders ?? {}).some(
+    ([name, value]) =>
+      name.toLowerCase() === 'content-disposition' && value.toLowerCase().includes('attachment')
+  );
+
+/**
+ * Holds an act call open just long enough for the download its own command
+ * started to show up. A call that started no navigation pays only the start
+ * grace: no document can turn into a file. A navigation keeps the call open
+ * while it is unanswered, and an announced download for a short grace while
+ * the browser names the item. Returns how many downloads the tab announced, so
+ * a call that stopped none still reports what it caused.
+ */
+const awaitStartedDownload = async ({
+  announced,
+  attachmentResponse,
+  pendingNavigation,
+  stopped,
+}: {
+  readonly announced: () => number;
+  readonly attachmentResponse: () => boolean;
+  readonly pendingNavigation: () => number;
+  /** Whether the guard already has a download of its own: the item was named while waiting. */
+  readonly stopped: () => boolean;
+}): Promise<number> => {
+  const start = Date.now();
+  let count = 0;
+  let started = false;
+  let idleAt = start;
+
+  for (let attempt = 0; attempt < DOWNLOAD_ANNOUNCE_POLLS; attempt += 1) {
+    count += announced();
+
+    if (stopped()) {
+      return count;
+    }
+
+    const now = Date.now();
+    const pending = pendingNavigation();
+
+    if (count > 0 || pending > 0 || attachmentResponse()) {
+      started = true;
+      idleAt = now;
+    }
+
+    // A call that started no navigation cannot have started a download: the start grace is all it pays.
+    if (!started) {
+      if (now - start >= DOWNLOAD_START_GRACE_MS) {
+        return count;
+      }
+    } else if (count === 0 && pending === 0 && now - idleAt >= DOWNLOAD_ANNOUNCE_GRACE_MS) {
+      // Its navigation answered with a page, and no download was announced in the grace: nothing is coming.
+      return count;
+    } else if (count > 0 && now - idleAt >= DOWNLOAD_ANNOUNCE_GRACE_MS) {
+      // The tab announced a download: the browser names the item a moment later, then the wait is over.
+      return count;
+    }
+
+    // eslint-disable-next-line no-await-in-loop -- one live-state poll per bounded attempt
+    await after(DOWNLOAD_ANNOUNCE_POLL_MS);
+  }
+
+  return count;
+};
+
 /**
  * The guard that uses the optional `downloads` permission: the browser names a
  * download when it creates it, and every item this call started is cancelled
@@ -601,7 +716,8 @@ const observeDownloads = async ({
  */
 const armDownloadGuard = (
   api: BrowserDownloadsApi,
-  attribution: DownloadAttribution
+  attribution: DownloadAttribution,
+  linger?: LingerSink
 ): DownloadGuard => {
   const { navigation, tab, tabIds } = attribution;
   const startedAt = Date.now();
@@ -611,6 +727,7 @@ const armDownloadGuard = (
     item.tabId === undefined || tabIds().includes(item.tabId);
   let created = false;
   let listening = true;
+  let lingering = false;
 
   const stop = (item: BrowserDownloadItem): void => {
     created = true;
@@ -644,8 +761,15 @@ const armDownloadGuard = (
     }
   };
 
+  const listen = (): void => {
+    if (!listening) {
+      listening = true;
+      api.onCreated.addListener(listener);
+    }
+  };
+
   const report = async (): Promise<GuardSettlement> => {
-    const outcomes = await Promise.all([...stops.values()]);
+    const outcomes = await Promise.all(stops.values());
 
     return {
       kept: outcomes.flatMap(outcome => (outcome.kind === 'kept' ? [outcome.filename] : [])),
@@ -669,8 +793,20 @@ const armDownloadGuard = (
         }
       }
 
-      // An act call's download is created a moment after its own command returns, so the guard looks for it.
+      // An act call's download is created a moment after its own command returns, so the guard waits for it.
+      // The wait follows the navigation it started while that navigation is unanswered, then looks for the item.
       // Without this the linger would delete a file the model was never told about.
+      let announced = 0;
+
+      if (navigation === undefined && attribution.witness !== undefined) {
+        announced = await awaitStartedDownload({
+          announced: attribution.witness.announced,
+          attachmentResponse: attribution.witness.attachmentResponse,
+          pendingNavigation: attribution.witness.pendingNavigation,
+          stopped: () => stops.size > 0,
+        });
+      }
+
       if (!created && navigation === undefined) {
         for (const item of await observeDownloads({
           api,
@@ -681,21 +817,55 @@ const armDownloadGuard = (
         }
       }
 
-      if (stops.size === 0) {
+      /** Keeps the guard listening for a late item, and hands the runtime a way to end it at the next call. */
+      const lingerOn = (): void => {
         // Nothing started, so the call does not pay for a window it may never need.
         // The listener stays armed for a bounded linger, so a download whose headers arrive late is deleted too.
+        // The linger owns only this call's window: downloads that start before the next call ends it.
+        // That is why an approved repeat's file is never cancelled by the guard that asked for it.
+        const end = (): void => {
+          if (!lingering) {
+            return;
+          }
+
+          lingering = false;
+          disarm();
+          linger?.ended();
+          // Whatever the linger already stopped is still deleted, now that nothing else will report it.
+          void report();
+        };
+
+        lingering = true;
+        listen();
+        linger?.armed(end);
         void (async (): Promise<void> => {
           await after(DOWNLOAD_GUARD_LINGER_MS);
-          disarm();
-          await report();
+          end();
         })();
+      };
+
+      if (stops.size === 0 && announced === 0) {
+        lingerOn();
 
         return { kept: [], stopped: 0 };
       }
 
+      const settlement = await report();
+
+      if (settlement.stopped === 0) {
+        // The tab announced a download the browser has not named yet: this call reports it now.
+        // The linger still deletes whatever lands, so no file is kept unapproved and none vanishes unreported.
+        lingerOn();
+
+        return { kept: settlement.kept, stopped: announced };
+      }
+
       disarm();
 
-      return report();
+      // A download the tab announced but did not yet hand over belongs to this call too: the model is told about it.
+      return announced === 0
+        ? settlement
+        : { kept: settlement.kept, stopped: settlement.stopped + announced };
     },
   };
 };
@@ -762,6 +932,16 @@ export const createBrowserRuntime = ({
   const chains = new Map<number, Promise<void>>();
   // The abort hook of the call currently running in the tab, keyed by tab.
   const inFlight = new Map<number, () => void>();
+  // The linger a finished call left armed on a tab: the next call on that tab ends it before it can act.
+  const lingers = new Map<number, () => void>();
+
+  /** Ends whatever linger an earlier call left on this tab: a new call owns the downloads from now on. */
+  const endLinger = (tabId: number): void => {
+    const end = lingers.get(tabId);
+
+    lingers.delete(tabId);
+    end?.();
+  };
 
   const sessionFor = (tabId: number): BrowserToolSession => {
     const existing = sessions.get(tabId);
@@ -786,6 +966,8 @@ export const createBrowserRuntime = ({
   const disposeTab = async (tabId: number): Promise<void> => {
     chains.delete(tabId);
     inFlight.delete(tabId);
+    // A closed tab has no next call, so its linger is over: it must not keep listening for that tab's id.
+    endLinger(tabId);
     autoAttachedTabs.delete(tabId);
     sessionOwnedTabs.delete(tabId);
     groups.noteTabRemoved(tabId);
@@ -810,6 +992,9 @@ export const createBrowserRuntime = ({
     );
 
     await previous;
+
+    // This call owns the tab's downloads from here: an earlier call's linger must not act on what this one starts.
+    endLinger(tabId);
 
     try {
       return await task();
@@ -973,7 +1158,15 @@ export const createBrowserRuntime = ({
    * missing — the caller then refuses the call rather than run it unguarded.
    */
   const armGuard = (api: BrowserDownloadsApi, attribution: DownloadAttribution): DownloadGuard =>
-    armDownloadGuard(api, attribution);
+    armDownloadGuard(api, attribution, {
+      armed: end => {
+        // One linger per tab: the previous one was ended when this call began.
+        lingers.set(attribution.tab.tabId, end);
+      },
+      ended: () => {
+        lingers.delete(attribution.tab.tabId);
+      },
+    });
 
   /** Whether the tab now sits on the page a navigate asked for; a download never loads it. */
   const navigationLanded = (tabId: number, destination: string) => async (): Promise<boolean> => {
@@ -1209,6 +1402,11 @@ export const createBrowserRuntime = ({
         // A navigate names the document it asked for, so a download that starts after the call returns can still be found.
         const destination =
           preflight?.class === 'navigate' ? argumentText(argsRecord['url']) : undefined;
+        // The requests this call can be charged with: everything the tab starts from here on.
+        // A download needs one, so a call that starts none never waits for a file.
+        const requestsBefore = new Set(
+          guardDownloads ? session.networkRequests().map(request => request.requestId) : []
+        );
         const downloadGuard =
           guardTab === undefined || guardApi === undefined
             ? undefined
@@ -1223,6 +1421,26 @@ export const createBrowserRuntime = ({
                     }),
                 tab: guardTab,
                 tabIds: guardTabIds,
+                witness: {
+                  announced: () => session.takeDownloads().length,
+                  attachmentResponse: () =>
+                    session
+                      .networkRequests()
+                      .some(
+                        request => !requestsBefore.has(request.requestId) && isAttachment(request)
+                      ),
+                  pendingNavigation: () =>
+                    session
+                      .networkRequests()
+                      .filter(
+                        request =>
+                          !requestsBefore.has(request.requestId) &&
+                          request.resourceType === 'Document' &&
+                          request.status === undefined &&
+                          request.finishedAt === undefined &&
+                          request.failure === undefined
+                      ).length,
+                },
               });
 
         // No guard without the optional permission: no file may be started, so the call is refused instead of run unguarded.

@@ -7,6 +7,7 @@ import {
   getRequestIgnoredVercelProviderIds,
   getVercelProviderIdForUserByok,
   isGatewayUserByokProviderId,
+  normalizeInferenceProviderId,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
   VertexCredentialsSchema,
@@ -25,6 +26,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   getCachedVercelInferenceProviderIdsForModel,
+  getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsFromDatabase,
   isValidOpenRouterModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -121,11 +123,57 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  if (!openRouterDisabled && !(await isVercelRoutingEnabledForModel(requestedModel))) {
+  if (
+    !openRouterDisabled &&
+    !(await isVercelRoutingEnabledForModel(requestedModel)) &&
+    !(await allowsOnlyVercelProviders(requestedModel, await getRoutingProviderConfig()))
+  ) {
     return false;
   }
 
   return await canRouteToVercel(requestedModel, getRoutingProviderConfig);
+}
+
+/**
+ * Whether the provider routing settings leave the model no OpenRouter provider but at least one
+ * Vercel provider. OpenRouter cannot serve such a request, so Kilo's Vercel opt-out list does not
+ * apply to it. Missing provider data on either gateway keeps the opt-out.
+ */
+async function allowsOnlyVercelProviders(
+  requestedModel: string,
+  provider: OpenRouterProviderConfig | undefined
+): Promise<boolean> {
+  if (!provider || (!provider.only && !provider.ignore?.length)) return false;
+  const { only, ignore = [] } = provider;
+  const [openRouterModels, vercelModelId] = await Promise.all([
+    getOpenRouterModelsMetadataFromDatabase(),
+    mapModelIdToVercel(requestedModel),
+  ]);
+  const openRouterModel = openRouterModels[requestedModel];
+  if (!openRouterModel) return false;
+
+  const onlyProviders = only && new Set(only.map(normalizeInferenceProviderId));
+  const ignoredProviders = new Set(ignore.map(normalizeInferenceProviderId));
+  const openRouterServesAllowedProvider = openRouterModel.endpoints.some(({ tag }) => {
+    // An endpoint without a tag could belong to any provider.
+    if (!tag) return true;
+    const providerId = normalizeInferenceProviderId(tag);
+    return !ignoredProviders.has(providerId) && (!onlyProviders || onlyProviders.has(providerId));
+  });
+  if (openRouterServesAllowedProvider) return false;
+
+  const vercelInferenceProviders = await getCachedVercelInferenceProviderIdsForModel(vercelModelId);
+  if (
+    !vercelInferenceProviders ||
+    getVercelInferenceProvidersExcludingIgnored(ignore, only, vercelInferenceProviders).length === 0
+  ) {
+    return false;
+  }
+
+  console.debug(
+    `[shouldRouteToVercel] routing opted-out model ${requestedModel} to Vercel because only Vercel serves the allowed providers`
+  );
+  return true;
 }
 
 /** Whether Kilo's routing config sends the model to Vercel: the model is not opted out. Vercel must still serve the model. */

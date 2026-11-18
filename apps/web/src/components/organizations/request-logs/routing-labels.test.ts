@@ -1,4 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
+import type { RequestLogRoutingResult } from '@/lib/request-logs/routing-details';
 import { describeResult, describeStep, describeUnsentResult, gatewayName } from './routing-labels';
 
 describe('describeStep', () => {
@@ -161,17 +162,27 @@ describe('describeResult', () => {
 });
 
 describe('describeResult for a partner', () => {
-  test('names the partner provider and bills Kilo credits', () => {
-    expect(
-      describeResult({
-        kind: 'provider',
-        route: 'kilo',
-        provider_type: 'partner',
-        byok_provider_ids: [],
-        payer: 'kilo',
-        is_free: false,
-      })
-    ).toEqual({ title: 'Sent to a Kilo partner provider', paidBy: 'Kilo credits' });
+  const partnerResult: RequestLogRoutingResult = {
+    kind: 'provider',
+    route: 'kilo',
+    provider_type: 'partner',
+    byok_provider_ids: [],
+    payer: 'kilo',
+    is_free: false,
+  };
+
+  test('names the partner from its inference provider and bills Kilo credits', () => {
+    expect(describeResult(partnerResult, 'mistral')).toEqual({
+      title: 'Sent to Mistral',
+      paidBy: 'Kilo credits',
+    });
+  });
+
+  test('falls back to a generic label when the partner is not recorded', () => {
+    expect(describeResult(partnerResult)).toEqual({
+      title: 'Sent to the partner provider',
+      paidBy: 'Kilo credits',
+    });
   });
 });
 

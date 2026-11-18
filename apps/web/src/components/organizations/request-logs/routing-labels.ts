@@ -63,7 +63,6 @@ const SENT_TO_LABELS: Record<string, string> = {
   'claude-billing': 'Anthropic (Claude organization)',
   custom: PROMOTIONAL_MODEL_PROVIDER,
   'custom-public': PROMOTIONAL_MODEL_PROVIDER,
-  partner: 'a Kilo partner provider',
   'dev-tools': 'Development tools',
 };
 
@@ -133,9 +132,27 @@ function paidByLabel(result: RequestLogRoutingResult): string | null {
   }
 }
 
-function selectedProviderName(result: RequestLogRoutingResult): string | null {
+/** The partner a partner-first Kilo route sent the request to, from its `kilo` step. */
+export function partnerInferenceProviderOf(
+  steps: readonly RequestLogRoutingStep[]
+): string | undefined {
+  return steps.find(step => step.step === 'kilo')?.partner_inference_provider;
+}
+
+/** The display name of a partner, or a generic label when the routing record does not name it. */
+export function partnerName(partnerInferenceProvider: string | undefined): string {
+  return partnerInferenceProvider
+    ? inferenceProviderNames([partnerInferenceProvider])
+    : 'the partner provider';
+}
+
+function selectedProviderName(
+  result: RequestLogRoutingResult,
+  partnerInferenceProvider: string | undefined
+): string | null {
   const providerType = result.provider_type;
   if (!providerType) return null;
+  if (providerType === 'partner') return partnerName(partnerInferenceProvider);
   if (providerType === 'direct-byok') {
     const providerIds = result.byok_provider_ids ?? [];
     return providerIds.length > 0
@@ -145,8 +162,11 @@ function selectedProviderName(result: RequestLogRoutingResult): string | null {
   return lookup(SENT_TO_LABELS, providerType);
 }
 
-export function describeResult(result: RequestLogRoutingResult): DescribedResult {
-  const provider = selectedProviderName(result);
+export function describeResult(
+  result: RequestLogRoutingResult,
+  partnerInferenceProvider?: string
+): DescribedResult {
+  const provider = selectedProviderName(result, partnerInferenceProvider);
   return {
     title: provider ? `Sent to ${provider}` : 'Provider selected',
     paidBy: paidByLabel(result),
@@ -156,9 +176,10 @@ export function describeResult(result: RequestLogRoutingResult): DescribedResult
 /** Nothing was sent, so nobody paid; the detail names the provider Kilo had selected. */
 export function describeUnsentResult(
   result: RequestLogRoutingResult,
-  reason: RequestLogNotSentReason
+  reason: RequestLogNotSentReason,
+  partnerInferenceProvider?: string
 ): DescribedUnsentResult {
-  const provider = selectedProviderName(result);
+  const provider = selectedProviderName(result, partnerInferenceProvider);
   return {
     title: NOT_SENT_LABELS[reason],
     detail: provider ? `Would have been sent to ${provider}.` : null,

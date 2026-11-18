@@ -2,7 +2,7 @@ import { getByokProviderDisplayName } from '@/lib/byok/provider-names';
 import type { RequestLogByokFailoverAttempt } from '@/lib/request-logs/routing-details';
 import { DetailSection, ToneBadge } from './detail-primitives';
 import { formatDurationMs } from './format';
-import { gatewayName, isPartnerFailover, type StepTone } from './routing-labels';
+import { gatewayName, isPartnerFailover, partnerName, type StepTone } from './routing-labels';
 
 const OUTCOMES: Record<string, { label: string; tone: StepTone }> = {
   'failed-over': { label: 'Failed, tried next key', tone: 'rejected' },
@@ -27,8 +27,13 @@ function partnerOutcomeOf(outcome: string) {
     : { label: outcome, tone: 'info' as const };
 }
 
-function partnerAttemptName(attempt: RequestLogByokFailoverAttempt): string {
-  if (attempt.provider_type === 'partner') return 'Partner provider';
+function partnerAttemptName(
+  attempt: RequestLogByokFailoverAttempt,
+  partnerInferenceProvider: string | undefined
+): string {
+  if (attempt.provider_type === 'partner') {
+    return partnerInferenceProvider ? partnerName(partnerInferenceProvider) : 'Partner provider';
+  }
   return (attempt.provider_type && gatewayName(attempt.provider_type)) ?? 'Kilo gateway';
 }
 
@@ -45,7 +50,14 @@ function isThroughVercel(attempt: RequestLogByokFailoverAttempt): boolean {
   );
 }
 
-export function ByokFailoverSection({ attempts }: { attempts: RequestLogByokFailoverAttempt[] }) {
+export function ByokFailoverSection({
+  attempts,
+  partnerInferenceProvider,
+}: {
+  attempts: RequestLogByokFailoverAttempt[];
+  /** The partner a partner-first Kilo route tried first, when the routing record names it. */
+  partnerInferenceProvider?: string;
+}) {
   const partner = isPartnerFailover(attempts);
   return (
     <DetailSection
@@ -72,7 +84,9 @@ export function ByokFailoverSection({ attempts }: { attempts: RequestLogByokFail
               </span>
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="font-medium">
-                  {partner ? partnerAttemptName(attempt) : keyName(attempt)}
+                  {partner
+                    ? partnerAttemptName(attempt, partnerInferenceProvider)
+                    : keyName(attempt)}
                 </span>
                 {!partner && isThroughVercel(attempt) && (
                   <span className="text-muted-foreground">via Vercel AI Gateway</span>

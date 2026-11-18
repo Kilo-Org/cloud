@@ -20,6 +20,8 @@ import {
   rejectedResultLabel,
   type StepTone,
   isPartnerFailover,
+  partnerInferenceProviderOf,
+  partnerName,
 } from './routing-labels';
 
 const TONE_ICONS: Record<StepTone, typeof CircleCheck> = {
@@ -166,11 +168,22 @@ function failoverStopLabels(stopReason: string | undefined): { title: string; de
   }
 }
 
-function FailoverNote({ attempts }: { attempts: RequestLogByokFailoverAttempt[] }) {
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function FailoverNote({
+  attempts,
+  partnerInferenceProvider,
+}: {
+  attempts: RequestLogByokFailoverAttempt[];
+  partnerInferenceProvider: string | undefined;
+}) {
   if (isPartnerFailover(attempts)) {
     return (
       <p className="text-muted-foreground text-xs">
-        The partner provider failed before this attempt. See Partner fallback.
+        {capitalize(partnerName(partnerInferenceProvider))} failed before this attempt. See Partner
+        fallback.
       </p>
     );
   }
@@ -187,6 +200,7 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
   const result = routing.result;
   const attempts = routing.byok_failover_attempts;
   const finalAttempt = attempts.at(-1);
+  const partnerInferenceProvider = partnerInferenceProviderOf(routing.steps);
   if (!result) {
     return (
       <FlowNode tone="info" icon={Flag} isLast>
@@ -203,7 +217,7 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
   }
   const notSentReason = requestNotSentReason(routing);
   if (notSentReason) {
-    const { title, detail } = describeUnsentResult(result, notSentReason);
+    const { title, detail } = describeUnsentResult(result, notSentReason, partnerInferenceProvider);
     return (
       <FlowNode tone="rejected" icon={Flag} isLast>
         <span className="text-sm font-medium">{title}</span>
@@ -217,7 +231,9 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
     return (
       <FlowNode tone="rejected" icon={Flag} isLast>
         <span className="text-sm font-medium">
-          {partnerFailed ? 'The partner provider and the Kilo gateway both failed' : stopped.title}
+          {partnerFailed
+            ? `${capitalize(partnerName(partnerInferenceProvider))} and the Kilo gateway both failed`
+            : stopped.title}
         </span>
         <p className="text-muted-foreground text-xs">
           {partnerFailed
@@ -234,7 +250,8 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
           provider_type: finalAttempt.provider_type ?? result.provider_type,
           byok_provider_ids: finalAttempt.byok_provider_ids,
         }
-      : result
+      : result,
+    partnerInferenceProvider
   );
   return (
     <FlowNode tone="selected" icon={Flag} isLast>
@@ -244,7 +261,9 @@ function ResultNode({ routing }: { routing: RequestLogRoutingDetails }) {
           Paid by: <span className="text-foreground">{paidBy}</span>
         </p>
       )}
-      {finalAttempt && <FailoverNote attempts={attempts} />}
+      {finalAttempt && (
+        <FailoverNote attempts={attempts} partnerInferenceProvider={partnerInferenceProvider} />
+      )}
     </FlowNode>
   );
 }

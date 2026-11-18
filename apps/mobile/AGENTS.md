@@ -352,6 +352,7 @@ pnpm dev:mobile:design-gate run --link <deep link> [--link ...] --matrix standar
 - The sampler retains the newest layouts that fit its weight budget, up to a maximum count. A truncation flag in the timeline and motion artifacts marks incomplete capture.
 - Fix every `error` finding, then run the gate again until it exits 0. Fix each `warning`, or give a one-line reason in the pull request.
 - Exit code 2 is an environment failure (no device, no Metro page, no probe), not a pass.
+- React's "state update on a component that hasn't mounted yet" warning painted over a screen is a `dev-overlay` error. The gate mutes it only when its stack enters `react-native-css` (`useNativeCss`/`styleEffect`), whose theme and size listeners fire during an uncommitted Activity prerender; any other instance is an app defect to fix.
 - Attach `contact-sheet.png` from the output directory to the pull request with `gh pr comment --attach`. Never commit it.
 - A separate reviewer judges the per-screen sheets in `sheets/` for what numbers cannot measure. Never grade your own screenshots.
 - For an Android release build, `pnpm dev:mobile:design-gate scan --source agent-device` checks the current screen from the accessibility tree of an open `agent-device` session, and `--source uiautomator` does the same without one. Both read the tree until its layout repeats and measure that read; a screen that never settles is not measured and the command exits 2.

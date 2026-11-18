@@ -10,6 +10,7 @@ import type {
 } from '@kilocode/cloud-agent-profile';
 import { repositoryLeaf } from '@kilocode/cloud-agent-profile';
 import type { BuildInputRecord } from './store.js';
+import type { EnvironmentBuildTarget } from './target.js';
 
 export function buildInputMembers(record: BuildInputRecord): EnvironmentReferenceRepository[] {
   if (record.repoFullName === undefined) return [...record.reference.repositories];
@@ -22,21 +23,36 @@ export function buildInputMembers(record: BuildInputRecord): EnvironmentReferenc
   ];
 }
 
+/**
+ * Only the AWS builder reads `egressPolicy`. Other targets omit it, so the
+ * previous release's strict record schema still reads their builds after a
+ * revert deploy.
+ */
+function egressPolicyOf(
+  input: ProfileBuildInput,
+  target: EnvironmentBuildTarget
+): Pick<BuildInputRecord, 'egressPolicy'> {
+  if (target.provider !== 'aws' && target.provider !== 'aws-ecs') return {};
+  if (input.egressMode === undefined) return {};
+  return {
+    egressPolicy:
+      input.egressMode === 'allowlist'
+        ? { egressMode: 'allowlist', egressAllowlist: input.egressAllowlist ?? [] }
+        : { egressMode: 'unrestricted' },
+  };
+}
+
 /** The stored input JSON for a profile build input: one path, or the V2 repositories. */
-export function buildInputRecordOf(input: ProfileBuildInput): BuildInputRecord {
+export function buildInputRecordOf(
+  input: ProfileBuildInput,
+  target: EnvironmentBuildTarget
+): BuildInputRecord {
   const { reference, commands, plainVars } = input;
-  const policy =
-    input.egressMode === undefined
-      ? {}
-      : {
-          egressPolicy:
-            input.egressMode === 'allowlist'
-              ? { egressMode: 'allowlist' as const, egressAllowlist: input.egressAllowlist ?? [] }
-              : { egressMode: 'unrestricted' as const },
-        };
-  if (reference.repositories !== undefined) return { reference, commands, plainVars, ...policy };
+  const policy = egressPolicyOf(input, target);
+  if (reference.repositories !== undefined)
+    return { reference, commands, plainVars, ...policy, target };
   if (input.repoFullName === undefined) throw new Error('A V1 build input has no repository path');
-  return { reference, repoFullName: input.repoFullName, commands, plainVars, ...policy };
+  return { reference, repoFullName: input.repoFullName, commands, plainVars, ...policy, target };
 }
 
 /** Native and BYOC builders receive the same repository layout and input shape. */

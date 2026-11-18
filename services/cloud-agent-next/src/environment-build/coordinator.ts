@@ -314,7 +314,7 @@ export class EnvironmentBuildCoordinator {
     const networkSecretGrants = buildNetworkSecretGrants(this.environmentId, input, target, () =>
       this.deps.networkSecretExcludedUrls()
     );
-    const record: BuildInputRecord = { ...buildInputRecordOf(input), target };
+    const record: BuildInputRecord = buildInputRecordOf(input, target);
     const runtimeRelease = await this.deps.provider.runtimeReleaseId();
     const admitted = this.deps.transaction(() => {
       if (this.deps.store.activeBuild() !== null) return false;

@@ -136,6 +136,7 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
   DirectionalChevronLeft: 'ChevronLeft',
   DirectionalChevronRight: 'ChevronRight',
 }));
@@ -801,7 +802,7 @@ describe('SessionDetailScreen display scope', () => {
         const buttonLabels = findByType(renderer.root, 'Button').flatMap(button =>
           findByType(button, 'Text').flatMap(node => node.children)
         );
-        expect(buttonLabels).toEqual(['Copy', 'Back to sessions']);
+        expect(buttonLabels).toEqual(['Back to sessions']);
       }
       expect(globalContext.organizationId).toBe('global-org');
       expect(globalContext.setOrganizationId).not.toHaveBeenCalled();

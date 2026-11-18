@@ -3908,7 +3908,6 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
       expect(error.variant).toBe(code === 'UNAUTHORIZED' ? 'permission' : 'server');
       expect(Boolean(error.onRetry)).toBe(code !== 'UNAUTHORIZED');
       expect(renderedText(view.renderer.root)).toContain('Back to sessions');
-      expect(renderedText(view.renderer.root)).toContain('Copy');
       // The card's Back returns to the sessions list through the same POP_TO
       // the session route's not-found card uses, so the two cards cannot drift.
       const backToSessions = view.renderer.root.find(

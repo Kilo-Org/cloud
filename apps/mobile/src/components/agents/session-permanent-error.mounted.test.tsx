@@ -1,28 +1,28 @@
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
 import { AGENTS_SESSIONS_INDEX_HREF } from '@/lib/agents-sessions-route';
 import { i18n } from '@/i18n';
-import { Button } from '@/components/ui/button';
 import { QueryError } from '@/components/query-error';
 import { SessionPermanentError } from './session-permanent-error';
-import { Text } from '@/components/ui/text';
 
 const router = vi.hoisted(() => ({ dismissTo: vi.fn() }));
-const copy = vi.hoisted(() => ({ performCopy: vi.fn() }));
 
 vi.mock('expo-router', () => ({ useRouter: () => router }));
-vi.mock('./use-message-copy', () => ({ performCopy: copy.performCopy }));
 vi.mock('./restored-route-fallback', () => ({ RestoredRouteFallback: 'RestoredRouteFallback' }));
-vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalArrowLeft: 'DirectionalArrowLeft',
+}));
+vi.mock('@/components/empty-state', () => ({ StateAction: 'StateAction' }));
+// The body of the shared state is another suite's; this one reads the state it
+// asks for, so the stub forwards the recovery slot it was handed.
+vi.mock('@/components/query-error', () => ({
+  QueryError: ({ action }: { action?: ReactNode }) => action ?? null,
+}));
 
-function mountCard(): TestRenderer.ReactTestRenderer {
+function mountCard(retry?: () => void): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
@@ -30,8 +30,8 @@ function mountCard(): TestRenderer.ReactTestRenderer {
         variant: 'not-found',
         title: 'Session not found',
         message: 'This session is no longer available.',
+        retry,
         isRetrying: false,
-        copyText: 'ses_test not-found',
         restoredRouteOpen: false,
       })
     );
@@ -42,38 +42,25 @@ function mountCard(): TestRenderer.ReactTestRenderer {
   return ref.current;
 }
 
-describe('SessionPermanentError actions', () => {
-  it('fills Back with the muted dark tone, keeps Copy outlined, and returns to the sessions index', () => {
+describe('SessionPermanentError recovery', () => {
+  it('offers the way back to the sessions and returns to the sessions index', () => {
     const renderer = mountCard();
-    const root = renderer.root;
-
-    expect(root.findAllByType(QueryError)).toHaveLength(1);
-
-    const buttons = root.findAllByType(Button);
-    const back = buttons.find(
-      button =>
-        button.findByType(Text).props.children === i18n.t('agentChat.session.backToSessions')
-    );
-    const copyButton = buttons.find(
-      button => button.findByType(Text).props.children === i18n.t('common.copy')
-    );
-    if (!back || !copyButton) {
-      throw new Error('the terminal card is missing one of its actions');
-    }
-
-    // Dark --primary is the brand yellow that glares on the near-black page, so dark takes the muted lifted olive.
-    expect(String(back.props.className)).toContain('bg-primary');
-    expect(String(back.props.className)).toContain('dark:bg-selection');
-    const backLabel = back.findByType(Text);
-    expect(String(backLabel.props.className)).toContain('text-primary-foreground');
-    expect(String(backLabel.props.className)).toContain('dark:text-selection-foreground');
-
-    expect(copyButton.props.variant).toBe('outline');
-    expect(String(copyButton.props.className)).not.toContain('dark:bg-selection');
+    const actions = renderer.root.findAll(node => String(node.type) === 'StateAction');
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.props.label).toBe(i18n.t('agentChat.session.backToSessions'));
 
     act(() => {
-      (back.props.onPress as () => void)();
+      (actions[0]?.props.onPress as () => void)();
     });
     expect(router.dismissTo).toHaveBeenCalledWith(AGENTS_SESSIONS_INDEX_HREF);
+  });
+
+  it('leaves the retry slot to the denial a retry can clear', () => {
+    const retry = vi.fn();
+    const renderer = mountCard(retry);
+    expect(renderer.root.findAll(node => String(node.type) === 'StateAction')).toHaveLength(0);
+    const error = renderer.root.findByType(QueryError);
+    expect(error.props.onRetry).toBe(retry);
+    expect(error.props.action).toBeUndefined();
   });
 });

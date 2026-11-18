@@ -201,7 +201,10 @@ export function OrganizationRequestLogsScreen() {
           title={t('organization.settingsOnWeb.requestLogs')}
           backFallback={ORGANIZATION_HUB_PATH}
         />
-        <PermissionDenied description={t('organization.requestLogs.permissionDenied')} />
+        <PermissionDenied
+          description={t('organization.requestLogs.permissionDenied')}
+          showBack={false}
+        />
       </View>
     );
   }

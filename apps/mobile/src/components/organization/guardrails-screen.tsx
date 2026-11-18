@@ -57,7 +57,10 @@ export function OrganizationGuardrailsScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t(TITLE_KEY)} />
-        <PermissionDenied description={t('organizationGuardrails.permissionDenied')} />
+        <PermissionDenied
+          description={t('organizationGuardrails.permissionDenied')}
+          showBack={false}
+        />
       </View>
     );
   }

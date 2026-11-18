@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { IconButton } from '@/components/ui/icon-button';
 import { Newspaper, Settings } from '@/components/ui/icons';
-import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -97,7 +96,6 @@ export function BriefingListScreen() {
     listEmpty && !emptySettingsAction
       ? t(history ? 'agentBriefing.historyHint' : 'agentBriefing.emptyHint')
       : undefined;
-  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />;
   let footer = <View className="h-8" />;
   if (query.isFetchNextPageError) {
     footer = (
@@ -167,34 +165,34 @@ export function BriefingListScreen() {
           }}
         />
       )}
-      {/* The empty state owns the body so the shared centered form measures the
-          band the header and the filters leave, instead of sitting at the top
-          of a list that has nothing to scroll. */}
-      {listEmpty && (
-        <EmptyState
-          icon={Newspaper}
-          title={t(emptyLabel)}
-          description={emptyDescription}
-          refreshControl={refreshControl}
-          action={
-            emptySettingsAction ? (
-              <StateAction
-                label={t('agentBriefing.settings')}
-                icon={Settings}
-                onPress={() => {
-                  router.push(`${BRIEFING_PATH}/settings` as Href);
-                }}
-              />
-            ) : undefined
-          }
-        />
-      )}
-      {!loading && !failure && reports.length > 0 && (
+      {/* The empty state rides in the list so it sits under the controls it
+          follows and keeps the list's pull-to-refresh gesture. */}
+      {!loading && !failure && (
         <FlashList
           data={reports}
           keyExtractor={report => report.id}
           refreshing={refreshing}
           onRefresh={onRefresh}
+          ListEmptyComponent={
+            <EmptyState
+              placement="top"
+              inset="gutter"
+              icon={Newspaper}
+              title={t(emptyLabel)}
+              description={emptyDescription}
+              action={
+                emptySettingsAction ? (
+                  <StateAction
+                    label={t('agentBriefing.settings')}
+                    icon={Settings}
+                    onPress={() => {
+                      router.push(`${BRIEFING_PATH}/settings` as Href);
+                    }}
+                  />
+                ) : undefined
+              }
+            />
+          }
           onEndReached={() => {
             // Once the next page has failed, auto-loading re-fires on every
             // content-size change (the footer grows/shrinks as the fetch flips

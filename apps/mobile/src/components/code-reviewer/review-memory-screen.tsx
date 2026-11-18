@@ -6,16 +6,15 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
-import { CenteredState } from '@/components/centered-state';
 import { ReviewMemoryAnalyzeSection } from '@/components/code-reviewer/review-memory-analyze-section';
 import { ReviewMemoryProposalSheet } from '@/components/code-reviewer/review-memory-proposal-sheet';
 import { ReviewMemoryToggleCard } from '@/components/code-reviewer/review-memory-toggle-card';
-import { EmptyState } from '@/components/empty-state';
+import { EmptyState, StateAction } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { Brain } from '@/components/ui/icons';
+import { Brain, Sparkles } from '@/components/ui/icons';
 import { RowChevron } from '@/components/ui/row-chevron';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
 import { Text } from '@/components/ui/text';
@@ -154,31 +153,29 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
     );
   } else if (disabled) {
     body = (
-      <CenteredState>
-        <View className="items-center gap-3 px-4">
-          <Text className="text-center text-sm font-medium">
-            {t('codeReviewer.reviewMemory.off')}
-          </Text>
-          <Text variant="muted" className="text-center text-xs">
-            {t('codeReviewer.reviewMemory.offDescription')}
-          </Text>
-          {readOnly ? (
-            <Text variant="muted" className="text-center text-xs">
+      <EmptyState
+        icon={Brain}
+        title={t('codeReviewer.reviewMemory.off')}
+        description={t('codeReviewer.reviewMemory.offDescription')}
+        action={
+          readOnly ? (
+            // This reader has no press to make, so the sentence that names who
+            // does takes the action's slot.
+            <Text variant="muted" className="text-center">
               {t('codeReviewer.reviewMemory.readOnlyDescription')}
             </Text>
           ) : (
-            <Button
+            <StateAction
+              label={t('codeReviewer.reviewMemory.enable')}
+              icon={Sparkles}
+              loading={setEnabled.isPending}
               onPress={() => {
                 setEnabled.mutate(true);
               }}
-              loading={setEnabled.isPending}
-              accessibilityLabel={t('codeReviewer.reviewMemory.enable')}
-            >
-              <Text>{t('codeReviewer.reviewMemory.enable')}</Text>
-            </Button>
-          )}
-        </View>
-      </CenteredState>
+            />
+          )
+        }
+      />
     );
   } else if (firstPageError) {
     body = (

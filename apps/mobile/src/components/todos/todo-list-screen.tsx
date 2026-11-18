@@ -29,7 +29,7 @@ import {
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
-import { selectTodoQueryErrorView, type TodoQueryErrorView } from '@/lib/todos/todo-query-error';
+import { selectTodoQueryErrorView } from '@/lib/todos/todo-query-error';
 import { todoItemPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
 
@@ -157,11 +157,8 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
   let body: ReactNode = null;
   if (items.isPending || (lists.isPending && !list)) {
     body = <TodoRowsSkeleton />;
-  } else if (items.isError || notFound) {
-    // A list the caller's collection no longer names is missing, not denied.
-    const errorView: TodoQueryErrorView = notFound
-      ? { variant: 'not-found', showRetry: false }
-      : selectTodoQueryErrorView(items.error);
+  } else if (items.isError) {
+    const errorView = selectTodoQueryErrorView(items.error);
     body = (
       <QueryError
         variant={errorView.variant}
@@ -171,7 +168,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
         isRetrying={items.isFetching}
       />
     );
-  } else {
+  } else if (!notFound) {
     body = (
       <>
         <TodoQuickAdd
@@ -265,15 +262,19 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
           : {})}
       />
       {list ? <ListDefaultsLine list={list} onPress={openSettings} /> : null}
-      <KeyboardAvoidingView className="flex-1" behavior="padding">
-        <Animated.ScrollView
-          ref={scrollRef}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: bottomClearance }}
-        >
-          {body}
-        </Animated.ScrollView>
-      </KeyboardAvoidingView>
+      {notFound ? (
+        <QueryError variant="not-found" />
+      ) : (
+        <KeyboardAvoidingView className="flex-1" behavior="padding">
+          <Animated.ScrollView
+            ref={scrollRef}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: bottomClearance }}
+          >
+            {body}
+          </Animated.ScrollView>
+        </KeyboardAvoidingView>
+      )}
     </View>
   );
 }

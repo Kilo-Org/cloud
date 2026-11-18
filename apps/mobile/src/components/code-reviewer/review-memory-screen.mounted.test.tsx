@@ -6,7 +6,7 @@
 // plain member), the empty state, and the paginated happy list. The query
 // layer is mocked so each state is driven directly through the screen JSX.
 
-import { createElement, Fragment, type ReactElement } from 'react';
+import { createElement, Fragment, type ReactElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -207,11 +207,17 @@ vi.mock('@shopify/flash-list', () => ({
   },
 }));
 
-vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-
 vi.mock('@/components/empty-state', () => ({
   StateAction: 'StateAction',
-  EmptyState: ({ title }: { title: string }) => `EMPTY:${title}`,
+  EmptyState: ({
+    title,
+    description,
+    action,
+  }: {
+    title: string;
+    description?: ReactNode;
+    action?: ReactNode;
+  }) => createElement('EmptyState', null, `EMPTY:${title}`, description, action),
 }));
 
 vi.mock('@/components/query-error', () => ({
@@ -242,6 +248,7 @@ vi.mock('@/components/ui/icons', () => ({
   Brain: 'Brain',
   ChevronLeft: 'ChevronLeft',
   ChevronRight: 'ChevronRight',
+  Sparkles: 'Sparkles',
 }));
 
 function renderScreen(): TestRenderer.ReactTestRenderer {
@@ -337,18 +344,15 @@ describe('ReviewMemoryScreen feature disabled', () => {
     summary.data = { enabled: false, repositories: [], openProposalCount: 0 };
     permission.canEdit = true;
 
-    renderScreen();
+    const renderer = renderScreen();
 
-    const enableButton = buttons.rendered.find(
-      button => button.accessibilityLabel === 'Enable review memory'
-    );
-    expect(enableButton).toBeDefined();
-    expect(enableButton?.onPress).toBeDefined();
-    if (enableButton?.onPress) {
-      act(() => {
-        enableButton.onPress?.();
-      });
-    }
+    const enable = renderer.root.findAll(node => String(node.type) === 'StateAction')[0];
+    expect(enable?.props.label).toBe('Enable review memory');
+    expect(enable?.props.icon).toBe('Sparkles');
+    expect(enable?.props.onPress).toBeDefined();
+    act(() => {
+      (enable?.props.onPress as (() => void) | undefined)?.();
+    });
     expect(setEnabled.mutate).toHaveBeenCalledWith(true);
   });
 
@@ -361,9 +365,7 @@ describe('ReviewMemoryScreen feature disabled', () => {
     expect(collectText(renderer.toJSON())).toContain(
       'Only organization owners, admins, and billing managers can change review memory.'
     );
-    expect(
-      buttons.rendered.find(button => button.accessibilityLabel === 'Enable review memory')
-    ).toBeUndefined();
+    expect(renderer.root.findAll(node => String(node.type) === 'StateAction')).toHaveLength(0);
   });
 
   it.each(['loading', 'error'] as const)(
@@ -375,9 +377,7 @@ describe('ReviewMemoryScreen feature disabled', () => {
 
       const renderer = renderScreen();
 
-      expect(
-        buttons.rendered.find(button => button.accessibilityLabel === 'Enable review memory')
-      ).toBeDefined();
+      expect(renderer.root.findAll(node => String(node.type) === 'StateAction')).toHaveLength(1);
       expect(collectText(renderer.toJSON())).not.toContain(
         'Only organization owners, admins, and billing managers can change review memory.'
       );

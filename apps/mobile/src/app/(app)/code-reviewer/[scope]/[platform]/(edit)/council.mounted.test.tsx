@@ -144,7 +144,11 @@ vi.mock('@/components/ui/preference-row', () => ({
     return createElement('PreferenceRow', props);
   },
 }));
-vi.mock('@/components/ui/icons', () => ({ Users: 'Users', ShieldCheck: 'ShieldCheck' }));
+vi.mock('@/components/ui/icons', () => ({
+  Lock: 'Lock',
+  Users: 'Users',
+  ShieldCheck: 'ShieldCheck',
+}));
 vi.mock('@/components/ui/choice-row', () => ({
   ChoiceRow: (props: ChoiceProps) => {
     state.choiceProps.push(props);
@@ -221,6 +225,9 @@ describe('council route gate', () => {
     expect(renderedTexts(renderer)).toContain(
       'Council review is not available for this organization.'
     );
+    // The refusal is the shared plan gate: a title naming the tier and the
+    // sentence saying what this organization cannot use.
+    expect(renderedTexts(renderer)).toContain('Enterprise feature');
     expect(renderer.root.findAll(node => String(node.type) === 'PreferenceRow')).toHaveLength(0);
     // The config read is what the editor needs; a refused platform never asks.
     expect(state.configEnabled).toEqual([false]);

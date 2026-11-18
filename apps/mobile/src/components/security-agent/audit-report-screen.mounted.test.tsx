@@ -111,6 +111,8 @@ describe('AuditReportScreen states', () => {
     expect(empty).toHaveLength(1);
     expect(empty[0]?.props.title).toBe('No recorded activity');
     expect(empty[0]?.props.placement).toBe('static');
+    // The owner line the centered state used to carry is the header's subtitle.
+    expect(findByType(root.root, 'ScreenHeader')[0]?.props.subtitle).toBe('Personal owner');
     expect(findByType(root.root, 'TabScreenScrollView')).toHaveLength(1);
   });
 });

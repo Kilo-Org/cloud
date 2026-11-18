@@ -205,12 +205,11 @@ function AuditReportView({
     // empty state has is the window, so `periodUtc` states it once, with the
     // invariant UTC marker, at the same size the non-empty header uses. A
     // second sentence saying the same thing in words was removed: it restated
-    // the heading and pointed at this line. The owner line is the header's
-    // first line, so an empty report identifies whose window it covers instead
-    // of leaving that to the screen the reader came from.
+    // the heading and pointed at this line. The owner is the screen header's
+    // subtitle, so an empty report identifies whose window it covers without a
+    // stray line between the header and the centered state.
     return (
       <TabScreenScrollView className="flex-1" contentContainerClassName="grow">
-        <Text className="px-4 pt-3 text-sm font-medium">{report.owner.displayName}</Text>
         <View className="grow justify-center">
           <EmptyState
             placement="static"
@@ -251,6 +250,13 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
   const query = useSecurityAgentAuditReport(scope);
   const errorCode = query.error?.data?.code;
   const hasReport = query.data?.status === 'ok' && query.data.report.findings.length > 0;
+  // An empty report has nowhere else to name its owner: the header carries the
+  // name, and the findings view names it in its own first line.
+  const report = query.data?.status === 'ok' ? query.data.report : undefined;
+  const ownerSubtitle =
+    !query.isError && report && report.findings.length === 0
+      ? report.owner.displayName
+      : undefined;
   // The org procedure is `organizationBillingProcedure`, which rejects
   // viewers without the owner/billing_manager role. That denial is
   // non-retryable: retrying cannot change the viewer's role.
@@ -261,7 +267,11 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.auditReport.title')} showBackButton />
+      <ScreenHeader
+        title={t('securityAgent.auditReport.title')}
+        showBackButton
+        subtitle={ownerSubtitle}
+      />
 
       {query.isLoading && <AuditReportSkeleton />}
 

@@ -61,6 +61,8 @@ describe('AuditReportScreen cached report', () => {
     expect(findByType(root.root, 'CollapsibleSection')).toHaveLength(1);
     expect(findByType(root.root, 'EmptyState')).toHaveLength(0);
     expect(findByType(root.root, 'QueryError')).toHaveLength(0);
+    // A report with findings names its owner in its own first line.
+    expect(findByType(root.root, 'ScreenHeader')[0]?.props.subtitle).toBeUndefined();
   });
 });
 

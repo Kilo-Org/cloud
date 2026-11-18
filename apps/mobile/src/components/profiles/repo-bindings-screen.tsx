@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { EmptyState, StateAction } from '@/components/empty-state';
+import { EmptyState } from '@/components/empty-state';
 import { ProfileManageSlot } from '@/components/profiles/profile-manage-slot';
 import { type ProfileOwnerChoice } from '@/components/profiles/profile-owner-model';
 import { RepoBindingsAddForm } from '@/components/profiles/repo-bindings-add-form';
@@ -24,10 +24,9 @@ import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { Button } from '@/components/ui/button';
 import { GitBranch, Plus } from '@/components/ui/icons';
+import { IconButton } from '@/components/ui/icon-button';
 import { RowGroup } from '@/components/ui/row-group';
-import { Text } from '@/components/ui/text';
 import { useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
 import { useOrganizationProfilePermission } from '@/lib/hooks/use-can-manage-profiles';
 import {
@@ -35,6 +34,7 @@ import {
   useRepoBindings,
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { getNewProfilePath, type ProfileManagementStack } from '@/lib/profile-agent-navigation';
 import { type ProfileExternalOpener } from '@/lib/profile-route-stack';
@@ -71,6 +71,7 @@ export function RepoBindingsScreen({
 }>) {
   const router = useRouter();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const bindingsQuery = useRepoBindings(organizationId);
   const { bind, unbind } = useRepoBindingMutations(organizationId);
   const profileList = useAgentProfileList(organizationId);
@@ -190,7 +191,22 @@ export function RepoBindingsScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profiles.repoBindings.title')} backFallback={backFallback} />
+      <ScreenHeader
+        title={t('profiles.repoBindings.title')}
+        backFallback={backFallback}
+        headerRight={
+          canManage ? (
+            <IconButton
+              accessibilityLabel={t('profiles.repoBindings.add')}
+              onPress={() => {
+                setIsAdding(true);
+              }}
+            >
+              <Plus size={22} color={colors.foreground} />
+            </IconButton>
+          ) : undefined
+        }
+      />
       {emptySurface ? (
         <EmptyState
           icon={GitBranch}
@@ -199,17 +215,6 @@ export function RepoBindingsScreen({
           // member cannot add a default, so its state names the role instead.
           description={
             canManage ? t('profiles.repoBindings.emptyDescription') : readOnlyDescription
-          }
-          action={
-            canManage ? (
-              <StateAction
-                label={t('profiles.repoBindings.add')}
-                icon={Plus}
-                onPress={() => {
-                  setIsAdding(true);
-                }}
-              />
-            ) : undefined
           }
         />
       ) : (
@@ -257,9 +262,8 @@ export function RepoBindingsScreen({
             </RowGroup>
           ) : null}
 
-          {/* The Add form and its trigger are one action, so they share the
-              slot: a member sees the sentence where the trigger would be, and a
-              manager sees the same place. */}
+          {/* The form opens from the header's create control, so the slot holds
+              the form or the sentence that names who may add one. */}
           <ProfileManageSlot permission={profilePermission}>
             {isAdding ? (
               <RepoBindingsAddForm
@@ -278,16 +282,7 @@ export function RepoBindingsScreen({
                   void handleAdd();
                 }}
               />
-            ) : (
-              <Button
-                accessibilityLabel={t('profiles.repoBindings.add')}
-                onPress={() => {
-                  setIsAdding(true);
-                }}
-              >
-                <Text>{t('profiles.repoBindings.add')}</Text>
-              </Button>
-            )}
+            ) : null}
           </ProfileManageSlot>
         </TabScreenScrollView>
       )}

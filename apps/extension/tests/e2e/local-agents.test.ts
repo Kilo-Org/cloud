@@ -1,4 +1,4 @@
-/* eslint-disable import/no-nodejs-modules, vitest/no-conditional-in-test, typescript-eslint/consistent-type-definitions -- the harness writes a temp profile, and frame predicates mirror the wire protocol */
+/* eslint-disable import/no-nodejs-modules, max-lines, max-params, vitest/no-conditional-in-test, typescript-eslint/consistent-type-definitions -- the harness writes a temp profile, and frame predicates mirror the wire protocol */
 import { expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
@@ -9,12 +9,7 @@ import {
   seedExtensionAuth,
 } from './extension-context-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
-import {
-  FAKE_HUB_ID,
-  fakeHubMac,
-  fakeHubNonce,
-  startFakeHub,
-} from './local-agents-hub-fixture';
+import { FAKE_HUB_ID, fakeHubMac, fakeHubNonce, startFakeHub } from './local-agents-hub-fixture';
 import type { FakeHub } from './local-agents-hub-fixture';
 
 /*
@@ -60,10 +55,7 @@ const rpcMessage = (frame: Record<string, unknown>) => {
 const rpcOf = async (hub: FakeHub, id: number) => {
   await expect
     .poll(
-      () =>
-        hub.frames.some(
-          frame => frame['type'] === 'rpc' && rpcMessage(frame)?.['id'] === id
-        ),
+      () => hub.frames.some(frame => frame['type'] === 'rpc' && rpcMessage(frame)?.['id'] === id),
       { timeout: 20_000 }
     )
     .toBe(true);
@@ -197,9 +189,7 @@ test('local agents pair over loopback, list the session, and Stop all revokes it
     await enableLocalAgents(sidePanel, extensionId);
     await pairAndHandshake({ context, extensionId, hub, sidePanel });
 
-    const hello = helloFrameSchema.parse(
-      hub.frames.find(frame => frame['type'] === 'ext.hello')
-    );
+    const hello = helloFrameSchema.parse(hub.frames.find(frame => frame['type'] === 'ext.hello'));
     expect(hello.protocol).toStrictEqual([1]);
     expect(hello.contractSha).toHaveLength(64);
 
@@ -229,9 +219,7 @@ test('local agents pair over loopback, list the session, and Stop all revokes it
       sessionId: 'session-e2e',
       title: sessionTitle,
     });
-    const { sessionHandle } = z
-      .object({ sessionHandle: z.string() })
-      .parse(opened.result);
+    const { sessionHandle } = z.object({ sessionHandle: z.string() }).parse(opened.result);
 
     await expect(sidePanel.getByText(sessionTitle)).toBeVisible();
     await expect(sidePanel.getByText(cwd)).toBeVisible();
@@ -301,9 +289,7 @@ test('an agent session drives its tab through the runtime and Stop all ends it',
       sessionId: 'session-agent',
       title: 'Agent E2E session',
     });
-    const { sessionHandle } = z
-      .object({ sessionHandle: z.string() })
-      .parse(opened.result);
+    const { sessionHandle } = z.object({ sessionHandle: z.string() }).parse(opened.result);
 
     const shared = await sendRpc(hub, controllerId, 2, 'session.shareActiveTab', {
       sessionHandle,
@@ -338,8 +324,10 @@ test('an agent session drives its tab through the runtime and Stop all ends it',
     expect(toolText(snapshot.result)).toContain('Bridge page');
 
     // A tab outside the session's group is not the agent's to act on (D9).
-    const otherPage = await context.newPage();
-    await otherPage.goto('about:blank');
+    // Created through CDP: a tab opened from the session's tab would join the
+    // group by design, and this one must belong to nobody.
+    const cdp = await context.newCDPSession(sidePanel);
+    await cdp.send('Target.createTarget', { url: `${hub.pageUrl}?other=1` });
     await activateTab(sidePanel, hub.pageUrl);
 
     const listed = await sendRpc(hub, controllerId, 6, 'tools.call', {
@@ -351,7 +339,7 @@ test('an agent session drives its tab through the runtime and Stop all ends it',
     const tabs = z
       .array(z.object({ index: z.number(), url: z.string() }))
       .parse(z.object({ tabs: z.unknown() }).parse(JSON.parse(toolText(listed.result))).tabs);
-    const outside = tabs.find(tab => tab.url.includes('withheld') || tab.url === 'about:blank');
+    const outside = tabs.find(tab => tab.url.includes('other=1'));
 
     expect(outside).toBeDefined();
 
@@ -379,9 +367,9 @@ test('an agent session drives its tab through the runtime and Stop all ends it',
     // D12: the group outlives the session, collapsed, grey and titled `Kilo · ended`.
     await expect
       .poll(
-        async () =>
+        () =>
           sidePanel.evaluate(
-            "chrome.tabGroups.query({}).then(groups => groups.map(group => ({ collapsed: group.collapsed, color: group.color, title: group.title })))"
+            'chrome.tabGroups.query({}).then(groups => groups.map(group => ({ collapsed: group.collapsed, color: group.color, title: group.title })))'
           ),
         { timeout: 10_000 }
       )

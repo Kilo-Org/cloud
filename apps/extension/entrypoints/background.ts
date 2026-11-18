@@ -159,7 +159,7 @@ export const getBrowserRuntime = ({
               ...(tabGroupsApi.group === undefined
                 ? {}
                 : { group: tabGroupsApi.group.bind(tabGroupsApi) }),
-              tabQuery: async query => tabsApi.query(query),
+              tabQuery: query => tabsApi.query(query),
               ...(tabGroupsApi.update === undefined
                 ? {}
                 : {
@@ -566,8 +566,7 @@ export default defineBackground(() => {
 
               return tabs[0]?.id;
             },
-            runtime: () =>
-              getBrowserRuntime({ debuggerApi, scriptingApi, tabGroupsApi, tabsApi }),
+            runtime: () => getBrowserRuntime({ debuggerApi, scriptingApi, tabGroupsApi, tabsApi }),
           }),
         }),
   });

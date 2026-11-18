@@ -25,6 +25,8 @@ const sessionOpenSchema = z.object({
 
 const sessionHandleSchema = z.object({ sessionHandle: z.uuid() });
 
+const toolCallSessionSchema = z.object({ sessionHandle: z.string().min(1) });
+
 const invalidParams = (message: string): LocalAgentRpcError =>
   new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.invalidParams, message);
 
@@ -101,7 +103,7 @@ export const createLocalAgentDispatcher = ({
       }
 
       if (method === 'tools.call') {
-        const input = z.object({ sessionHandle: z.string().min(1) }).safeParse(params);
+        const input = toolCallSessionSchema.safeParse(params);
 
         if (!input.success) {
           throw invalidParams('Invalid tools.call parameters.');
@@ -112,11 +114,7 @@ export const createLocalAgentDispatcher = ({
         return bridge.callTool(controllerId, params);
       }
 
-      if (
-        method === 'upload.begin' ||
-        method === 'upload.chunk' ||
-        method === 'upload.end'
-      ) {
+      if (method === 'upload.begin' || method === 'upload.chunk' || method === 'upload.end') {
         // The extension's browser_file_upload uses the page's own file chooser; the hub upload path is not served.
         throw new LocalAgentRpcError(
           LOCAL_AGENT_ERROR_CODES.unsupportedInBrowser,

@@ -54,8 +54,7 @@ type PairingState = {
   wsUrl: string;
 };
 
-const PAIRING_PAGE_HTML =
-  '<!doctype html><html><body>Pairing in progress…</body></html>';
+const PAIRING_PAGE_HTML = '<!doctype html><html><body>Pairing in progress…</body></html>';
 
 /** A plain page for the agent to navigate to and snapshot; no script, no secrets. */
 const AGENT_PAGE_HTML = `<!doctype html>

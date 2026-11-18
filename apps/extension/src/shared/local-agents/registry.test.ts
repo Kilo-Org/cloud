@@ -104,12 +104,10 @@ describe('controller registry', () => {
     });
 
     await expect(registry.sessionOwner(first.sessionHandle)).resolves.toBe(CONTROLLER_ID);
-    await expect(registry.sessionOwner(second.sessionHandle)).resolves.toBe(
-      SECOND_CONTROLLER_ID
-    );
-    await expect(registry.sessionOwner('99999999-8888-4777-8666-555555555555')).resolves.toBe(
-      undefined
-    );
+    await expect(registry.sessionOwner(second.sessionHandle)).resolves.toBe(SECOND_CONTROLLER_ID);
+    await expect(
+      registry.sessionOwner('99999999-8888-4777-8666-555555555555')
+    ).resolves.toBeUndefined();
   });
 
   it('refuses session.open for a controller that never announced itself', async () => {

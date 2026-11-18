@@ -224,6 +224,15 @@ export const createLocalAgentControllerRegistry = ({
         return removed;
       }),
 
+    sessionOwner: sessionHandle =>
+      runExclusive(async () => {
+        const controllers = await readControllers();
+
+        return controllers.find(controller =>
+          controller.sessions.some(session => session.sessionHandle === sessionHandle)
+        )?.controllerId;
+      }),
+
     takeAllSessions: () =>
       runExclusive(async () => {
         const controllers = await readControllers();
@@ -237,15 +246,6 @@ export const createLocalAgentControllerRegistry = ({
         await writeControllers([]);
 
         return revoked;
-      }),
-
-    sessionOwner: sessionHandle =>
-      runExclusive(async () => {
-        const controllers = await readControllers();
-
-        return controllers.find(controller =>
-          controller.sessions.some(session => session.sessionHandle === sessionHandle)
-        )?.controllerId;
       }),
   };
 };

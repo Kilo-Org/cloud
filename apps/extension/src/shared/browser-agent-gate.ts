@@ -268,8 +268,7 @@ const sensitiveStepFor = async (input: {
   }
 
   if (isScriptTool(input.toolName)) {
-    // Model-authored code reaches every field a page script can reach: the tab's
-    // own origin, and any frame the extension may read. One probe per such frame.
+    // Model-authored code reaches every field a page script can reach: the tab's own origin, and any frame the extension may read. One probe per such frame.
     const mainOrigin = mainFrameOf(input.frames)?.origin;
     const reachable = input.frames.filter(
       frame =>

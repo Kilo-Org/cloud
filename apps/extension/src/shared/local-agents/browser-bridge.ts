@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/consistent-type-definitions -- AGENTS.md prefers type over interface */
+/* eslint-disable max-lines, typescript-eslint/consistent-type-definitions -- One bridge owns session, call and content translation; AGENTS.md prefers type over interface. */
 import { z } from 'zod';
 import {
   AGENT_TAB_OUTSIDE_GROUP_ERROR,
@@ -61,12 +61,11 @@ export type LocalAgentBrowserBridge = {
   shareActiveTab(input: LocalAgentBrowserSessionRef): Promise<JsonRpcResult>;
 };
 
-const unavailable = (): never => {
-  throw new LocalAgentRpcError(
+const unavailableError = (): LocalAgentRpcError =>
+  new LocalAgentRpcError(
     LOCAL_AGENT_ERROR_CODES.browserUnavailable,
     'The browser is not available right now.'
   );
-};
 
 /**
  * The background without a tabs API (no browser to drive). Session bookkeeping
@@ -76,16 +75,16 @@ const unavailable = (): never => {
 export const createUnavailableBrowserBridge = (): LocalAgentBrowserBridge => ({
   adopt: () => Promise.resolve({}),
   callTool: () => {
-    throw unavailable();
+    throw unavailableError();
   },
   closeSession: () => Promise.resolve(),
   endSessions: () => Promise.resolve(),
   listTools: () => {
-    throw unavailable();
+    throw unavailableError();
   },
   openSession: () => Promise.resolve(),
   shareActiveTab: () => {
-    throw unavailable();
+    throw unavailableError();
   },
 });
 
@@ -125,23 +124,28 @@ const textContent = (text: string): JsonRpcResult => ({
   content: [{ text: boundBrowserToolText(text), type: 'text' }],
 });
 
+const textValueSchema = z.string();
+
 /**
  * One runtime result as MCP content. A screenshot leaves as an image plus its
  * text line; every other value is the text the tool already produced, and an
  * object value is its JSON so the model sees the same shape the panel does.
  */
 const contentOf = (result: Extract<EvalTabResult, { readonly ok: true }>): JsonRpcResult => {
-  const value = result.value;
+  const { value } = result;
+  const text = textValueSchema.safeParse(value);
 
-  if (typeof value === 'string') {
-    return textContent(value);
+  if (text.success) {
+    return textContent(text.data);
   }
 
   const screenshot = screenshotSchema.safeParse(value);
 
   if (screenshot.success) {
     const dataUrl = base64DataUrlSchema.safeParse(screenshot.data.dataUrl);
-    const data = dataUrl.success ? screenshot.data.dataUrl.slice(dataUrl.data.indexOf(',') + 1) : '';
+    const data = dataUrl.success
+      ? screenshot.data.dataUrl.slice(dataUrl.data.indexOf(',') + 1)
+      : '';
 
     return {
       content: [
@@ -241,10 +245,8 @@ export const createRuntimeBrowserBridge = ({
       }
 
       const caller = sessionCaller(input);
-      let outcome;
-
-      try {
-        outcome = await runtime().runTool({
+      const outcome = await runtime()
+        .runTool({
           agent: {
             authorized: parsed.data.authorized,
             ...(parsed.data.sensitive === undefined ? {} : { sensitive: parsed.data.sensitive }),
@@ -253,11 +255,11 @@ export const createRuntimeBrowserBridge = ({
           caller,
           tabId,
           toolName: parsed.data.name,
-        });
-      } finally {
+        })
         // Turn end: the next call re-takes the tab, so the user and the panel are never locked out between calls.
-        runtime().releaseCaller(caller);
-      }
+        .finally(() => {
+          runtime().releaseCaller(caller);
+        });
 
       // Stop all may have ended the session while the call ran: its page effects are not reported as a live result.
       if (ended.has(sessionHandle)) {
@@ -276,11 +278,10 @@ export const createRuntimeBrowserBridge = ({
       }
 
       if (outcome.kind === 'origin_changed') {
-        throw new LocalAgentRpcError(
-          LOCAL_AGENT_ERROR_CODES.originChanged,
-          ORIGIN_CHANGED_ERROR,
-          { from: outcome.from, to: outcome.to }
-        );
+        throw new LocalAgentRpcError(LOCAL_AGENT_ERROR_CODES.originChanged, ORIGIN_CHANGED_ERROR, {
+          from: outcome.from,
+          to: outcome.to,
+        });
       }
 
       if (outcome.kind === 'needs_take_over') {

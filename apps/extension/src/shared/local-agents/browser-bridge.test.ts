@@ -1,4 +1,4 @@
-/* eslint-disable eslint/max-statements, max-lines-per-function, typescript-eslint/consistent-type-definitions -- one fake runtime serves every protocol branch, and its recorders read as one table */
+/* eslint-disable eslint/max-statements, max-lines, max-lines-per-function, max-expects, require-await, typescript/require-await, typescript-eslint/consistent-type-definitions -- one fake runtime serves every protocol branch, and its recorders read as one table */
 import { describe, expect, it } from 'vitest';
 import { AGENT_TAB_OUTSIDE_GROUP_ERROR } from '../browser-agent-checks';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
@@ -207,7 +207,9 @@ describe('local agent browser bridge', () => {
   it('maps needs_permission with its items and step token onto -32010', async () => {
     const fake = createFakeRuntime({
       outcome: () => ({
-        items: [{ class: 'sensitive', origin: 'https://app.example.com', reason: 'typing a password' }],
+        items: [
+          { class: 'sensitive', origin: 'https://app.example.com', reason: 'typing a password' },
+        ],
         kind: 'needs_permission',
         result: { error: 'needs permission', ok: false },
         stepToken: 'step-1',
@@ -313,7 +315,11 @@ describe('local agent browser bridge', () => {
         kind: 'result',
         result: {
           ok: true,
-          value: { dataUrl: 'data:image/png;base64,aGVsbG8=', mediaType: 'png', text: 'Screenshot captured.' },
+          value: {
+            dataUrl: 'data:image/png;base64,aGVsbG8=',
+            mediaType: 'png',
+            text: 'Screenshot captured.',
+          },
         },
       }),
     });
@@ -383,7 +389,7 @@ describe('local agent browser bridge', () => {
   it('reports user_stopped for a call Stop all ended while it ran', async () => {
     const { promise, resolve } = Promise.withResolvers<void>();
     const fake = createFakeRuntime();
-    const runTool = fake.runtime.runTool;
+    const { runTool } = fake.runtime;
     const bridge = createRuntimeBrowserBridge({
       runtime: () => ({
         ...fake.runtime,
@@ -439,15 +445,15 @@ describe('local agent browser bridge', () => {
     });
 
     // The new session starts with no tab of its own; the ended group is what it adopts.
-    await expect(
-      bridge.callTool(CONTROLLER, snapshotParams(SECOND_HANDLE))
-    ).rejects.toMatchObject({ code: LOCAL_AGENT_ERROR_CODES.blocked });
+    await expect(bridge.callTool(CONTROLLER, snapshotParams(SECOND_HANDLE))).rejects.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.blocked,
+    });
     await expect(
       bridge.adopt({ controllerId: CONTROLLER, sessionHandle: SECOND_HANDLE })
     ).resolves.toStrictEqual({});
 
-    await expect(
-      bridge.callTool(CONTROLLER, snapshotParams(SECOND_HANDLE))
-    ).resolves.toMatchObject({ content: [{ type: 'text' }] });
+    await expect(bridge.callTool(CONTROLLER, snapshotParams(SECOND_HANDLE))).resolves.toMatchObject(
+      { content: [{ type: 'text' }] }
+    );
   });
 });

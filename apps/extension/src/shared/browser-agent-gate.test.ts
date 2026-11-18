@@ -211,7 +211,9 @@ const createSession = (
 
       return {
         result: {
-          value: JSON.stringify({ present: options.presentFieldFrames?.includes(frameId) === true }),
+          value: JSON.stringify({
+            present: options.presentFieldFrames?.includes(frameId) === true,
+          }),
         },
       };
     },

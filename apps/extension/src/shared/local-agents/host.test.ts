@@ -179,13 +179,13 @@ const createHarness = () => {
     remove: removeTab,
   };
   const bridge = {
-    adopt: vi.fn(async () => ({})),
-    callTool: vi.fn(async () => ({ content: [] })),
-    closeSession: vi.fn(async () => {}),
-    endSessions: vi.fn(async () => {}),
-    listTools: vi.fn(async () => ({ contractSha: 'a'.repeat(64), tools: [] })),
-    openSession: vi.fn(async () => {}),
-    shareActiveTab: vi.fn(async () => ({ tabId: 5 })),
+    adopt: vi.fn(() => Promise.resolve({})),
+    callTool: vi.fn(() => Promise.resolve({ content: [] })),
+    closeSession: vi.fn(() => Promise.resolve()),
+    endSessions: vi.fn(() => Promise.resolve()),
+    listTools: vi.fn(() => Promise.resolve({ contractSha: 'a'.repeat(64), tools: [] })),
+    openSession: vi.fn(() => Promise.resolve()),
+    shareActiveTab: vi.fn(() => Promise.resolve({ tabId: 5 })),
   };
   const hostOptions = {
     availability: {

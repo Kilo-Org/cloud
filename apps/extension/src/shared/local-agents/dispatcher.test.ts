@@ -1,3 +1,4 @@
+/* eslint-disable require-await, typescript/require-await, typescript-eslint/consistent-type-definitions -- the fake bridge is a table of vi.fn spies, whose async shape matches the real bridge */
 import { describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import type {
@@ -28,7 +29,12 @@ const createMemoryStorage = (): LocalAgentStorageArea => {
   };
 };
 
-const sessionInput = { cliVersion: '1.4.0', cwd: '/tmp/kilo', sessionId: 'session-1', title: 'Work' };
+const sessionInput = {
+  cliVersion: '1.4.0',
+  cwd: '/tmp/kilo',
+  sessionId: 'session-1',
+  title: 'Work',
+};
 
 type FakeBridge = {
   readonly adopt: Mock;
@@ -198,12 +204,12 @@ describe('local agent dispatcher', () => {
   it('rejects malformed parameters before any work', async () => {
     const { dispatcher, fake } = await createHarness();
 
-    await expect(dispatcher.handle(CONTROLLER, 'session.open', { title: 'Work' })).rejects.toMatchObject(
-      { code: -32_602 }
-    );
+    await expect(
+      dispatcher.handle(CONTROLLER, 'session.open', { title: 'Work' })
+    ).rejects.toMatchObject({ code: -32_602 });
     await expect(dispatcher.handle(CONTROLLER, 'tools.list', {})).resolves.toMatchObject({
       contractSha: 'a'.repeat(64),
     });
-    expect(fake.listTools).toHaveBeenCalledTimes(1);
+    expect(fake.listTools).toHaveBeenCalledWith();
   });
 });

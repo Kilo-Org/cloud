@@ -242,8 +242,10 @@ import type {
 import {
   cloudAgentChildSessions,
   controlPlaneMessages,
+  costBackfillState,
   events,
   historyImport,
+  sessionCostTotals,
 } from './sqlite-schema.js';
 import {
   decodeSessionHistoryCursor,
@@ -3537,6 +3539,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         this.db.delete(events).run();
         this.db.delete(cloudAgentChildSessions).run();
         this.db.delete(historyImport).run();
+        this.db.delete(sessionCostTotals).run();
+        this.db.delete(costBackfillState).run();
       },
     });
     this.clearSessionInMemoryState();

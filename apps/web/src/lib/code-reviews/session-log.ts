@@ -31,7 +31,7 @@ export type SessionLogConversionOptions = {
  * parts — those add noise without actionable context for end users.
  */
 export function v2SnapshotToLogEntries(
-  snapshot: SessionSnapshot,
+  snapshot: Pick<SessionSnapshot, 'messages'>,
   options: SessionLogConversionOptions = {}
 ): SessionLogEntry[] {
   const entries: SessionLogEntry[] = [];

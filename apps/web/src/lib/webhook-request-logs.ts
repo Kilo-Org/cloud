@@ -4,7 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getWorkerRequest, type CapturedRequest } from '@/lib/webhook-agent/webhook-agent-client';
-import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
+import { fetchSessionTranscript } from '@/lib/session-transcript';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import {
   v1BlobToLogEntries,
@@ -365,7 +365,12 @@ export async function getWebhookRequestLogs(
   }
 
   const [v2, duplicateV2] = await db
-    .select({ sessionId: cli_sessions_v2.session_id, userId: cli_sessions_v2.kilo_user_id })
+    .select({
+      sessionId: cli_sessions_v2.session_id,
+      userId: cli_sessions_v2.kilo_user_id,
+      organizationId: cli_sessions_v2.organization_id,
+      version: cli_sessions_v2.version,
+    })
     .from(cli_sessions_v2)
     .where(
       and(
@@ -381,9 +386,10 @@ export async function getWebhookRequestLogs(
     .limit(2);
 
   if (!v2 || duplicateV2) return empty;
-  const snapshot = await fetchSessionSnapshot(v2.sessionId, v2.userId);
+  const snapshot = await fetchSessionTranscript(v2);
   if (!snapshot) return empty;
-  const transcriptMessages = toSharedTranscriptMessages(snapshot.messages);
+  const transcriptMessages =
+    snapshot.source === 'sync' ? snapshot.messages : toSharedTranscriptMessages(snapshot.messages);
   return {
     ...empty,
     logs: v2SnapshotToLogEntries(snapshot),

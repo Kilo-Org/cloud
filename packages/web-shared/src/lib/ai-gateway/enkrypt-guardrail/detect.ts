@@ -153,22 +153,33 @@ type DetectError =
 
 type ScanError = DetectError | 'invalid_config' | 'missing_api_key' | 'request_too_large';
 
+/**
+ * `detected`: Enkrypt answered. Some detectors may still have failed inside Enkrypt; `error` then
+ * names them, and the scan fails unless a blocking detector fired anyway.
+ */
 type DetectAttempt =
   | {
       kind: 'detected';
       firedDetectors: EnkryptDetectorId[];
       resultMessage: string | null;
       creditsCost: number | null;
+      error: `detector_error:${string}` | null;
     }
   | { kind: 'failed'; error: DetectError; creditsCost: number | null };
 
-/** A failure of Enkrypt itself, or of reaching it in time, rather than a client disconnect or a fault of Kilo's own. */
+/**
+ * A failure of Enkrypt itself, or of reaching it in time, rather than a client disconnect or a
+ * fault of Kilo's own. Enkrypt rejecting the API key (401 or 403) is Kilo's fault: a revoked or
+ * wrong `ENKRYPT_API_KEY` must not silently turn the guardrail off.
+ */
 function isEnkryptFailure(error: ScanError): boolean {
   return (
     error !== 'client_aborted' &&
     error !== 'invalid_config' &&
     error !== 'missing_api_key' &&
-    error !== 'request_too_large'
+    error !== 'request_too_large' &&
+    error !== 'http_401' &&
+    error !== 'http_403'
   );
 }
 
@@ -284,7 +295,7 @@ async function detectOnce(
 ): Promise<DetectAttempt> {
   const finish = (attempt: DetectAttempt): DetectAttempt => {
     if (requestLog) {
-      requestLog.error = attempt.kind === 'failed' ? attempt.error : null;
+      requestLog.error = attempt.error;
       deps.requestLog?.capture(capturedBody.then(() => requestLog));
     }
     return attempt;
@@ -334,18 +345,12 @@ async function detectOnce(
     return finish({ kind: 'failed', error: 'invalid_response', creditsCost });
   }
   const erroredDetectors = matchingDetectors(parsed.data.summary, hasErrored);
-  if (erroredDetectors.length > 0) {
-    return finish({
-      kind: 'failed',
-      error: `detector_error:${erroredDetectors.join(',')}`,
-      creditsCost,
-    });
-  }
   return finish({
     kind: 'detected',
     firedDetectors: matchingDetectors(parsed.data.summary, hasFired),
     resultMessage: parsed.data.result_message ?? null,
     creditsCost,
+    error: erroredDetectors.length > 0 ? `detector_error:${erroredDetectors.join(',')}` : null,
   });
 }
 
@@ -390,7 +395,8 @@ function attemptDecision(
   config: ReadyEnkryptGuardrailConfig
 ): EnkryptGuardrailDecision {
   if (attempt.kind === 'failed') return 'error';
-  return blockingDetectors(attempt.firedDetectors, config).length > 0 ? 'blocked' : 'allowed';
+  if (blockingDetectors(attempt.firedDetectors, config).length > 0) return 'blocked';
+  return attempt.error ? 'error' : 'allowed';
 }
 
 /**
@@ -501,8 +507,18 @@ export async function scanRequest(
   }
 
   const blocking = blockingDetectors(attempt.firedDetectors, config);
+  // A blocking detector that fired blocks even when another detector failed inside Enkrypt, so a
+  // detector error never lets content through that Enkrypt did flag.
+  if (attempt.error && blocking.length === 0) {
+    return failedVerdict(usageRecords, scope, {
+      error: attempt.error,
+      detectorsFired: attempt.firedDetectors,
+      latencyMs,
+    });
+  }
   const report = scanReport(scope, {
     decision: blocking.length === 0 ? 'allowed' : 'blocked',
+    error: attempt.error ?? undefined,
     detectorsFired: attempt.firedDetectors,
     usageRecords,
     latencyMs,
@@ -620,8 +636,9 @@ function failureDecision(kind: EnkryptScanKind, error: ScanError): EnkryptScanRe
  * for only `ENKRYPT_FAILED_SCAN_CACHE_TTL_SECONDS`, so it is rescanned soon anyway, without every
  * step of an agent's conversation adding load to an Enkrypt that is already failing.
  *
- * Failures of Kilo's own, an invalid configuration or a missing API key, still fail closed, since
- * they would otherwise silently turn the guardrail off; so does content too large to scan.
+ * Failures of Kilo's own, an invalid configuration or a missing or rejected API key, still fail
+ * closed, since they would otherwise silently turn the guardrail off; so does content too large to
+ * scan.
  */
 function failureVerdict(
   kind: EnkryptScanKind,
@@ -643,11 +660,13 @@ function failedVerdict(
     error: ScanError;
     latencyMs: number;
     closedVerdict?: EnkryptGuardrailVerdict;
+    detectorsFired?: EnkryptDetectorId[];
   }
 ): EnkryptGuardrailScanResult {
   const report = scanReport(scope, {
     decision: failureDecision(scope.report.scan, failure.error),
     error: failure.error,
+    detectorsFired: failure.detectorsFired,
     usageRecords,
     latencyMs: failure.latencyMs,
   });

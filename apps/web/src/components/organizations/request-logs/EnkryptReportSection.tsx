@@ -257,7 +257,7 @@ function GuardrailReportBody({
           ...items,
         ]}
       />
-      {report.verdict === 'fail_open' && (
+      {report.verdict === 'fail_open' && report.added_latency_ms !== null && (
         <p className="text-status-warning text-xs">{failOpenNotice}</p>
       )}
       {notice}

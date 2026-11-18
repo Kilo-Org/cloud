@@ -414,6 +414,45 @@ describe('scanRequest', () => {
         expect(logged).not.toContain('prompt-derived text');
       }
     );
+
+    it('still blocks when a blocking detector fired next to the detector that failed', async () => {
+      const result = await scanRequest(
+        makeScan({ config: policyConfig }),
+        deps(async () =>
+          detectResponse(
+            { summary: { injection_attack: 1, policy_violation: -1 } },
+            { credits: '4' }
+          )
+        )
+      );
+
+      expect(result.verdict).toMatchObject({ action: 'block' });
+      expect(result.report).toMatchObject({
+        decision: 'blocked',
+        error: 'detector_error:policy_violation',
+        detectors_fired: ['injection_attack'],
+      });
+      expect(result.usageRecords).toEqual([
+        expect.objectContaining({ decision: 'blocked', detectorsFired: ['injection_attack'] }),
+      ]);
+    });
+
+    it('fails open and reports a log-only detector that fired next to the detector that failed', async () => {
+      const result = await scanRequest(
+        makeScan({ config: { ...policyConfig, blockingDetectors: ['policy_violation'] } }),
+        deps(async () => detectResponse({ summary: { injection_attack: 1, policy_violation: -1 } }))
+      );
+
+      expect(result.verdict).toEqual({ action: 'fail_open' });
+      expect(result.report).toMatchObject({
+        decision: 'error_fail_open',
+        error: 'detector_error:policy_violation',
+        detectors_fired: ['injection_attack'],
+      });
+      expect(result.usageRecords).toEqual([
+        expect.objectContaining({ decision: 'error', detectorsFired: ['injection_attack'] }),
+      ]);
+    });
   });
 
   it('ignores detections from detectors it does not know', async () => {
@@ -1033,6 +1072,23 @@ describe('scanRequest', () => {
       expect(result.report).toMatchObject({ decision: 'error_fail_open', error, attempts: 1 });
       expect(result.usageRecords.every(usageRecord => usageRecord.decision === 'error')).toBe(true);
     });
+
+    it.each([401, 403])(
+      'fails closed when Enkrypt rejects the API key with HTTP %i',
+      async status => {
+        const result = await scanRequest(
+          makeScan(),
+          deps(async () => detectResponse({ summary: {} }, { status }))
+        );
+
+        expect(result.verdict).toEqual({ action: 'unavailable', reason: 'failed' });
+        expect(result.report).toMatchObject({
+          decision: 'error_fail_closed',
+          error: `http_${status}`,
+          attempts: 1,
+        });
+      }
+    );
 
     it('fails open when Enkrypt does not answer within the timeout', async () => {
       const hang = (_input: string, init: RequestInit) =>

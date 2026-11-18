@@ -205,6 +205,21 @@ export function CreditPurchaseScreen() {
   const storeUnavailableAlone = storeUnavailable && !identityUnavailable;
   const showPlaceholders = isLoading && !identityUnavailable && !storeUnavailable;
   const showRows = !isLoading && !identityUnavailable && !packsEmpty;
+  // The store's credit-expiry policy belongs to the pack group, so the screen
+  // states it once under the rows instead of repeating the same sentence under
+  // every pack. A catalogue whose packs differ (one expiring, the rest not)
+  // contributes one caption per distinct policy, still once each.
+  const expiryNotes = showRows
+    ? [
+        ...new Set(
+          products
+            .map(
+              pack => getStoreCreditExpiryMessageKey(pack.backend, storefront) ?? undefined
+            )
+            .filter((key): key is string => key !== undefined)
+        ),
+      ].map(key => t(key))
+    : [];
   const balancePending = balanceQuery.isPending;
   const balanceFailed = balanceQuery.isError;
   // The card's title and its default body come from one per-store source, so
@@ -503,12 +518,13 @@ export function CreditPurchaseScreen() {
                       <ConfigureRow
                         icon={Wallet}
                         title={packLabel}
-                        subtitle={stateLabel ?? expiryMessage}
+                        subtitle={stateLabel}
                         // One line under the title, capped by the row frame:
-                        // the state phrase or expiry note never wraps into a
-                        // second line, so no row changes height when a purchase
-                        // or the store state changes. The full note stays in the
-                        // row's accessibility label.
+                        // the state phrase never wraps into a second line, so
+                        // no row changes height when a purchase or the store
+                        // state changes. The expiry policy is stated once for
+                        // the group below the rows; the row's accessible label
+                        // still carries it per pack.
                         subtitleNumberOfLines={1}
                         variant="action"
                         disabled={disabled}
@@ -525,6 +541,12 @@ export function CreditPurchaseScreen() {
                 })}
               </RowGroup>
             )}
+
+            {expiryNotes.map(note => (
+              <Text key={note} variant="caption">
+                {note}
+              </Text>
+            ))}
           </View>
 
           {/* The purchase state is its own slot after the pack rows: a request

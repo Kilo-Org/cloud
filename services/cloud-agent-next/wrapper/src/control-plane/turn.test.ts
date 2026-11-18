@@ -3878,6 +3878,7 @@ describe('GitHub review publication recovery', () => {
     [{ type: 'provider.quota', message: 'Request failed', status: 402 }, 'insufficient_credits'],
     [{ type: 'provider.quota', message: 'Request failed', status: 402.5 }, 'insufficient_credits'],
     [{ type: 'provider.rate-limit', message: 'Request failed' }, 'rate_limited'],
+    [{ type: 'provider.unknown', message: 'Request failed', status: 200 }, 'provider_unavailable'],
     [{ type: 'provider.future-error', message: 'Request failed' }, 'unknown'],
   ] as const)(
     'reports Kilo v2 assistant error %j as %s when the root closes completed',
@@ -4001,7 +4002,9 @@ describe('GitHub review publication recovery', () => {
     await settle();
 
     expect(h.client(spec).prompts).toHaveLength(1);
-    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', lastMessageId: 'm1' }]);
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', assistantReason: 'provider_unavailable', lastMessageId: 'm1' },
+    ]);
   });
 
   it('keeps v1 finalization completing when a later error-free message supersedes the error', async () => {

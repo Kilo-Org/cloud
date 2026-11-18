@@ -37,7 +37,13 @@ const NATIVE_ERROR_STATUSES = new Map([
 ]);
 
 export function nativeTurnError(error: z.infer<typeof nativeErrorSchema>) {
-  const status = error.status ?? NATIVE_ERROR_STATUSES.get(error.type);
+  // A 2xx response status is not an HTTP error status; the provider type owns
+  // the classification, so a 200 must not mask it as an unmapped status.
+  const reportedStatus =
+    error.status !== undefined && error.status >= 200 && error.status < 300
+      ? undefined
+      : error.status;
+  const status = reportedStatus ?? NATIVE_ERROR_STATUSES.get(error.type);
   const name =
     status === undefined
       ? (NATIVE_ERROR_NAMES.get(error.type) ?? error.name ?? 'UnknownError')
@@ -50,7 +56,7 @@ export function nativeTurnError(error: z.infer<typeof nativeErrorSchema>) {
     data: {
       ...data,
       ...(error.type === 'provider.invalid-request' &&
-      (error.status === undefined || error.status === 400 || error.status === 413) &&
+      (status === undefined || status === 400 || status === 413) &&
       (message.reason === 'context_limit' || message.reason === 'output_limit')
         ? { message: error.message }
         : {}),

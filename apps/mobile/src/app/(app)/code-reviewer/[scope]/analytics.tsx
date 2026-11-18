@@ -221,20 +221,15 @@ function AnalyticsScreen({ scope }: Readonly<{ scope: string }>) {
           <Text variant="muted" className="text-xs">
             {t('codeReviewer.analytics.trackedReviewsCaption')}
           </Text>
-          {/* The space stays reserved either way: the line always renders so a
-          period or platform change never moves the list below it. */}
+          {/* The line always renders, so a period or platform change never
+          moves the list below it; at zero the count names the problem none. */}
           <Text variant="muted" className="text-xs">
-            {t(
-              uncapturedReviews === 1
-                ? 'codeReviewer.analytics.trackedReviewsUncounted_one'
-                : 'codeReviewer.analytics.trackedReviewsUncounted_other',
-              {
-                count: uncapturedReviews,
-                displayCount: number(uncapturedReviews),
-                total: coverage.enrolledCompletedReviews,
-                displayTotal: number(coverage.enrolledCompletedReviews),
-              }
-            )}
+            {t('codeReviewer.analytics.trackedReviewsUncounted', {
+              count: uncapturedReviews,
+              displayCount: number(uncapturedReviews),
+              total: coverage.enrolledCompletedReviews,
+              displayTotal: number(coverage.enrolledCompletedReviews),
+            })}
           </Text>
         </View>
 

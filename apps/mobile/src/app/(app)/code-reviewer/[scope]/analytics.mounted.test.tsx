@@ -410,7 +410,7 @@ describe('CodeReviewerAnalytics empty state', () => {
       'Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.'
     );
     expect(captions).toContain(
-      '1 of the 13 finished reviews the organization has is not counted: its result was not captured.'
+      'Not counted: 1 of 13 finished reviews have no captured result.'
     );
 
     act(() => {
@@ -436,7 +436,7 @@ describe('CodeReviewerAnalytics empty state', () => {
       'Completed reviews that finished in this period with analytics turned on. Running and failed reviews are never counted.'
     );
     expect(completeCaptions).toContain(
-      '0 of the 13 finished reviews the organization has are not counted: their results were not captured.'
+      'Not counted: 0 of 13 finished reviews have no captured result.'
     );
 
     act(() => {

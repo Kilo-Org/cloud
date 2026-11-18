@@ -253,9 +253,10 @@ describe('FormField label row with an accessory', () => {
   }
 
   it('centres the copy on the accessory instead of stretching the row', () => {
-    // The accessory is its own touch target and sets the row height, so the
-    // label row centres the copy on it; the row adds no height of its own and
-    // does not stretch the copy to the accessory's box.
+    // The label row is one `text-sm` line tall, so the label's own line sets the
+    // row height. The row centres the copy on the accessory's box, and the
+    // accessory floats its own box on the label line, so a taller control does
+    // not grow the row.
     const classes = String(mountLabelRow().props.className);
 
     expect(classes).toContain('flex-row');

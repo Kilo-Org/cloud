@@ -148,29 +148,6 @@ export const DENSE_ROW_HIT_SLOP = {
 } as const;
 
 /**
- * Per-side `hitSlop` that lifts the dense `min-h-11` frame (NativeWind's rem
- * is 14pt, so `min-h-11` renders 38.5pt) to `DESIGN.md:364`'s 44pt minimum:
- * 38.5 + 5.5 = 44. Larger than {@link DENSE_ROW_HIT_SLOP_DP} because the
- * frame is smaller than {@link DENSE_ROW_FRAME_DP}'s 39.
- */
-export const DENSE_ROW_H11_TOUCH_SLOP_DP = 5.5;
-
-/**
- * The vertical-only `hitSlop` a dense `min-h-11` row renders on the side that
- * must reach 44pt: `top: 0` because the side that faces a filled 44pt control
- * above must not shadow it, and the row is last in its card, so the slop side
- * is also the side the card's padding must contain. Horizontal sides stay 0;
- * the row spans the card's full inner width, so horizontal slop would reach
- * past the card's own edge. 38.5 + {@link DENSE_ROW_H11_TOUCH_SLOP_DP} = 44.
- */
-export const DENSE_ROW_H11_APPEND_HIT_SLOP = {
-  top: 0,
-  bottom: DENSE_ROW_H11_TOUCH_SLOP_DP,
-  left: 0,
-  right: 0,
-} as const;
-
-/**
  * The box a section header's text action renders, in dp. It carries the target
  * on its own node, and its vertical margins cancel the box back down to the
  * header's one-line content band, so a header with an action is exactly as tall

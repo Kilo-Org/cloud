@@ -2,8 +2,9 @@
 
 import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { STRIPE_PUBLISHABLE_KEY } from '@kilocode/web-shared/lib/constants';
@@ -89,15 +90,18 @@ export function OrgKiloPassSetup({
   const setup = setupQuery.data;
 
   if (setupQuery.isError)
-    return (
-      <OrgKiloPassSetupError
-        message={
-          setupQuery.error.data?.code === 'PRECONDITION_FAILED'
-            ? setupQuery.error.message
-            : 'Kilo Pass setup could not be loaded.'
-        }
-        onRetry={() => void setupQuery.refetch()}
-      />
+    return setupQuery.error.data?.code === 'PRECONDITION_FAILED' ? (
+      <OrgKiloPassSetupError message={setupQuery.error.message}>
+        <Button asChild variant="outline">
+          <Link href={`/organizations/${organizationId}/subscriptions`}>Subscribe to seats</Link>
+        </Button>
+      </OrgKiloPassSetupError>
+    ) : (
+      <OrgKiloPassSetupError message="Kilo Pass setup could not be loaded.">
+        <Button type="button" variant="outline" onClick={() => void setupQuery.refetch()}>
+          Retry
+        </Button>
+      </OrgKiloPassSetupError>
     );
   if (setupQuery.isPending || !setup) return <OrgKiloPassSetupLoading />;
 
@@ -150,13 +154,11 @@ function OrgKiloPassSetupLoading() {
   );
 }
 
-function OrgKiloPassSetupError({ message, onRetry }: { message: string; onRetry: () => void }) {
+function OrgKiloPassSetupError({ message, children }: { message: string; children: ReactNode }) {
   return (
     <div className="space-y-3 p-6">
       <p className="type-body">{message}</p>
-      <Button type="button" variant="outline" onClick={onRetry}>
-        Retry
-      </Button>
+      {children}
     </div>
   );
 }

@@ -8,22 +8,23 @@ next build appends its section above the newest one.
 
 ### New
 
-- Signing in with the same email through a different method now links to one confirmed account.
-- Cloud Agent chats show their workspace environment underneath the conversation.
-- Cloud Agent sessions keep their history across app restarts.
-- A Cloud Agent run can hand its result back to the current chat or start a new one.
-- A Cloud Agent environment can now include more than one repository.
-- A Watch PR mode lets Cloud Agent follow a pull request without changing it.
+- Cloud Agent chats show the workspace environment beneath them.
+- Cloud Agent now keeps its history across sessions.
+- Cloud Agent can hand work back to a workspace chat or start a new chat.
+- Cloud Agent can work across multiple repositories in one environment.
+- Cloud Agent can watch a pull request without making changes.
+- You can now open your notification history.
 
 ### Changes
 
-- New paid credits expire one year after purchase.
-- Only organization managers can change an organization profile.
-- On Android, approving a request now requires an unlocked device.
+- New paid credits now expire one year after purchase.
+- Only managers can change organization profiles.
+- Approving a request on Android now requires an unlocked device.
+- Sign-in sessions now expire after a set period.
 
 ### Fixes
 
-- areas: cloudAgent, securityAgent, signIn
+- areas: cloudAgent, securityAgent, notifications
 
 ## 1.0.15 (build 703 iOS, 704 Android)
 
@@ -478,21 +479,21 @@ _Its notes are on the newest 1.0.15 section above._
 ### New
 
 - The Chat tab now shows the active workspace.
-- You can use tool interfaces from connected apps in the chat transcript.
-- You can create single-run briefings for an agent.
-- Morning briefings summarize overnight agent activity.
-- Desktop sessions are now labeled Desktop instead of Extension.
-- You can pick a computer's command-line agents in the agent picker.
+- You can ask an agent for a one-off briefing.
+- Tools from connected apps can appear in the chat transcript.
+- You can get a morning briefing about what your agents did overnight.
+- Quick Chat can search the web.
+- Quick Chat can run downloaded models on your device, including models that read images.
 
 ### Changes
 
-- In-app Kilo Pass purchases are no longer available on iOS and Android.
-- Signing in now requires your device to pass a security check.
-- Some risky signups are asked to continue with Google or Apple.
+- Kilo Pass is no longer sold inside the app on iOS and Android.
+- Only owners and admins can create organization profiles.
+- Deleting your account now requires a confirmation code.
 
 ### Fixes
 
-- areas: cloudAgent, securityAgent, codeReviewer
+- areas: cloudAgent, securityAgent, profileOrganizations
 
 ## 1.0.14 (build 550)
 
@@ -782,17 +783,12 @@ _Its notes are on the newest 1.0.14 section above._
 
 ### New
 
-- Dispatch failure alerts now explain what went wrong and what to do next.
-- You can move between a session's code reviews and use compact review controls.
-- Home now shows a single agents card instead of separate live rows.
-- You can open a session directly from its long-press menu.
-- Profile has a What's New row that opens the changelog.
-- You can buy one-off credit packs through the App Store and Google Play.
-
-### Changes
-
-- Copy session ID is no longer available from the long-press menu; Open in session replaces it.
-- In read-only sessions, only the Continue section is shown and the composer is disabled.
+- An alert about a session that failed to start now tells you what you can do next.
+- You can now move between pull requests in a session and use smaller review controls.
+- Home now shows one card that summarizes your agents.
+- Profile now has a What's New row that opens the changelog.
+- Long-pressing a session card now opens a live preview of the session.
+- You can now buy one-off credit packs through the App Store and Google Play.
 
 ### Fixes
 
@@ -950,9 +946,10 @@ _Its notes are on the newest 1.0.13 section above._
 
 ### New
 
-- Scheduled sessions now appear in the session list, on session details, and in quick-glance views.
+- Spend alerts now show a clearer panel and reach the right people in your organization.
+- Scheduled sessions now appear in the session list, on session details, and in at-a-glance summaries.
 - You can now edit and delete your own pull request review comments.
-- You can now browse and run skills from the slash command menu.
+- You can now list and use skills from the slash command menu in the message box.
 
 ### Fixes
 

@@ -123,7 +123,10 @@ export interface BrowserSessionTabResult {
 
 /** One download the browser created, as `chrome.downloads.onCreated` reports it. */
 export interface BrowserDownloadItem {
+  readonly filename?: string;
   readonly finalUrl?: string;
+  /** ISO-8601 start time, used to tell this call's download from an older one at the same url. */
+  readonly startTime?: string;
   readonly id: number;
   /** `chrome.downloads` lifecycle state; `complete` means `cancel` is too late and the file must be removed. */
   readonly state?: string;
@@ -236,6 +239,10 @@ const TAB_COMMIT_POLL_MS = 50;
  */
 const DOWNLOAD_GUARD_SETTLE_MS = 120;
 
+/** How long an approved navigate waits for the browser to name the file it kept. */
+const KEPT_DOWNLOAD_POLLS = 60;
+const KEPT_DOWNLOAD_POLL_MS = 50;
+
 /** How long a navigate that did not land on its destination waits for the download the browser owes it. */
 const NAVIGATE_DOWNLOAD_POLL_MS = 20;
 const NAVIGATE_DOWNLOAD_POLLS = 15;
@@ -253,6 +260,55 @@ const NAVIGATE_DOWNLOAD_POLLS = 15;
 interface DownloadGuard {
   readonly settle: () => Promise<number>;
 }
+
+/**
+ * The text an approved navigate reports when the file it started was kept.
+ * Chrome answers such a navigation with `ERR_ABORTED` — there is no page to
+ * load — so without this the model would read a kept file as a failure. The
+ * item may still be in progress when it is found, so the name falls back to the
+ * requested url until the browser fills the path in.
+ */
+const keptDownloadText = async (
+  api: BrowserDownloadsApi | undefined,
+  destination: string,
+  startedAt: number
+): Promise<string | undefined> => {
+  if (api?.search === undefined) {
+    return undefined;
+  }
+
+  for (let attempt = 0; attempt < KEPT_DOWNLOAD_POLLS; attempt += 1) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- the browser creates the download on its own schedule
+      const found = await api.search({ url: destination });
+      // `startedAfter` in the query misses items the browser has not finished naming, so the time filter is applied here.
+      const item = (found ?? []).find(
+        candidate =>
+          candidate.startTime === undefined ||
+          Number.isNaN(Date.parse(candidate.startTime)) ||
+          Date.parse(candidate.startTime) >= startedAt
+      );
+
+      if (item !== undefined) {
+        const name =
+          item.filename?.split('/').pop() ??
+          item.finalUrl?.split('/').pop() ??
+          destination.split('/').pop();
+
+        return name === undefined || name === ''
+          ? 'The file was downloaded; the page did not change.'
+          : `${name}: The file was downloaded; the page did not change.`;
+      }
+    } catch {
+      return undefined;
+    }
+
+    // eslint-disable-next-line no-await-in-loop -- bounded wait for the browser to name the item
+    await after(KEPT_DOWNLOAD_POLL_MS);
+  }
+
+  return undefined;
+};
 
 /** A string argument of a tool call, or `undefined` when it is absent or empty. */
 const argumentText = (value: unknown): string | undefined => {
@@ -860,8 +916,8 @@ export const createBrowserRuntime = ({
           !downloadApproved;
 
         // Read the optional permission at call time: it can be granted or revoked while this worker lives.
+        const guardApi = downloadsApi?.();
         const guardTab = guardDownloads ? await guardTabOf(tabsApi, tabId) : undefined;
-        const guardApi = guardTab === undefined ? undefined : downloadsApi?.();
         // A tab this call opens (a first navigate, `browser_tabs new`) owns its downloads too.
         const guardTabIds = (): readonly number[] =>
           caller.kind === 'agent' ? groups.tabsForSession(caller.sessionHandle) : [tabId];
@@ -896,6 +952,7 @@ export const createBrowserRuntime = ({
           await setDownloadBehavior(session, 'deny');
         }
 
+        const callStartedAt = Date.now();
         let result: EvalTabResult | null = null;
         let guardedDownloads = 0;
 
@@ -984,8 +1041,20 @@ export const createBrowserRuntime = ({
           );
         }
 
+        // An approved navigate to an attachment keeps its file and still answers `ERR_ABORTED`: that is a success with no page change, not a failure.
+        const keptText =
+          downloadApproved &&
+          preflight?.class === 'navigate' &&
+          destination !== undefined &&
+          !settled.ok &&
+          settled.error.includes('ERR_ABORTED')
+            ? await keptDownloadText(guardApi, destination, callStartedAt)
+            : undefined;
+        const finalResult: EvalTabResult =
+          keptText === undefined ? settled : { ok: true, value: keptText };
+
         if (agentContext === undefined) {
-          return { kind: 'result', result: settled };
+          return { kind: 'result', result: finalResult };
         }
 
         // A read never navigates, so its tree is the one the preflight saw; an act or navigate call may have replaced it, and a stale list would under-report.
@@ -994,7 +1063,7 @@ export const createBrowserRuntime = ({
 
         return {
           kind: 'result',
-          result: settled,
+          result: finalResult,
           withheldFrames: await withheldOriginsFor(withheldReader, agentContext.authorized),
         };
       } finally {

@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { Download } from '@playwright/test';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { z } from 'zod';
 import {
   DOWNLOAD_BODY,
@@ -239,8 +239,11 @@ test('a navigate to an attachment asks first, then keeps the file once approved'
       [guarded.kind === 'error' ? (guarded.stepToken ?? '') : '']
     );
 
-    // The browser answers a download navigation with an aborted page load; the file is the result the human approved.
-    expect(approved.kind).toBe('result');
+    // The browser answers a download navigation with an aborted page load; the approved file is reported as the success it is.
+    expect(approved).toMatchObject({ isError: false, kind: 'result' });
+    expect(approved.kind === 'result' ? approved.text : '').toContain(
+      'The file was downloaded; the page did not change.'
+    );
     await expect.poll(() => readdir(downloadsPath), { timeout: 15_000 }).toHaveLength(1);
     const download = downloads.at(-1);
 
@@ -256,6 +259,9 @@ test('a navigate to an attachment asks first, then keeps the file once approved'
     }
 
     expect(await readFile(saved, 'utf8')).toBe(DOWNLOAD_BODY);
+    // The success text names the file the browser wrote, which Playwright stores under its own name here.
+    expect(approved.kind === 'result' ? approved.text : '').toContain(basename(saved));
+    expect(approved.kind === 'result' ? approved.isError : true).toBe(false);
   } finally {
     await context.close();
     await hub.close();

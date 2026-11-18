@@ -317,6 +317,7 @@ const createFakeDownloads = (options: { readonly cancelRejects?: boolean } = {})
   const cancelled: number[] = [];
   const erased: { readonly id: number }[] = [];
   const removed: number[] = [];
+  const searched: BrowserDownloadItem[] = [];
   const api: BrowserDownloadsApi = {
     // Sorted keys: `cancel` first, as chrome.downloads declares them.
     cancel: async downloadId => {
@@ -344,6 +345,7 @@ const createFakeDownloads = (options: { readonly cancelRejects?: boolean } = {})
     removeFile: async downloadId => {
       removed.push(downloadId);
     },
+    search: async () => searched,
   };
 
   return {
@@ -357,6 +359,7 @@ const createFakeDownloads = (options: { readonly cancelRejects?: boolean } = {})
     erased,
     live: () => listeners.length,
     removed,
+    searched,
   };
 };
 
@@ -936,6 +939,83 @@ describe('agent browser calls', () => {
     emitting = true;
     await click();
     expect(downloads.cancelled).toStrictEqual([45]);
+  });
+
+  it('reports an approved navigate that kept its file as a success, not an aborted page load', async () => {
+    const downloads = createFakeDownloads();
+    downloads.searched.push({ filename: '/home/me/Downloads/report.txt', id: 51 });
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+
+    cdp.setHandlers({
+      // The browser answers a download navigation with an aborted page load and the tab never moves.
+      'Page.navigate': () => ({ errorText: 'net::ERR_ABORTED' }),
+    });
+
+    const navigate = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          sensitive: [...sensitive],
+        },
+        arguments: { url: `${MAIN_ORIGIN}/invoice.pdf` },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_navigate',
+      });
+
+    const guarded = await navigate([]);
+
+    expect(guarded).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+
+    // The approved repeat keeps the file: the model must read that as a success that changed no page.
+    const approved = await navigate([expectStepToken(guarded)]);
+
+    expect(approved).toMatchObject({ kind: 'result', result: { ok: true } });
+    const approvedText =
+      approved.kind === 'result' && approved.result.ok ? String(approved.result.value) : '';
+
+    // The success names the file the browser wrote and says the page did not change.
+    expect(approvedText).toContain('report.txt');
+    expect(approvedText).toContain('The file was downloaded; the page did not change.');
+  });
+
+  it('keeps the aborted page-load error for an approved navigate that downloaded nothing', async () => {
+    const downloads = createFakeDownloads();
+    const { cdp, runtime } = await createHarness({ downloadsApi: downloads.api });
+    let announcing = true;
+
+    cdp.setHandlers({
+      'Page.navigate': () => {
+        // The first navigate starts a download, so it earns a token; the approved repeat starts none.
+        if (announcing) {
+          announcing = false;
+          downloads.emit({ id: 52, tabId: TAB_ID });
+        }
+
+        return { errorText: 'net::ERR_ABORTED' };
+      },
+    });
+
+    const navigate = (sensitive: readonly string[]) =>
+      runtime.runTool({
+        agent: {
+          authorized: [readGrant, { class: 'navigate', origin: MAIN_ORIGIN }],
+          sensitive: [...sensitive],
+        },
+        arguments: { url: `${MAIN_ORIGIN}/invoice.pdf` },
+        caller: agent(),
+        tabId: TAB_ID,
+        toolName: 'browser_navigate',
+      });
+
+    const guarded = await navigate([]);
+    const approved = await navigate([expectStepToken(guarded)]);
+
+    // No download was found, so the browser's own failure stands: an aborted load for another reason is not a success.
+    expect(approved).toMatchObject({ kind: 'result', result: { ok: false } });
+    expect(
+      approved.kind === 'result' && !approved.result.ok ? approved.result.error : ''
+    ).toContain('ERR_ABORTED');
   });
 
   it('does not let one session\u2019s download token approve another session\u2019s call', async () => {

@@ -9,7 +9,7 @@
  */
 
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import {
   getBuiltinModeDescriptionKey,
@@ -18,8 +18,10 @@ import {
 import { BUILTIN_AGENT_MODES } from '@/components/agents/mode-normalize';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { cn } from '@/lib/utils';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import { LINE_ACTION_BOX_CLASS, LINE_ACTION_HIT_SLOP } from '@/lib/a11y/tap-target';
 import { triggerProblemText } from '@/lib/cloud-triggers/trigger-problem-copy';
 import { type TriggerDraft, type TriggerDraftProblems } from '@/lib/cloud-triggers/trigger-draft';
 import { TRIGGER_FIELD_EXAMPLES } from '@/lib/cloud-triggers/trigger-field-examples';
@@ -62,6 +64,14 @@ export function TriggerFormAgent({
   const profiles = useTriggerProfiles(draft.runAsCreator ? undefined : organizationId, true);
   const isCustomAgent = !BUILTIN_AGENT_MODES.some(mode => mode === draft.agent);
   const { markTouched, shownProblem } = useTouchedProblems(problems);
+  // TanStack Query v5 resets a no-data query to `pending` when it refetches,
+  // clearing `error`, so `isError` alone would unmount the failure row (and its
+  // retry) the moment the retry is pressed. Keeping the failed state through
+  // the refetch leaves the row in place and lets the retry show its busy state
+  // until the request settles. Same contract as the tool-summary settings
+  // screen and `use-current-user-id`.
+  const catalogueFailed =
+    (models.isError || (models.isLoading && models.isFetched)) && models.models.length === 0;
 
   const agentOptions: TriggerChoice[] = [
     ...BUILTIN_AGENT_MODES.map(mode => ({
@@ -126,13 +136,27 @@ export function TriggerFormAgent({
               markTouched('model');
             }}
             isLoading={models.isLoading}
+            disabled={catalogueFailed}
           />
-          {models.isError ? (
-            <Text className="min-w-0 flex-1 text-xs text-destructive">
+        </View>
+        {catalogueFailed ? (
+          <View className="flex-row items-center gap-2">
+            <Text accessibilityRole="alert" className="min-w-0 flex-1 text-xs text-destructive">
               {t('common.couldNotLoadModels')}
             </Text>
-          ) : null}
-        </View>
+            <Pressable
+              accessibilityLabel={t('common.retry')}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: models.isFetching }}
+              className={cn(LINE_ACTION_BOX_CLASS, 'min-w-[36px] justify-center active:opacity-70')}
+              disabled={models.isFetching}
+              hitSlop={LINE_ACTION_HIT_SLOP}
+              onPress={() => void models.refetch()}
+            >
+              <Text className="text-xs font-medium text-destructive">{t('common.retry')}</Text>
+            </Pressable>
+          </View>
+        ) : null}
         {modelProblemText === undefined ? null : (
           <AccessibleStatus message={modelProblemText} className="text-sm" />
         )}

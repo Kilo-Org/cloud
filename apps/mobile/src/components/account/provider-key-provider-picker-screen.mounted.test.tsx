@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   providers: [] as Provider[],
   error: false,
   push: vi.fn(),
+  scrollToOffset: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', TextInput: 'TextInput' }));
@@ -22,20 +23,34 @@ vi.mock('@shopify/flash-list', async () => {
   // be loaded from inside the factory rather than at the top of the module.
   const React = await import('react');
   return {
-    FlashList: (props: {
-      data: unknown[];
-      renderItem: (info: { item: unknown }) => React.ReactNode;
-      ListEmptyComponent?: React.ReactNode;
-    }) =>
-      React.createElement(
-        'FlashList',
-        { itemCount: props.data.length },
-        props.data.length === 0
-          ? props.ListEmptyComponent
-          : props.data.map((item, index) =>
-              React.createElement(React.Fragment, { key: index }, props.renderItem({ item }))
-            )
-      ),
+    FlashList: React.forwardRef(
+      (
+        props: {
+          data: unknown[];
+          renderItem: (info: { item: unknown }) => React.ReactNode;
+          maintainVisibleContentPosition?: unknown;
+          ListEmptyComponent?: React.ReactNode;
+        },
+        ref
+      ) => {
+        // The screen's effect calls `listRef.current?.scrollToOffset(...)`;
+        // the real FlashList exposes the method through its forwarded ref.
+        React.useImperativeHandle(ref, () => ({
+          scrollToOffset: (params: { offset: number; animated: boolean }) =>
+            state.scrollToOffset(params),
+          props: {},
+        }));
+        return React.createElement(
+          'FlashList',
+          { itemCount: props.data.length, mvc: props.maintainVisibleContentPosition },
+          props.data.length === 0
+            ? props.ListEmptyComponent
+            : props.data.map((item, index) =>
+                React.createElement(React.Fragment, { key: index }, props.renderItem({ item }))
+              )
+        );
+      }
+    ),
   };
 });
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
@@ -62,6 +77,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/a11y/tap-target', () => ({
   COMPACT_CONTROL_HIT_SLOP_DP: 8,
+  FIELD_CLEAR_BOX_CLASS: 'h-[48px] w-[48px] -my-[7px] items-center justify-center',
   ROW_TARGET_CLASS: 'min-h-11',
   STATE_ACTION_CLASS: '',
 }));
@@ -90,11 +106,19 @@ async function mount(organizationId?: string) {
   return view.renderer.root;
 }
 
-/** The provider rows: one pressable per provider, labelled with its name. */
+/** The provider rows: one pressable per provider, labelled with its name.
+ *
+ * Scoped to the mocked list so the row's own clear control — a labelled
+ * `Pressable` beside the input — never counts as a provider row. */
 function rowLabels(root: ReactTestRenderer['root']) {
-  return root.findAll(
-    node => Object.is(node.type, 'Pressable') && typeof node.props.accessibilityLabel === 'string'
-  );
+  return root
+    .findAll(node => Object.is(node.type, 'FlashList'))
+    .flatMap(list =>
+      list.findAll(
+        node =>
+          Object.is(node.type, 'Pressable') && typeof node.props.accessibilityLabel === 'string'
+      )
+    );
 }
 
 function row(root: ReactTestRenderer['root'], index: number) {
@@ -113,6 +137,16 @@ function searchInput(root: ReactTestRenderer['root']) {
   return input;
 }
 
+function clearControl(root: ReactTestRenderer['root']) {
+  const [control] = root.findAll(
+    node => Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Clear search'
+  );
+  if (!control) {
+    throw new Error('missing clear control');
+  }
+  return control;
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   state.providers = [
@@ -121,6 +155,7 @@ beforeEach(() => {
   ];
   state.error = false;
   state.push.mockClear();
+  state.scrollToOffset.mockClear();
 });
 
 afterEach(() => {
@@ -173,6 +208,78 @@ describe('ProviderKeyProviderPickerScreen', () => {
     expect(
       root.findAll(node => Object.is(node.type, 'EmptyState')).map(node => node.props.title)
     ).toEqual(['No matching providers']);
+  });
+
+  it('clears the query from its own control and returns the full list', async () => {
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('gpt');
+    });
+    expect(rowLabels(root)).toHaveLength(0);
+
+    act(() => {
+      (clearControl(root).props.onPress as () => void)();
+    });
+
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
+      'Anthropic',
+      'OpenAI',
+    ]);
+    expect(
+      root.findAll(
+        node =>
+          Object.is(node.type, 'Pressable') && node.props.accessibilityLabel === 'Clear search'
+      )
+    ).toHaveLength(0);
+  });
+
+  it('returns the full list from its first provider when the search clears', async () => {
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('gpt');
+    });
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('');
+    });
+
+    // The no-match state replaced the list; clearing the query brings the rows
+    // back with the first provider where the reader left the list, and the
+    // list re-anchors at its top so the first provider is what shows.
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual([
+      'Anthropic',
+      'OpenAI',
+    ]);
+    expect(state.scrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false });
+    expect(root.findAll(node => Object.is(node.type, 'FlashList')).at(0)?.props.itemCount).toBe(2);
+    expect(root.findAll(node => Object.is(node.type, 'FlashList')).at(0)?.props.mvc).toEqual({
+      disabled: true,
+    });
+  });
+
+  it('re-anchors the list at the top when a query change shortens it', async () => {
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('openai');
+    });
+
+    expect(state.scrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false });
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI']);
+  });
+
+  it('shows the matching rows after a no-match search finds a provider again', async () => {
+    const root = await mount();
+
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('gpt');
+    });
+    act(() => {
+      (searchInput(root).props.onChangeText as (value: string) => void)('openai');
+    });
+
+    expect(rowLabels(root).map(node => node.props.accessibilityLabel)).toEqual(['OpenAI']);
   });
 
   it('matches a provider by its id', async () => {

@@ -111,4 +111,50 @@ describe('Review Memory structured model output', () => {
     expect(JSON.stringify(proposeBranch?.properties?.value)).not.toContain('null');
     expect(JSON.stringify(schema)).not.toContain('oneOf');
   });
+
+  it('aborts the gateway request when the caller aborts', async () => {
+    const controller = new AbortController();
+    const fetchStarted = Promise.withResolvers<void>();
+    let requestSignal: AbortSignal | undefined;
+    const gatewayFetch: typeof fetch = (_request, init) => {
+      requestSignal = init?.signal ?? undefined;
+      fetchStarted.resolve();
+      const response = Promise.withResolvers<Response>();
+      const signal = init?.signal;
+      const abortError = new DOMException('Aborted', 'AbortError');
+      if (signal?.aborted) {
+        response.reject(abortError);
+      } else {
+        signal?.addEventListener('abort', () => response.reject(abortError), { once: true });
+      }
+      return response.promise;
+    };
+    const actor = {
+      id: 'test-user-id',
+      api_token_pepper: null,
+    } as User;
+    const provider = createReviewMemoryGatewayProvider({
+      owner: { type: 'user', id: actor.id },
+      actor,
+      userAgent: 'Review Memory abort test',
+      fetch: gatewayFetch,
+    });
+
+    const pending = generateReviewMemoryStructuredOutput({
+      model: provider.chatModel('test/model'),
+      prompt: 'Return a test result.',
+      maxOutputTokens: 100,
+      schemaName: 'test_review_memory_output',
+      schema: TestOutputSchema,
+      validate: output => output,
+      abortSignal: controller.signal,
+    });
+    const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+
+    await fetchStarted.promise;
+    controller.abort();
+    await rejection;
+
+    expect(requestSignal).toBe(controller.signal);
+  });
 });

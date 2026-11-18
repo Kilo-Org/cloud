@@ -21,6 +21,7 @@ import { CloudReadOnlyThread, CloudThread } from './assistant-ui/CloudThread';
 import { CloudSharedTranscript } from './assistant-ui/CloudSharedTranscript';
 import { useCloudPresentationActions } from './assistant-ui/cloud-presentation-context';
 import { readKilo2Messages } from '@kilocode/cloud-agent-sdk/kilo2-source-messages';
+import { RUNTIME_CONTINUATION_PROMPTS } from './runtime-continuation';
 
 Object.assign(globalThis, { React });
 
@@ -58,7 +59,7 @@ function reviewMessage(overall?: string): string {
   })}`;
 }
 
-function userMessage(text: string): StoredMessage {
+function userMessage(text: string, synthetic?: true): StoredMessage {
   return {
     info: {
       id: 'msg-review',
@@ -67,6 +68,7 @@ function userMessage(text: string): StoredMessage {
       time: { created: 1 },
       agent: 'build',
       model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+      synthetic,
     },
     parts: [
       {
@@ -75,6 +77,7 @@ function userMessage(text: string): StoredMessage {
         messageID: 'msg-review',
         type: 'text',
         text,
+        synthetic,
       },
     ],
   };
@@ -525,6 +528,64 @@ ${JSON.stringify({
     expect(html).not.toContain('Subagent');
     expect(html).toContain('A child Cloud Agent task finished');
   });
+
+  // Prompt text verified against the pinned kilo2 0.0.0-v2-104 artifact.
+  it.each([
+    [
+      'interrupted',
+      'The previous response was interrupted. Continue from where you left off without repeating completed content.',
+      'The previous response was interrupted.',
+    ],
+    [
+      'restarted',
+      'The server restarted while you were working. Continue from where you left off without repeating completed work.',
+      'The server restarted while the agent was working.',
+    ],
+    [
+      'output-limit',
+      'Your last response hit the output token limit (stop reason: length). Do not apologize, recap, or repeat yourself. Break the remaining work into smaller pieces.',
+      'The response reached the output token limit.',
+    ],
+  ] as const)(
+    'renders the synthetic %s continuation as a notice instead of a user bubble',
+    (_reason, prompt, description) => {
+      const messages = readKilo2Messages(
+        { id: 'ses-1', location: { directory: '/workspace' }, time: { created: 1, updated: 2 } },
+        [{ id: 'msg_continuation', type: 'synthetic', text: prompt, time: { created: 2 } }]
+      );
+      const html = renderToStaticMarkup(
+        React.createElement(MessageBubble, { message: messages[0] })
+      );
+      const sharedHtml = renderToStaticMarkup(
+        React.createElement(CloudSharedTranscript, { messages })
+      );
+
+      for (const rendered of [html, sharedHtml]) {
+        expect(rendered).toContain('Continued automatically');
+        expect(rendered).toContain(description);
+        expect(rendered).not.toContain('Continue from where you left off');
+        expect(rendered).not.toContain('Do not apologize, recap, or repeat yourself');
+        expect(rendered).not.toContain('bg-primary text-primary-foreground');
+      }
+    }
+  );
+
+  it.each([
+    ['confirmed', undefined],
+    ['unconfirmed', true],
+  ] as const)(
+    'keeps a typed copy of a continuation prompt as an ordinary user bubble when %s',
+    (_state, synthetic) => {
+      const prompt = RUNTIME_CONTINUATION_PROMPTS.interrupted;
+      const html = renderToStaticMarkup(
+        React.createElement(MessageBubble, { message: userMessage(prompt, synthetic) })
+      );
+
+      expect(html).not.toContain('Continued automatically');
+      expect(html).toContain('bg-primary text-primary-foreground');
+      expect(html).toContain('Continue from where you left off');
+    }
+  );
 });
 
 jest.mock('react-markdown', () => ({

@@ -26,6 +26,7 @@
     "creditHistory": "Historial de créditos",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Cancelar",
     "done": "Hecho",
     "retry": "Reintentar",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Cambios",
     "organizationTrialEnded": "La prueba de la organización ha finalizado y no tiene ningún plan activo. El propietario de la organización puede actualizar la facturación en kilo.ai y, después, volver a intentarlo.",
-    "privateRepositoryA11y": "{{name}}, repositorio privado"
+    "privateRepositoryA11y": "{{name}}, repositorio privado",
+    "legalDocumentEnglishOnly": "Este documento solo está disponible en inglés."
   },
   "language": {
     "restarting": "Reiniciando para aplicar el idioma",
@@ -481,7 +483,14 @@
       "viewReceipt": "Ver comprobante"
     },
     "changelog": "Novedades",
-    "changelogVersionPending": "Las notas de esta versión llegan con la próxima actualización."
+    "changelogVersionPending": "Las notas de la versión {{version}} llegan con la próxima actualización.",
+    "changelogGroupNew": "Novedades",
+    "changelogFixesIn": "Correcciones y mejoras en {{areas}}.",
+    "changelogFixesPolish": "Correcciones y mejoras en toda la aplicación.",
+    "changelogAreas": {
+      "signIn": "Inicio de sesión",
+      "profileOrganizations": "Perfil y organizaciones"
+    }
   },
   "preferences": {
     "general": "General",
@@ -676,7 +685,8 @@
       "managedOnWeb": "La conexión de Bitbucket de esta organización se gestiona en la web desde un ordenador.",
       "description": "Crea un token de acceso del espacio de trabajo con los permisos necesarios y pégalo abajo.",
       "scopes": "Cuenta: lectura · Repositorios: lectura/escritura · PR: lectura · Webhooks: lectura/escritura",
-      "tokenPlaceholder": "Token de acceso del espacio de trabajo"
+      "tokenPlaceholder": "Token de acceso del espacio de trabajo",
+      "tokenRefused": "Bitbucket no ha aceptado este token de acceso del espacio de trabajo. Comprueba que tiene los permisos indicados arriba y vuelve a intentarlo."
     },
     "followReviewMd": "Seguir las instrucciones de REVIEW.md",
     "followReviewMdSubtitle": "Respeta las instrucciones del archivo REVIEW.md de cada repositorio",
@@ -923,7 +933,8 @@
       "repositoryLine": "Revisiones: {{reviews}} · Hallazgos: {{findings}}",
       "empty": "Aún no hay revisiones con analíticas",
       "emptyDescription": "Las analíticas registran las revisiones completadas mientras estén activadas para la organización.",
-      "off": "Las analíticas están desactivadas para esta organización.",
+      "offTitle": "Las analíticas están desactivadas para {{platform}}",
+      "offDescription": "Actívalas en los ajustes de la organización en la web para registrar las revisiones completadas.",
       "couldNotLoad": "No se pudieron cargar las analíticas"
     },
     "council": {
@@ -3374,6 +3385,7 @@
       "manageOnWeb": "Ajustes de facturación en la web",
       "changePlan": "Cambiar plan",
       "buySeats": "Comprar licencias",
+      "managedOnWeb": "El plan, las licencias y la recarga automática se gestionan en la web.",
       "setupAutoTopUp": "Configurar recarga automática",
       "manageAutoTopUp": "Gestionar recarga automática",
       "opensOnWeb": "Se abre en la web"
@@ -3535,12 +3547,10 @@
       "requestLogs": "Registros de solicitudes"
     },
     "requestLogs": {
-      "hint": "Solicitudes de la hora previa al fin del intervalo, las más recientes primero.",
       "older": "Hora anterior",
       "newer": "Hora siguiente",
       "truncated": "Esta hora tiene más solicitudes de las que muestra la lista.",
       "emptyTitle": "No hay solicitudes",
-      "emptyDescription": "No hay solicitudes al gateway en esta hora.",
       "loadError": "No se pudieron cargar los registros de solicitudes.",
       "permissionDenied": "Solo un propietario, administrador o responsable de facturación de la organización puede ver sus registros de solicitudes.",
       "tokens": "{{input}} entrada · {{output}} salida",
@@ -4348,8 +4358,7 @@
       "repoValue": "Repositorio: {{name}}",
       "profileValue": "Perfil: {{name}}",
       "profileUnavailable": "Este perfil ya no está disponible. Elija otro.",
-      "pickerEmptyDescriptionOrganization": "Cree un perfil de organización para reutilizar variables de entorno, comandos de configuración y habilidades en todas las sesiones.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Un propietario o administrador de la organización puede crear un perfil de organización."
+      "pickerEmptyDescriptionOrganization": "Cree un perfil de organización para reutilizar variables de entorno, comandos de configuración y habilidades en todas las sesiones."
     },
     "variablesDeleteFailed": "No se pudo eliminar la variable",
     "deleteVariable": "Eliminar la variable {{key}}",
@@ -4539,7 +4548,6 @@
     "dismiss": "Descartar informe",
     "offline": "Sin conexión · informe guardado",
     "cached": "Informe guardado · no se puede actualizar",
-    "window": "{{start}} – {{end}}",
     "summary": "Resumen de IA",
     "summaryPending": "El resumen de IA está en curso. Se añadirá aquí cuando esté listo.",
     "summaryUnavailable": "Resumen de IA no disponible. Tu informe estructurado sigue disponible.",
@@ -4658,6 +4666,7 @@
       "title": "Disparadores y webhooks",
       "subtitle": "Automatiza ejecuciones de Cloud Agent desde una llamada de webhook o una programación.",
       "new": "Nuevo disparador",
+      "create": "Crear disparador",
       "emptyTitle": "Aún no hay disparadores",
       "emptyDescription": "Crea un disparador para iniciar una ejecución de Cloud Agent desde una llamada de webhook o de forma programada.",
       "loadFailedTitle": "No se pudieron cargar los disparadores",
@@ -4711,6 +4720,8 @@
       "created": "Disparador creado",
       "saved": "Disparador guardado",
       "statusArrived": "Recibida",
+      "defaultPromptWebhook": "Describe el cuerpo de esta solicitud de webhook:\n\n{{body}}",
+      "defaultPromptScheduled": "Ejecuta la tarea programada. Activado a las {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Introduce un nombre.",
         "nameTooShort": "Usa al menos 8 caracteres.",

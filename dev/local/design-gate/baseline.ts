@@ -190,6 +190,7 @@ function trackedFile(repo: string, commit: string, file: string): string {
  * its `prepared` list exactly like the generated route plumbing.
  */
 const INSTRUMENT_FILES = [
+  'apps/mobile/src/components/design-gate-probe.tsx',
   'apps/mobile/src/lib/design-gate/collect.ts',
   'apps/mobile/src/lib/design-gate/paint-state.ts',
   'apps/mobile/src/lib/design-gate/probe.ts',

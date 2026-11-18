@@ -26,6 +26,7 @@
     "creditHistory": "Istorik kredi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Anile",
     "done": "Fèt",
     "retry": "Eseye ankò",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Chanjman",
     "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò.",
-    "privateRepositoryA11y": "{{name}}, repòsitwa prive"
+    "privateRepositoryA11y": "{{name}}, repòsitwa prive",
+    "legalDocumentEnglishOnly": "Dokiman sa a disponib nan lang angle sèlman."
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -481,7 +483,14 @@
       "viewReceipt": "Wè resi a"
     },
     "changelog": "Sa ki nouvo",
-    "changelogVersionPending": "Nòt vèsyon sa a ap vini ak pwochen mizajou aplikasyon an."
+    "changelogVersionPending": "Nòt vèsyon {{version}} an ap vini ak pwochen mizajou aplikasyon an.",
+    "changelogGroupNew": "Nouvo",
+    "changelogFixesIn": "Koreksyon ak amelyorasyon nan {{areas}}.",
+    "changelogFixesPolish": "Koreksyon ak amelyorasyon nan tout aplikasyon an.",
+    "changelogAreas": {
+      "signIn": "Koneksyon",
+      "profileOrganizations": "Pwofil ak òganizasyon"
+    }
   },
   "preferences": {
     "general": "Jeneral",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "Koneksyon Bitbucket òganizasyon sa a jere sou entènèt la, apati yon òdinatè.",
       "description": "Kreye yon jeton aksè pou espas travay la ak pèmisyon ki nesesè yo, epi kole li anba a.",
       "scopes": "Kont: lekti · Depo: lekti/ekriti · Demann fizyon: lekti · Webhook: lekti/ekriti",
-      "tokenPlaceholder": "Jeton aksè pou espas travay la"
+      "tokenPlaceholder": "Jeton aksè pou espas travay la",
+      "tokenRefused": "Bitbucket pa aksepte jeton aksè pou espas travay sa a. Verifye ke li gen pèmisyon ki anwo a, epi eseye ankò."
     },
     "scopeList": {
       "personalStillAvailable": "Depo pèsonèl yo toujou disponib anba a.",
@@ -1465,7 +1475,8 @@
       "repositoryLine": "Revizyon: {{reviews}} · Konsta: {{findings}}",
       "empty": "Poko gen revizyon ak estatistik",
       "emptyDescription": "Estatistik yo anrejistre revizyon ki fini pandan yo aktive pou òganizasyon an.",
-      "off": "Estatistik yo dezaktive pou òganizasyon sa a.",
+      "offTitle": "Estatistik yo dezaktive pou {{platform}}",
+      "offDescription": "Aktive Estatistik yo nan paramèt òganizasyon an sou entènèt pou anrejistre revizyon ki fini.",
       "couldNotLoad": "Nou pa t ka chaje estatistik yo"
     },
     "council": {
@@ -3325,6 +3336,7 @@
       "manageOnWeb": "Paramèt faktirasyon sou entènèt",
       "changePlan": "Chanje plan",
       "buySeats": "Achte plas",
+      "managedOnWeb": "Se sou entènèt yo jere plan an, plas yo ak rechaj otomatik la.",
       "setupAutoTopUp": "Konfigire rechaj otomatik",
       "manageAutoTopUp": "Jere rechaj otomatik",
       "opensOnWeb": "Ap louvri sou entènèt la"
@@ -3473,12 +3485,10 @@
       "requestLogs": "Jounal demann"
     },
     "requestLogs": {
-      "hint": "Demann nan èdtan anvan fen fenèt la, pi resan yo an premye.",
       "older": "Èdtan anvan",
       "newer": "Èdtan apre",
       "truncated": "Èdtan sa a gen plis demann pase sa lis la montre.",
       "emptyTitle": "Pa gen demann",
-      "emptyDescription": "Pa gen demann pasrèl nan èdtan sa a.",
       "loadError": "Nou pa t ka chaje jounal demann yo.",
       "permissionDenied": "Se sèlman yon pwopriyetè, yon administratè oswa yon jesyonè faktirasyon nan òganizasyon an ki ka li jounal demann li.",
       "tokens": "{{input}} antre · {{output}} soti",
@@ -4282,8 +4292,7 @@
       "repoValue": "Depo: {{name}}",
       "profileValue": "Pwofil: {{name}}",
       "profileUnavailable": "Pwofil sa a pa disponib ankò. Chwazi yon lòt.",
-      "pickerEmptyDescriptionOrganization": "Kreye yon pwofil òganizasyon pou reitilize varyab anviwònman yo, kòmandman konfigirasyon, ak ladrès atravè sesyon yo.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Yon pwopriyetè oswa administratè òganizasyon ka kreye yon pwofil òganizasyon."
+      "pickerEmptyDescriptionOrganization": "Kreye yon pwofil òganizasyon pou reitilize varyab anviwònman yo, kòmandman konfigirasyon, ak ladrès atravè sesyon yo."
     },
     "variablesDeleteFailed": "Pa t 'kapab efase varyab",
     "deleteVariable": "Efase varyab {{key}}",
@@ -4469,7 +4478,6 @@
     "dismiss": "Rejte rapò a",
     "offline": "Hò liy · rapò anrejistre",
     "cached": "Rapò anrejistre · pa ka rafrechi",
-    "window": "{{start}} – {{end}}",
     "summary": "Rezime AI",
     "summaryPending": "Rezime AI a ap prepare. L ap parèt isit la lè l pare.",
     "summaryUnavailable": "Rezime AI a pa disponib. Rapò estriktire ou a toujou disponib.",
@@ -4588,6 +4596,7 @@
       "title": "Deklanchè ak wèbhuk",
       "subtitle": "Otomatize egzekisyon Cloud Agent soti nan yon apèl wèbhuk oswa yon pwogramasyon.",
       "new": "Nouvo deklanchè",
+      "create": "Kreye deklanchè",
       "emptyTitle": "Pa gen deklanchè ankò",
       "emptyDescription": "Kreye yon deklanchè pou kòmanse yon egzekisyon Cloud Agent soti nan yon apèl wèbhuk oswa sou yon pwogramasyon.",
       "loadFailedTitle": "Nou pa t kapab chaje deklanchè yo",
@@ -4641,6 +4650,8 @@
       "created": "Deklanchè kreye",
       "saved": "Deklanchè sove",
       "statusArrived": "Rive",
+      "defaultPromptWebhook": "Dekri kò demann wèbhuk sa a:\n\n{{body}}",
+      "defaultPromptScheduled": "Lanse travay pwograme a. Deklanche a {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Antre yon non.",
         "nameTooShort": "Sèvi ak omwen 8 karaktè.",

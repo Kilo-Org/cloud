@@ -26,6 +26,7 @@
     "creditHistory": "Kredit tarixçəsi",
     "sentenceJoiner": ". ",
     "listJoiner": ", ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "Ləğv et",
     "done": "Hazır",
     "retry": "Yenidən cəhd et",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "Dəyişikliklər",
     "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər.",
-    "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya"
+    "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya",
+    "legalDocumentEnglishOnly": "Bu sənəd yalnız ingilis dilində mövcuddur."
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -481,7 +483,14 @@
       "viewReceipt": "Qəbzə bax"
     },
     "changelog": "Yeniliklər",
-    "changelogVersionPending": "Bu versiyanın qeydləri tətbiqin növbəti yeniləməsi ilə gələcək."
+    "changelogVersionPending": "{{version}} versiyasının qeydləri tətbiqin növbəti yeniləməsi ilə gələcək.",
+    "changelogGroupNew": "Yeni",
+    "changelogFixesIn": "{{areas}} bölmələrində düzəlişlər və təkmilləşdirmələr.",
+    "changelogFixesPolish": "Bütün tətbiqdə düzəlişlər və təkmilləşdirmələr.",
+    "changelogAreas": {
+      "signIn": "Giriş",
+      "profileOrganizations": "Profil və təşkilatlar"
+    }
   },
   "preferences": {
     "general": "Ümumi",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "Bu təşkilatın Bitbucket bağlantısı kompüterdən vebdə idarə olunur.",
       "description": "Tələb olunan icazələri olan iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",
-      "tokenPlaceholder": "İş sahəsinin giriş tokeni"
+      "tokenPlaceholder": "İş sahəsinin giriş tokeni",
+      "tokenRefused": "Bitbucket bu iş sahəsi tokenini qəbul etmədi. Yuxarıdakı icazələrin olduğunu yoxla, sonra yenidən cəhd et."
     },
     "scopeList": {
       "personalStillAvailable": "Şəxsi repozitoriyalar aşağıda hələ də əlçatandır.",
@@ -1465,7 +1475,8 @@
       "repositoryLine": "Yoxlamalar: {{reviews}} · Tapıntılar: {{findings}}",
       "empty": "Analitikası olan yoxlama hələ yoxdur",
       "emptyDescription": "Analitika təşkilat üçün aktiv olduğu müddətdə tamamlanmış yoxlamaları qeydə alır.",
-      "off": "Bu təşkilat üçün analitika deaktivdir.",
+      "offTitle": "{{platform}} üçün analitika deaktivdir",
+      "offDescription": "Tamamlanmış yoxlamaları qeydə almaq üçün analitikanı vebdə təşkilat ayarlarında aktivləşdir.",
       "couldNotLoad": "Analitikanı yükləmək mümkün olmadı"
     },
     "council": {
@@ -3325,6 +3336,7 @@
       "manageOnWeb": "Vebdə ödənişlər ayarları",
       "changePlan": "Planı dəyiş",
       "buySeats": "İstifadəçi yerləri al",
+      "managedOnWeb": "Plan, istifadəçi yerləri və avtomatik artırma vebdə idarə olunur.",
       "setupAutoTopUp": "Avtomatik artırmanı qur",
       "manageAutoTopUp": "Avtomatik artırmanı idarə et",
       "opensOnWeb": "Vebdə açılır"
@@ -3473,12 +3485,10 @@
       "requestLogs": "Sorğu jurnalları"
     },
     "requestLogs": {
-      "hint": "Pəncərə bitənədək son bir saatın sorğuları, ən yeniləri əvvəldə.",
       "older": "Əvvəlki saat",
       "newer": "Sonrakı saat",
       "truncated": "Bu saatda siyahıda göstəriləndən daha çox sorğu var.",
       "emptyTitle": "Sorğu yoxdur",
-      "emptyDescription": "Bu saatda şlüz sorğusu yoxdur.",
       "loadError": "Sorğu jurnallarını yükləmək mümkün olmadı.",
       "permissionDenied": "Sorğu jurnallarını yalnız təşkilatın sahibi, administratoru və ya ödəniş meneceri oxuya bilər.",
       "tokens": "{{input}} giriş · {{output}} çıxış",
@@ -4282,8 +4292,7 @@
       "repoValue": "Repozitoru: {{name}}",
       "profileValue": "Profil: {{name}}",
       "profileUnavailable": "Bu profil artıq mövcud deyil. Başqa profil seçin.",
-      "pickerEmptyDescriptionOrganization": "Mühit dəyişənlərindən, quraşdırma əmrlərindən və sessiyalar arasında bacarıqlardan təkrar istifadə etmək üçün təşkilat profili yaradın.",
-      "pickerEmptyDescriptionOrganizationReadOnly": "Təşkilat sahibi və ya administratoru təşkilat profili yarada bilər."
+      "pickerEmptyDescriptionOrganization": "Mühit dəyişənlərindən, quraşdırma əmrlərindən və sessiyalar arasında bacarıqlardan təkrar istifadə etmək üçün təşkilat profili yaradın."
     },
     "variablesDeleteFailed": "Dəyişəni silmək mümkün olmadı",
     "deleteVariable": "{{key}} dəyişənini sil",
@@ -4469,7 +4478,6 @@
     "dismiss": "Hesabatı rədd et",
     "offline": "Oflayn · saxlanmış hesabat",
     "cached": "Saxlanmış hesabat · yeniləmə mümkün deyil",
-    "window": "{{start}} – {{end}}",
     "summary": "AI xülasəsi",
     "summaryPending": "AI xülasəsi hazırlanır. Hazır olanda bura əlavə ediləcək.",
     "summaryUnavailable": "AI xülasəsi əlçatan deyil. Strukturlu hesabatınız hələ də mövcuddur.",
@@ -4588,6 +4596,7 @@
       "title": "Tətikləyicilər və vebhuklar",
       "subtitle": "Cloud Agent icralarını vebhuk çağırışı və ya cədvəl vasitəsilə avtomatlaşdırın.",
       "new": "Yeni tətikləyici",
+      "create": "Tətikləyici yaradın",
       "emptyTitle": "Hələ tətikləyici yoxdur",
       "emptyDescription": "Cloud Agent icrasını vebhuk çağırışı və ya cədvəl üzrə başlatmaq üçün tətikləyici yaradın.",
       "loadFailedTitle": "Tətikləyicilər yüklənə bilmədi",
@@ -4641,6 +4650,8 @@
       "created": "Tətikləyici yaradıldı",
       "saved": "Tətikləyici yadda saxlanıldı",
       "statusArrived": "Gəldi",
+      "defaultPromptWebhook": "Bu vebhuk sorğusunun gövdəsini təsvir edin:\n\n{{body}}",
+      "defaultPromptScheduled": "Planlaşdırılmış tapşırığı icra edin. Tetiklənmə vaxtı: {{scheduledTime}}.",
       "problems": {
         "nameRequired": "Ad daxil edin.",
         "nameTooShort": "Ən azı 8 simvol istifadə edin.",

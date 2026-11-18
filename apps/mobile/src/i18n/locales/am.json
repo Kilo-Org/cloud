@@ -26,6 +26,7 @@
     "creditHistory": "የክሬዲት ታሪክ",
     "sentenceJoiner": "። ",
     "listJoiner": "፣ ",
+    "timeRange": "{{start}} – {{end}}",
     "cancel": "ተው",
     "done": "ጨርስ",
     "retry": "እንደገና ሞክር",
@@ -175,7 +176,8 @@
     "durationHourShort": "h",
     "changes": "ለውጦች",
     "organizationTrialEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የድርጅት ባለቤት በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላል፣ ከዚያ እንደገና ይሞክሩ።",
-    "privateRepositoryA11y": "{{name}}፣ የግል ማኅደር"
+    "privateRepositoryA11y": "{{name}}፣ የግል ማኅደር",
+    "legalDocumentEnglishOnly": "ይህ ሰነድ በእንግሊዝኛ ብቻ ይገኛል።"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -481,7 +483,14 @@
       "viewReceipt": "ደረሰኙን ይመልከቱ"
     },
     "changelog": "አዲስ ነገር",
-    "changelogVersionPending": "የዚህ ስሪት ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።"
+    "changelogVersionPending": "የስሪት {{version}} ማስታወሻዎች ከሚቀጥለው የመተግበሪያ ዝማኔ ጋር ይመጣሉ።",
+    "changelogGroupNew": "አዲስ",
+    "changelogFixesIn": "በእነዚህ ክፍሎች ጥገናዎች እና ማሻሻያዎች ተደርገዋል፦ {{areas}}።",
+    "changelogFixesPolish": "በመተግበሪያው ውስጥ በሙሉ ጥገናዎች እና ማሻሻያዎች ተደርገዋል።",
+    "changelogAreas": {
+      "signIn": "መግቢያ",
+      "profileOrganizations": "መገለጫ እና ድርጅቶች"
+    }
   },
   "preferences": {
     "general": "አጠቃላይ",
@@ -1354,7 +1363,8 @@
       "managedOnWeb": "የዚህ ድርጅት የBitbucket ግንኙነት ከኮምፒውተር በድር ላይ ይተዳደራል።",
       "description": "አስፈላጊ ፈቃዶች ያሉት የሥራ ቦታ መዳረሻ ቶከን ይፍጠሩና ከታች ይለጥፉት።",
       "scopes": "መለያ፦ ማንበብ · ማከማቻዎች፦ ማንበብ/መጻፍ · የኮድ ውህደት ጥያቄዎች፦ ማንበብ · ዌብሁኮች፦ ማንበብ/መጻፍ",
-      "tokenPlaceholder": "የሥራ ቦታ መዳረሻ ቶከን"
+      "tokenPlaceholder": "የሥራ ቦታ መዳረሻ ቶከን",
+      "tokenRefused": "Bitbucket ይህን የሥራ ቦታ ቶከን አልተቀበለውም። ከላይ ያሉት አስፈላጊ ፈቃዶች እንዳሉት ያረጋግጡ፣ ከዚያ እንደገና ይሞክሩ።"
     },
     "scopeList": {
       "personalStillAvailable": "የግል ማከማቻዎች አሁንም ከታች ይገኛሉ።",
@@ -1465,7 +1475,8 @@
       "repositoryLine": "ግምገማዎች፦ {{reviews}} · ግኝቶች፦ {{findings}}",
       "empty": "እስካሁን ትንታኔ ያላቸው ግምገማዎች የሉም",
       "emptyDescription": "ትንታኔ ለድርጅቱ ነቅቶ እያለ የተጠናቀቁ ግምገማዎችን ይመዘግባል።",
-      "off": "ለዚህ ድርጅት ትንታኔ ጠፍቷል።",
+      "offTitle": "ለ{{platform}} ትንታኔ ጠፍቷል",
+      "offDescription": "የተጠናቀቁ ግምገማዎችን ለመመዝገብ ትንታኔን በድር ላይ ባሉ የድርጅት ቅንብሮች ውስጥ ያንቁት።",
       "couldNotLoad": "ትንታኔን መጫን አልተቻለም"
     },
     "council": {
@@ -3325,6 +3336,7 @@
       "manageOnWeb": "የክፍያ ቅንብሮች በድር ላይ",
       "changePlan": "ዕቅድ ይቀይሩ",
       "buySeats": "የተጠቃሚ ፈቃዶችን ይግዙ",
+      "managedOnWeb": "ዕቅዱ፣ የተጠቃሚ ፈቃዶች እና ራስ-ሰር መሙላት የሚተዳደሩት በድር ላይ ነው።",
       "setupAutoTopUp": "ራስ-ሰር መሙላትን ያዋቅሩ",
       "manageAutoTopUp": "ራስ-ሰር መሙላትን አስተዳድር",
       "opensOnWeb": "በድር ላይ ይከፈታል"
@@ -3473,12 +3485,10 @@
       "requestLogs": "የጥያቄ መዝገቦች"
     },
     "requestLogs": {
-      "hint": "መስኮቱ ከማብቃቱ በፊት ባለው አንድ ሰዓት ውስጥ የተደረጉ ጥያቄዎች፣ አዲሶቹ በመጀመሪያ።",
       "older": "ቀዳሚ ሰዓት",
       "newer": "ቀጣይ ሰዓት",
       "truncated": "በዚህ ሰዓት ዝርዝሩ ከሚያሳየው በላይ ጥያቄዎች አሉ።",
       "emptyTitle": "ምንም ጥያቄዎች የሉም",
-      "emptyDescription": "በዚህ ሰዓት ውስጥ ምንም የጌትዌይ ጥያቄዎች የሉም።",
       "loadError": "የጥያቄ መዝገቦችን መጫን አልተቻለም።",
       "permissionDenied": "የጥያቄ መዝገቦቹን ማንበብ የሚችሉት የድርጅቱ ባለቤት፣ አስተዳዳሪ ወይም የክፍያ አስተዳዳሪ ብቻ ናቸው።",
       "tokens": "{{input}} ግብዓት · {{output}} ውጤት",
@@ -4282,8 +4292,7 @@
       "repoValue": "ማከማቻ: {{name}}",
       "profileValue": "መገለጫ: {{name}}",
       "profileUnavailable": "ይህ መገለጫ ከእንግዲህ ወዲህ አይገኝም። ሌላ ይምረጡ።",
-      "pickerEmptyDescriptionOrganization": "የአካባቢ ተለዋዋጮችን፣ የማዋቀር ትዕዛዞችን እና በክፍለ-ጊዜዎች ያሉ ክህሎቶችን እንደገና ለመጠቀም የድርጅት መገለጫ ይፍጠሩ።",
-      "pickerEmptyDescriptionOrganizationReadOnly": "የድርጅት ባለቤት ወይም አስተዳዳሪ የድርጅት መገለጫ መፍጠር ይችላል።"
+      "pickerEmptyDescriptionOrganization": "የአካባቢ ተለዋዋጮችን፣ የማዋቀር ትዕዛዞችን እና በክፍለ-ጊዜዎች ያሉ ክህሎቶችን እንደገና ለመጠቀም የድርጅት መገለጫ ይፍጠሩ።"
     },
     "variablesDeleteFailed": "ተለዋዋጭ ማጥፋት አልተቻለም",
     "deleteVariable": "ተለዋዋጭ {{key}} ሰርዝ",
@@ -4469,7 +4478,6 @@
     "dismiss": "ሪፖርቱን አስወግድ",
     "offline": "ከመስመር ውጭ · የተቀመጠ ሪፖርት",
     "cached": "የተቀመጠ ሪፖርት · ማደስ አይቻልም",
-    "window": "{{start}} – {{end}}",
     "summary": "AI ማጠቃለያ",
     "summaryPending": "AI ማጠቃለያ በሂደት ላይ ነው። ሲዘጋጅ እዚህ ይያያዛል።",
     "summaryUnavailable": "AI ማጠቃለያ አይገኝም። የተዋቀረ ሪፖርትዎ አሁንም ይገኛል።",
@@ -4588,6 +4596,7 @@
       "title": "ቀስቅሴዎች እና ዌብሁኮች",
       "subtitle": "የCloud Agent ሩጫዎችን ከዌብሁክ ጥሪ ወይም ከመርሐ ግብር በራስ-ሰር ያድርጉ።",
       "new": "አዲስ ቀስቅሴ",
+      "create": "ቀስቅሴ ፍጠር",
       "emptyTitle": "እስካሁን ቀስቅሴዎች የሉም",
       "emptyDescription": "የCloud Agent ሩጫን ከዌብሁክ ጥሪ ወይም በመርሐ ግብር ለመጀመር ቀስቅሴ ይፍጠሩ።",
       "loadFailedTitle": "ቀስቅሴዎችን መጫን አልተቻለም",
@@ -4641,6 +4650,8 @@
       "created": "ቀስቅሴ ተፈጥሯል",
       "saved": "ቀስቅሴ ተቀምጧል",
       "statusArrived": "ደርሷል",
+      "defaultPromptWebhook": "የዚህን የዌብሁክ ጥያቄ አካል ይግለጹ፦\n\n{{body}}",
+      "defaultPromptScheduled": "የተያዘውን ተግባር ያስኪዱ። በ{{scheduledTime}} ተጀምሯል።",
       "problems": {
         "nameRequired": "ስም ያስገቡ።",
         "nameTooShort": "ቢያንስ 8 ቁምፊዎችን ይጠቀሙ።",

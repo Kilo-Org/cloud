@@ -36,6 +36,7 @@ const query = vi.hoisted(() => ({
     | undefined,
   isLoading: false,
   isPending: false,
+  isPaused: false,
   isError: false,
   isFetching: false,
   refetch: vi.fn(),
@@ -124,6 +125,7 @@ beforeEach(() => {
   query.data = undefined;
   query.isLoading = false;
   query.isPending = false;
+  query.isPaused = false;
   query.isError = false;
   query.refetch.mockClear();
   updateMember.mutate.mockClear();
@@ -305,6 +307,28 @@ describe('MemberLimitSheet error copy', () => {
     const messages = accessibleStatusMessages(renderer);
     expect(messages).toContain(i18n.t('common.couldNotSaveSetting'));
     expect(messages).not.toContain('Failed to update user role');
+    unmount();
+  });
+});
+
+describe('MemberLimitSheet pending membership read', () => {
+  // A pending (not fetching yet, no data) read with no cached payload must
+  // reach the skeleton, not the member-not-found state: the sheet had no
+  // answer yet.
+  it('shows the skeleton, not member-not-found, while the read is pending and unfetched', async () => {
+    query.isPending = true;
+    query.isLoading = false;
+    query.data = undefined;
+
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(MemberLimitSheet, { memberId: 'member-1' })
+    );
+
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
     unmount();
   });
 });

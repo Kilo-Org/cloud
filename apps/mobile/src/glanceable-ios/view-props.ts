@@ -7,7 +7,7 @@ import {
   buildHomeWidgetData,
   buildHomeWidgetPresentation,
   buildHomeWidgetPresentationTimeline,
-  EMPTY_HOME_WIDGET_DETAILS,
+  emptyHomeWidgetDetails,
   glanceableSessionTitle,
   type HomeWidgetData,
   type HomeWidgetPresentation,
@@ -190,9 +190,9 @@ export function buildGlanceableViewProps(
     flags.signedOut || flags.orgInvalid
       ? {
           snapshot: { ...snapshot, status: flags.signedOut ? 'signed_out' : 'privacy' },
-          details: EMPTY_HOME_WIDGET_DETAILS,
+          details: emptyHomeWidgetDetails(),
         }
-      : (homeData ?? { snapshot, details: EMPTY_HOME_WIDGET_DETAILS }),
+      : (homeData ?? { snapshot, details: emptyHomeWidgetDetails() }),
     now
   );
   return {
@@ -347,7 +347,7 @@ export function buildExpiredWidgetProps(
       },
       {},
       translate,
-      { snapshot, details: EMPTY_HOME_WIDGET_DETAILS },
+      { snapshot, details: emptyHomeWidgetDetails() },
       Date.parse(snapshot.expiresAt)
     )
   );
@@ -397,7 +397,7 @@ export function widgetTimelineFrames(
   if (snapshot.status === 'signed_out' || snapshot.status === 'privacy') {
     return null;
   }
-  const data = homeData ?? { snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
+  const data = homeData ?? { snapshot, details: emptyHomeWidgetDetails() };
   const now = Date.now();
   // WidgetKit renders the newest entry at or before `now` and never rewinds, so
   // a frame whose date has already passed sits behind the current one and only

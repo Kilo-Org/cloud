@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -9,6 +9,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import http from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -20,17 +21,59 @@ import {
   insertSection,
   isVersionBumpCommit,
   linkPullRequest,
+  noteLineProblem,
   parseConfigVersion,
+  readerFacingSubject,
   sectionHeading,
   splitSections,
 } from './kilo-app-release-notes.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const NOTES = join(HERE, 'kilo-app-release-notes.mjs');
+const REWRITE_HISTORY = join(HERE, 'kilo-app-changelog-rewrite-history.mjs');
 const CAP = join(HERE, 'kilo-app-release-upload-cap.mjs');
 
+// A developer's own key must never turn a unit test into a live gateway call,
+// so every run starts with the rewrite's environment blank and a test opts in
+// with its own `env`.
+function scriptEnv(options = {}) {
+  return {
+    ...process.env,
+    KILO_CHANGELOG_API_KEY: '',
+    KILO_CHANGELOG_BASE_URL: '',
+    KILO_CHANGELOG_TIMEOUT_MS: '',
+    ...options.env,
+  };
+}
+
 function runScript(script, args, options = {}) {
-  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', ...options });
+  return spawnSync(process.execPath, [script, ...args], {
+    encoding: 'utf8',
+    ...options,
+    env: scriptEnv(options),
+  });
+}
+
+/**
+ * The same run without blocking this process: the fake gateway lives here, so a
+ * synchronous spawn would stall the server that has to answer it.
+ */
+function runScriptAsync(script, args, options = {}) {
+  return new Promise(resolve => {
+    const child = spawn(process.execPath, [script, ...args], {
+      ...options,
+      env: scriptEnv(options),
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', chunk => {
+      stderr += chunk;
+    });
+    child.on('close', status => resolve({ status, stdout, stderr }));
+  });
 }
 
 function git(cwd, args, options = {}) {
@@ -225,10 +268,7 @@ test('body lists app PRs oldest first and drops bumps, non-app, app-local, chang
 
     const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(
-      result.stdout,
-      '- fix(mobile): second ([#101](https://github.com/Kilo-Org/cloud/pull/101))\n'
-    );
+    assert.equal(result.stdout, ['### Fixes', '', '- areas: app', ''].join('\n'));
 
     const empty = runScript(NOTES, ['body', '--from', 'nopr'], { cwd: dir });
     assert.equal(empty.status, 0, empty.stderr);
@@ -236,6 +276,123 @@ test('body lists app PRs oldest first and drops bumps, non-app, app-local, chang
   } finally {
     cleanup(dir);
   }
+});
+
+test('body keeps the subjects a reader sees and drops the rest', () => {
+  const dir = initRepo('kilo-notes-reader-');
+  try {
+    commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
+    git(dir, ['tag', 'base']);
+    commit(
+      dir,
+      { 'apps/mobile/src/demo.ts': 'demo\n' },
+      'feat(mobile): add flag-gated native remote demo (#110)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/sync.ts': 'sync\n' },
+      'fix(mobile): bound native sync recovery by socket generation (#111)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/padding.ts': 'padding\n' },
+      'fix(mobile): align Spend alerts card padding with the info card (#112)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/label.ts': 'label\n' },
+      'fix(mobile): drop the redundant Members section label (#113)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/glance.ts': 'glance\n' },
+      'fix(mobile): answer the request a glanceable approval names (#114)'
+    );
+    commit(
+      dir,
+      { 'apps/mobile/src/signin.ts': 'signin\n' },
+      'fix(auth): link same-email sign-ins (#115)'
+    );
+    // A catalog fix stays: the screen folds a version's language bullets into
+    // one line in the reader's own language, so it needs them.
+    commit(
+      dir,
+      { 'apps/mobile/src/igbo.ts': 'igbo\n' },
+      'fix(mobile): correct the Igbo code reviewer copy (#116)'
+    );
+
+    const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    // The catalog fix's `mobile` scope names no area, and `auth` maps, so the
+    // section names the one area its fixes reached.
+    assert.equal(result.stdout, ['### Fixes', '', '- areas: signIn', ''].join('\n'));
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('body lists the newest features under New and the fix areas under Fixes', () => {
+  const dir = initRepo('kilo-notes-curated-');
+  try {
+    commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
+    git(dir, ['tag', 'base']);
+    commit(dir, { 'apps/mobile/src/a.ts': 'a\n' }, 'feat(chat): keep the composer visible (#121)');
+    commit(dir, { 'apps/mobile/src/b.ts': 'b\n' }, 'feat(security-agent): name the scope (#122)');
+    commit(dir, { 'apps/mobile/src/c.ts': 'c\n' }, 'fix(auth): link same-email sign-ins (#123)');
+    commit(dir, { 'apps/mobile/src/d.ts': 'd\n' }, 'fix(chat): steady the toolbar (#124)');
+    commit(
+      dir,
+      { 'apps/mobile/src/e.ts': 'e\n' },
+      'fix(notifications): lead with the message (#125)'
+    );
+
+    const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      result.stdout,
+      [
+        '### New',
+        '',
+        '- feat(security-agent): name the scope ([#122](https://github.com/Kilo-Org/cloud/pull/122))',
+        '- feat(chat): keep the composer visible ([#121](https://github.com/Kilo-Org/cloud/pull/121))',
+        '',
+        '### Fixes',
+        '',
+        '- areas: chat, signIn, notifications',
+        '',
+      ].join('\n')
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test('readerFacingSubject classifies a subject and links it', () => {
+  assert.deepEqual(readerFacingSubject('Quick Chat polish: bubble width (#117)'), {
+    kind: 'new',
+    text: 'Quick Chat polish: bubble width ([#117](https://github.com/Kilo-Org/cloud/pull/117))',
+    scope: undefined,
+  });
+  assert.deepEqual(readerFacingSubject('feat(mobile): add on-device Gemini Nano (#118)'), {
+    kind: 'new',
+    text: 'feat(mobile): add on-device Gemini Nano ([#118](https://github.com/Kilo-Org/cloud/pull/118))',
+    scope: 'mobile',
+  });
+  assert.equal(readerFacingSubject('fix(security-agent): name the scope (#121)')?.kind, 'fix');
+  assert.equal(readerFacingSubject('docs(mobile): correct a comment (#119)'), null);
+  assert.equal(
+    readerFacingSubject('feat(mobile): add shared client transport and web demo (#120)'),
+    null
+  );
+  // Backend, web and API work never reaches the phone app's notes.
+  assert.equal(readerFacingSubject('feat(ai-gateway): serve /api/v1 (#126)'), null);
+  assert.equal(readerFacingSubject('feat(web-shared): add a header (#127)'), null);
+  assert.equal(readerFacingSubject('feat(mobile): record push history over tRPC (#128)'), null);
+  assert.equal(readerFacingSubject('feat(chat): expose the API route (#129)'), null);
+  // A removal or a restriction is a change, but it is not a new feature.
+  assert.equal(readerFacingSubject('feat(kilo-pass): stop in-app sales (#130)')?.kind, 'fix');
+  assert.equal(readerFacingSubject('feat(credits): expire paid credits (#131)')?.kind, 'fix');
+  assert.equal(readerFacingSubject('feat(chat): remove the old composer (#132)')?.kind, 'fix');
 });
 
 test('linkPullRequest links only the trailing pull-request ref', () => {
@@ -258,6 +415,696 @@ test('body exits 2 naming an unresolvable --from ref', () => {
     const result = runScript(NOTES, ['body', '--from', 'no-such-ref'], { cwd: dir });
     assert.equal(result.status, 2);
     assert.match(result.stderr, /no-such-ref/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+/**
+ * A local OpenAI-compatible gateway. `answer` writes one completion for each
+ * request, so a test can return canned JSON, invalid JSON, or leave the request
+ * hanging for the timeout path. Nothing here reaches the network.
+ */
+async function fakeGateway(answer) {
+  const requests = [];
+  const server = http.createServer((request, response) => {
+    let body = '';
+    request.on('data', chunk => {
+      body += chunk;
+    });
+    request.on('end', () => {
+      const parsed = {
+        authorization: request.headers.authorization,
+        url: request.url,
+        body: JSON.parse(body),
+      };
+      requests.push(parsed);
+      answer(response, parsed);
+    });
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  return {
+    baseUrl: `http://127.0.0.1:${port}`,
+    requests,
+    close: () =>
+      new Promise(resolve => {
+        server.close(resolve);
+        server.closeAllConnections();
+      }),
+  };
+}
+
+/** A chat completion carrying `answer` as its message. */
+function completion(answer) {
+  return { choices: [{ message: { role: 'assistant', content: JSON.stringify(answer) } }] };
+}
+
+function reply(response, payload) {
+  response.writeHead(200, { 'content-type': 'application/json' });
+  response.end(JSON.stringify(payload));
+}
+
+/** Two shippable commits after the `base` tag: one feature, one fix. */
+function rewriteRepo(prefix) {
+  const dir = initRepo(prefix);
+  commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
+  git(dir, ['tag', 'base']);
+  commit(dir, { 'apps/mobile/src/a.ts': 'a\n' }, 'feat(chat): keep the composer visible (#121)');
+  commit(dir, { 'apps/mobile/src/b.ts': 'b\n' }, 'fix(auth): link same-email sign-ins (#123)');
+  return dir;
+}
+
+/** The deterministic block `body` writes when the rewrite is unavailable. */
+const DETERMINISTIC_BODY = [
+  '### New',
+  '',
+  '- feat(chat): keep the composer visible ([#121](https://github.com/Kilo-Org/cloud/pull/121))',
+  '',
+  '### Fixes',
+  '',
+  '- areas: signIn',
+  '',
+].join('\n');
+
+test('noteLineProblem rejects a pull request reference but not a counted number', () => {
+  assert.equal(noteLineProblem('Keep the composer visible (#121)'), 'a pull request reference');
+  assert.equal(noteLineProblem('Keep the composer visible #121)'), 'a pull request reference');
+  assert.equal(noteLineProblem('Keep the composer visible #121'), 'a pull request reference');
+  assert.equal(noteLineProblem('See [#121]'), 'a pull request reference');
+  assert.equal(noteLineProblem('See pull/121'), 'a pull request reference');
+  // A number the copy counts is not a pull request reference.
+  assert.equal(noteLineProblem('Ranked #1 for speed in the store'), null);
+  assert.equal(noteLineProblem('The #1 request from users is now one tap away'), null);
+});
+
+test('body writes the generic fixes line when the answer names no area', async () => {
+  const dir = initRepo('kilo-notes-generic-');
+  const gateway = await fakeGateway(response =>
+    reply(response, completion({ new: [], changes: [], areas: [] }))
+  );
+  try {
+    commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
+    git(dir, ['tag', 'base']);
+    // An unscoped fix names no product area, so the model has nothing to list.
+    commit(
+      dir,
+      { 'apps/mobile/src/a.ts': 'a\n' },
+      'fix(mobile): keep the sheet from jumping (#130)'
+    );
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.equal(result.stdout, ['### Fixes', '', '- areas: app', ''].join('\n'));
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body falls back when the answer names the generic area itself', async () => {
+  const dir = initRepo('kilo-notes-generic-reject-');
+  const gateway = await fakeGateway(response =>
+    reply(response, completion({ new: [], changes: [], areas: ['app'] }))
+  );
+  try {
+    commit(dir, { 'apps/mobile/src/first.ts': 'first\n' }, 'feat(mobile): first (#100)');
+    git(dir, ['tag', 'base']);
+    commit(
+      dir,
+      { 'apps/mobile/src/a.ts': 'a\n' },
+      'fix(mobile): keep the sheet from jumping (#130)'
+    );
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /unknown area: app/);
+    assert.equal(result.stdout, ['### Fixes', '', '- areas: app', ''].join('\n'));
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body writes the model rewrite when the gateway answers with valid notes', async () => {
+  const dir = rewriteRepo('kilo-notes-model-');
+  const gateway = await fakeGateway(response =>
+    reply(
+      response,
+      completion({
+        new: ['Keep the composer visible while you read older messages'],
+        changes: [],
+        areas: ['chat', 'signIn'],
+      })
+    )
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: {
+        KILO_CHANGELOG_API_KEY: 'test-key',
+        KILO_CHANGELOG_BASE_URL: gateway.baseUrl,
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.equal(
+      result.stdout,
+      [
+        '### New',
+        '',
+        '- Keep the composer visible while you read older messages',
+        '',
+        '### Fixes',
+        '',
+        '- areas: chat, signIn',
+        '',
+      ].join('\n')
+    );
+    assert.equal(gateway.requests.length, 1, 'one rewrite per version');
+    const request = gateway.requests[0];
+    assert.equal(request.authorization, 'Bearer test-key');
+    // The briefing's working call: the chat completions route under
+    // `/api/openrouter`, a non-streamed body, and a cap sized for a reasoning
+    // model's hidden tokens before the answer.
+    assert.equal(request.url, '/api/openrouter/chat/completions');
+    assert.equal(request.body.stream, false);
+    assert.equal(request.body.max_tokens, 16_384);
+    assert.equal('temperature' in request.body, false);
+    assert.equal(request.body.model, '~deepseek/deepseek-flash-latest');
+    const prompt = request.body.messages.map(message => message.content).join('\n');
+    assert.match(prompt, /new \| chat \| feat\(chat\): keep the composer visible/);
+    assert.match(prompt, /fix \| signIn \| fix\(auth\): link same-email sign-ins/);
+    assert.doesNotMatch(prompt, /first \(#100\)/, 'a pre-range commit must not reach the model');
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body reads the answer past a reasoning field, a preamble and a fence', async () => {
+  const dir = rewriteRepo('kilo-notes-reasoning-');
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [
+        {
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            reasoning: 'One object, three lists, plain words.',
+            content: [
+              'Here are the notes:',
+              '```json',
+              JSON.stringify({
+                new: ['Keep the composer visible while you read older messages'],
+                changes: [],
+                areas: ['chat'],
+              }),
+              '```',
+              'That is all.',
+            ].join('\n'),
+          },
+        },
+      ],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.equal(
+      result.stdout,
+      [
+        '### New',
+        '',
+        '- Keep the composer visible while you read older messages',
+        '',
+        '### Fixes',
+        '',
+        '- areas: chat',
+        '',
+      ].join('\n')
+    );
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body skips an echoed placeholder shape and reads the answer after it', async () => {
+  const dir = rewriteRepo('kilo-notes-placeholder-');
+  const placeholder = '{"new":["..."],"changes":["..."],"areas":["..."]}';
+  const answer = JSON.stringify({
+    new: ['Keep the composer visible while you read older messages'],
+    changes: [],
+    areas: ['chat'],
+  });
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [
+        {
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            content: `I will reply in the requested shape:\n${placeholder}\n\n${answer}`,
+          },
+        },
+      ],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.equal(
+      result.stdout,
+      [
+        '### New',
+        '',
+        '- Keep the composer visible while you read older messages',
+        '',
+        '### Fixes',
+        '',
+        '- areas: chat',
+        '',
+      ].join('\n')
+    );
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body keeps a URL reason when the answer carries an object of its own', async () => {
+  const dir = rewriteRepo('kilo-notes-nested-object-');
+  // The only answer: one line quotes an empty object and one carries a URL, so
+  // validation fails for the URL. A scan that resumes inside the answer collects
+  // the `{}` as a later answer and reports its shape error instead.
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [
+        {
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            content: JSON.stringify({
+              new: ['Tap {} to collapse a group', 'Download at https://example.com'],
+              changes: [],
+              areas: ['chat'],
+            }),
+          },
+        },
+      ],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /contained a URL/);
+    assert.doesNotMatch(result.stderr, /expected shape/);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body names a reasoning-only answer, and does not log its reasoning', async () => {
+  const dir = rewriteRepo('kilo-notes-reasoning-only-');
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [
+        {
+          finish_reason: 'length',
+          message: { role: 'assistant', content: '', reasoning: 'First I read\nthe diff.' },
+        },
+      ],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /invalid JSON/);
+    assert.match(result.stderr, /finish_reason length/);
+    assert.match(result.stderr, /0 content characters/);
+    assert.match(result.stderr, /a reasoning field present/);
+    assert.doesNotMatch(result.stderr, /First I read/, 'the reasoning is not the answer');
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body names a truncated answer with the start of its content', async () => {
+  const dir = rewriteRepo('kilo-notes-truncated-');
+  const truncated = '{"new":["Keep the composer visible while you';
+  const gateway = await fakeGateway(response =>
+    reply(response, {
+      choices: [{ finish_reason: 'length', message: { role: 'assistant', content: truncated } }],
+    })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /invalid JSON/);
+    assert.match(result.stderr, /finish_reason length/);
+    assert.match(result.stderr, new RegExp(`${truncated.length} content characters`));
+    assert.match(result.stderr, /no reasoning field/);
+    // The excerpt is JSON-quoted, so a quote in the model's text cannot end it.
+    assert.ok(
+      result.stderr.includes(`content starts ${JSON.stringify(truncated)}`),
+      `the diagnostic must show the content's start: ${result.stderr}`
+    );
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body falls back to the deterministic block when the answer is not JSON', async () => {
+  const dir = rewriteRepo('kilo-notes-invalid-json-');
+  const gateway = await fakeGateway(response =>
+    reply(response, { choices: [{ message: { content: 'I cannot help with that.' } }] })
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /invalid JSON/);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body falls back when the answer does not match the schema', async () => {
+  const dir = rewriteRepo('kilo-notes-schema-');
+  const gateway = await fakeGateway(response =>
+    reply(response, completion({ new: 'one line', changes: [], areas: [] }))
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /expected shape/);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body falls back when a line names a code identifier', async () => {
+  const dir = rewriteRepo('kilo-notes-code-');
+  const gateway = await fakeGateway(response =>
+    reply(
+      response,
+      completion({
+        new: ['Call getUser() from apps/mobile to keep the composer'],
+        changes: [],
+        areas: ['chat', 'signIn'],
+      })
+    )
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /code identifier/);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body falls back when a line carries a pull request reference', async () => {
+  const dir = rewriteRepo('kilo-notes-pr-');
+  const gateway = await fakeGateway(response =>
+    reply(
+      response,
+      completion({
+        new: ['Keep the composer visible (#121)'],
+        changes: [],
+        areas: ['chat', 'signIn'],
+      })
+    )
+  );
+  try {
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /pull request reference/);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body falls back when the gateway does not answer before the timeout', async () => {
+  const dir = rewriteRepo('kilo-notes-timeout-');
+  const gateway = await fakeGateway(() => {
+    // Leave the request open: only the client's own timeout ends it.
+  });
+  try {
+    const started = Date.now();
+    const result = await runScriptAsync(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: {
+        KILO_CHANGELOG_API_KEY: 'test-key',
+        KILO_CHANGELOG_BASE_URL: gateway.baseUrl,
+        KILO_CHANGELOG_TIMEOUT_MS: '200',
+      },
+    });
+    const elapsed = Date.now() - started;
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /did not answer within 200ms/);
+    assert.ok(elapsed < 10_000, `the timeout must end the wait, took ${elapsed}ms`);
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('body writes the deterministic block without calling the gateway when the key is unset', async () => {
+  const dir = rewriteRepo('kilo-notes-nokey-');
+  const gateway = await fakeGateway(response => reply(response, completion({ new: [] })));
+  try {
+    const result = runScript(NOTES, ['body', '--from', 'base'], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, DETERMINISTIC_BODY);
+    assert.match(result.stderr, /KILO_CHANGELOG_API_KEY is not set/);
+    assert.equal(gateway.requests.length, 0, 'no key means no call');
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+const HISTORY_CHANGELOG = `# Kilo App Changelog
+
+Newest first: one section per store build.
+
+## 1.0.15 (build 710 iOS, 711 Android)
+
+- feat(auth): link same-email sign-ins ([#10334](https://github.com/Kilo-Org/cloud/pull/10334))
+
+## 1.0.15 (build 703 iOS, 704 Android)
+
+- fix(chat): steady the toolbar ([#101](https://github.com/Kilo-Org/cloud/pull/101))
+
+## 1.0.14 (build 700 iOS, 701 Android)
+
+- feat(chat): keep the composer visible ([#99](https://github.com/Kilo-Org/cloud/pull/99))
+`;
+
+/** The history rewrite's canned answers, chosen by the subject in the prompt. */
+function historyAnswer(request) {
+  const prompt = request.body.messages[request.body.messages.length - 1].content;
+  if (prompt.includes('link same-email sign-ins')) {
+    return {
+      new: ['Sign in once and stay signed in'],
+      changes: [],
+      areas: ['chat'],
+    };
+  }
+  return {
+    new: ['Keep the composer visible while you read older messages'],
+    changes: [],
+    areas: [],
+  };
+}
+
+test('the history rewrite curates every shipped version and is idempotent', async () => {
+  const dir = initRepo('kilo-notes-history-');
+  const changelog = writeFixture(dir, 'apps/mobile/CHANGELOG.md', HISTORY_CHANGELOG);
+  const gateway = await fakeGateway((response, request) =>
+    reply(response, completion(historyAnswer(request)))
+  );
+  try {
+    const env = {
+      KILO_CHANGELOG_API_KEY: 'test-key',
+      KILO_CHANGELOG_BASE_URL: gateway.baseUrl,
+    };
+    const result = await runScriptAsync(REWRITE_HISTORY, [], { cwd: dir, env });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /curated 2 version\(s\)/);
+    const written = readFileSync(changelog, 'utf8');
+    assert.equal(
+      written,
+      `# Kilo App Changelog
+
+Newest first: one section per store build.
+
+## 1.0.15 (build 710 iOS, 711 Android)
+
+### New
+
+- Sign in once and stay signed in
+
+### Fixes
+
+- areas: chat
+
+## 1.0.15 (build 703 iOS, 704 Android)
+
+_Its notes are on the newest 1.0.15 section above._
+
+## 1.0.14 (build 700 iOS, 701 Android)
+
+### New
+
+- Keep the composer visible while you read older messages
+`
+    );
+    const second = await runScriptAsync(REWRITE_HISTORY, [], { cwd: dir, env });
+    assert.equal(second.status, 0, second.stderr);
+    assert.equal(gateway.requests.length, 2, 'a curated file is not sent again');
+    assert.equal(readFileSync(changelog, 'utf8'), written, 'a second run changes nothing');
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('the history rewrite lands a partial success and names the versions it left', async () => {
+  const dir = initRepo('kilo-notes-history-partial-');
+  const changelog = writeFixture(dir, 'apps/mobile/CHANGELOG.md', HISTORY_CHANGELOG);
+  const gateway = await fakeGateway((response, request) => {
+    const prompt = request.body.messages[request.body.messages.length - 1].content;
+    if (prompt.includes('link same-email sign-ins')) {
+      reply(response, completion(historyAnswer(request)));
+      return;
+    }
+    reply(response, { choices: [{ message: { content: 'not json' } }] });
+  });
+  try {
+    const result = await runScriptAsync(REWRITE_HISTORY, [], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 3, 'a partial rewrite is not a failed run');
+    assert.match(result.stdout, /curated 1 version\(s\)/);
+    assert.match(result.stderr, /1\.0\.14: .*invalid JSON/);
+    assert.match(result.stderr, /still need the rewrite: 1\.0\.14$/m);
+    assert.equal(
+      readFileSync(changelog, 'utf8'),
+      `# Kilo App Changelog
+
+Newest first: one section per store build.
+
+## 1.0.15 (build 710 iOS, 711 Android)
+
+### New
+
+- Sign in once and stay signed in
+
+### Fixes
+
+- areas: chat
+
+## 1.0.15 (build 703 iOS, 704 Android)
+
+_Its notes are on the newest 1.0.15 section above._
+
+## 1.0.14 (build 700 iOS, 701 Android)
+
+- feat(chat): keep the composer visible ([#99](https://github.com/Kilo-Org/cloud/pull/99))
+`
+    );
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('the history rewrite leaves a version it could not curate and exits 1', async () => {
+  const dir = initRepo('kilo-notes-history-fail-');
+  const changelog = writeFixture(dir, 'apps/mobile/CHANGELOG.md', HISTORY_CHANGELOG);
+  const gateway = await fakeGateway(response =>
+    reply(response, { choices: [{ message: { content: 'not json' } }] })
+  );
+  try {
+    const result = await runScriptAsync(REWRITE_HISTORY, [], {
+      cwd: dir,
+      env: { KILO_CHANGELOG_API_KEY: 'test-key', KILO_CHANGELOG_BASE_URL: gateway.baseUrl },
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /1\.0\.15: .*invalid JSON/);
+    assert.match(result.stderr, /still need the rewrite: 1\.0\.15, 1\.0\.14/);
+    assert.equal(
+      readFileSync(changelog, 'utf8'),
+      HISTORY_CHANGELOG,
+      'a failed version is untouched'
+    );
+  } finally {
+    await gateway.close();
+    cleanup(dir);
+  }
+});
+
+test('the history rewrite requires the gateway key', () => {
+  const dir = initRepo('kilo-notes-history-nokey-');
+  try {
+    const result = runScript(REWRITE_HISTORY, [], { cwd: dir });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /KILO_CHANGELOG_API_KEY is required/);
   } finally {
     cleanup(dir);
   }
@@ -328,10 +1175,7 @@ test('body drops the squashed version-bump merge that carries the changelog', ()
 
     const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(
-      result.stdout,
-      '- fix(mobile): a real fix ([#7002](https://github.com/Kilo-Org/cloud/pull/7002))\n'
-    );
+    assert.equal(result.stdout, ['### Fixes', '', '- areas: app', ''].join('\n'));
 
     const onlyBump = runScript(NOTES, ['body', '--from', 'base', '--to', bumpMerge], { cwd: dir });
     assert.equal(onlyBump.status, 0, onlyBump.stderr);

@@ -277,6 +277,7 @@ const run = (
     consumeStepToken: (token, binding) => tokens.consume(token, binding),
     session:
       input.session ?? createSession(input.probe === undefined ? {} : { probe: input.probe }),
+    sessionHandle: 'session-1',
     stepTokens: input.stepTokens ?? [],
     tabId: 7,
     toolName: input.toolName,
@@ -531,6 +532,7 @@ describe('sensitive steps', () => {
       element: 'e12',
       origin: 'https://app.example.com',
       reason: SENSITIVE_REASON.password,
+      session: 'session-1',
       tabId: 7,
       toolName: 'browser_fill_form',
     });
@@ -831,6 +833,7 @@ describe('sensitive steps', () => {
       element: 'e12',
       origin: 'https://app.example.com',
       reason: SENSITIVE_REASON.password,
+      session: 'session-1',
       tabId: 7,
       toolName: 'browser_type',
     });
@@ -857,6 +860,7 @@ describe('sensitive steps', () => {
       element: 'e12',
       origin: 'https://app.example.com',
       reason: SENSITIVE_REASON.password,
+      session: 'session-1',
       tabId: 7,
       toolName: 'browser_type',
     });
@@ -979,6 +983,7 @@ describe('script calls', () => {
       argumentHash: hashBrowserToolArguments(args),
       origin: 'https://app.example.com',
       reason: SENSITIVE_REASON.script,
+      session: 'session-1',
       tabId: 7,
       toolName: 'browser_evaluate',
     });

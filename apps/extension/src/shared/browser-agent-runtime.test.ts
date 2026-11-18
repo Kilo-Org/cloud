@@ -537,11 +537,13 @@ describe('agent browser calls', () => {
     });
 
     expect(outcome).toMatchObject({
+      afterAction: true,
       items: [{ class: 'sensitive', origin: MAIN_ORIGIN, reason: SENSITIVE_REASON.download }],
       kind: 'needs_permission',
       result: { error: NEEDS_PERMISSION_ERROR, ok: false },
     });
-    // The download was denied for the call's duration and the browser's default restored afterwards.
+    // The click ran once: a click is a press and a release, and nothing ran the action a second time.
+    expect(cdp.commands().filter(method => method === 'Input.dispatchMouseEvent')).toHaveLength(2);
     expect(cdp.downloadsDenied()).toBe(1);
     expect(cdp.downloadsRestored()).toBe(1);
 
@@ -577,13 +579,75 @@ describe('agent browser calls', () => {
 
     const approved = await click([token]);
 
+    // The next identical call runs with the guard off and keeps its download.
     expect(approved.kind).toBe('result');
     expect(cdp.downloadsDenied()).toBe(1);
 
     const replay = await click([token]);
 
-    expect(replay.kind).toBe('needs_permission');
+    expect(replay).toMatchObject({ afterAction: true, kind: 'needs_permission' });
     expect(cdp.downloadsDenied()).toBe(2);
+  });
+
+  it('does not let one session\u2019s download token approve another session\u2019s call', async () => {
+    const { controller } = createGroups();
+    const { cdp, runtime } = await createHarness({ share: false, tabGroups: controller });
+
+    for (const sessionHandle of ['session-1', 'session-2']) {
+      // eslint-disable-next-line no-await-in-loop -- one session per share, in order
+      await runtime.openSession({ controllerId: 'controller-1', sessionHandle, title: 'Work' });
+      // eslint-disable-next-line no-await-in-loop -- see above
+      await runtime.shareActiveTab({ sessionHandle, tabId: TAB_ID });
+    }
+
+    cdp.setHandlers({
+      'Input.dispatchMouseEvent': () => {
+        cdp.emit('Browser.downloadWillBegin', {
+          guid: 'download-7',
+          suggestedFilename: 'invoice.pdf',
+          url: `${MAIN_ORIGIN}/invoice.pdf`,
+        });
+
+        return {};
+      },
+    });
+
+    const click = async (sessionHandle: string, sensitive: readonly string[] = []) => {
+      const caller = { controllerId: 'controller-1', kind: 'agent' as const, sessionHandle };
+
+      try {
+        return await runtime.runTool({
+          agent: { authorized: [readGrant, actGrant], sensitive: [...sensitive] },
+          arguments: { target: '#pay' },
+          caller,
+          tabId: TAB_ID,
+          toolName: 'browser_click',
+        });
+      } finally {
+        // The bridge releases at call end; without it the next session would wait for this lease.
+        runtime.releaseCaller(caller);
+      }
+    };
+
+    const token = expectStepToken(await click('session-1'));
+
+    // The other session presents the token: it does not match, so the call is guarded again.
+    await expect(click('session-2', [token])).resolves.toMatchObject({
+      afterAction: true,
+      kind: 'needs_permission',
+    });
+    expect(cdp.downloadsDenied()).toBe(2);
+
+    // A mismatch burns the token by design (a replay must not probe a valid binding), so even its owner is guarded again.
+    const ownerRetry = await click('session-1', [token]);
+
+    expect(ownerRetry).toMatchObject({ afterAction: true, kind: 'needs_permission' });
+
+    // A fresh approval for that session still buys exactly one unguarded run; the guard denied every refused call.
+    await expect(click('session-1', [expectStepToken(ownerRetry)])).resolves.toMatchObject({
+      kind: 'result',
+    });
+    expect(cdp.downloadsDenied()).toBe(3);
   });
 
   it('does not refuse an act call for a download an earlier call started', async () => {

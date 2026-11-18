@@ -188,7 +188,7 @@ export const ORIGIN_CHANGED_ERROR =
 /** Sensitive reasons, kept short and free of page content so they are safe to show a model. */
 export const SENSITIVE_REASON = {
   cardFormSubmit: 'submitting a form with payment fields',
-  download: 'starting a download',
+  download: 'downloading a file',
   fileUpload: 'uploading a file',
   oauthConsent: 'acting on an OAuth consent page',
   oneTimeCode: 'typing a one-time code',
@@ -344,6 +344,8 @@ export interface StepTokenBinding {
   readonly argumentHash: string;
   readonly element?: string | undefined;
   readonly origin: string;
+  /** The agent session the approval belongs to: another session's token never applies. */
+  readonly session: string;
   readonly tabId: number;
   readonly toolName: string;
 }
@@ -412,6 +414,7 @@ export const stepTokenBindingMatches = (
   stored: StepTokenBinding & { readonly expiresAt: number; readonly reason: string },
   binding: StepTokenBinding
 ): boolean =>
+  stored.session === binding.session &&
   stored.tabId === binding.tabId &&
   stored.toolName === binding.toolName &&
   stored.argumentHash === binding.argumentHash &&
@@ -471,6 +474,7 @@ export const createStepTokenStore = ({
         expiresAt: now() + STEP_TOKEN_TTL_MS,
         origin: input.origin,
         reason: input.reason,
+        session: input.session,
         tabId: input.tabId,
         toolName: input.toolName,
       });

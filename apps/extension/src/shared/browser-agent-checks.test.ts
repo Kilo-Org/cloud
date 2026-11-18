@@ -99,6 +99,7 @@ describe('step tokens', () => {
     argumentHash: 'abc',
     element: 'e12',
     origin: 'https://example.com',
+    session: 'session-1',
     tabId: 7,
     toolName: 'browser_type',
   };

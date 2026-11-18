@@ -273,6 +273,8 @@ export const createRuntimeBrowserBridge = ({
           {
             items: outcome.items,
             ...(outcome.stepToken === undefined ? {} : { stepToken: outcome.stepToken }),
+            // The page already ran: the CLI asks a human and must not replay the call.
+            ...(outcome.afterAction === true ? { afterAction: true } : {}),
           }
         );
       }

@@ -362,6 +362,8 @@ export interface AgentPreflightInput {
   /** Validates a token against this exact call and burns it; provided by the runtime's store. */
   readonly consumeStepToken: (token: string, binding: StepTokenBinding) => boolean;
   readonly session: GateSession;
+  /** The calling agent session's handle: a step token is bound to it, not just to the tab. */
+  readonly sessionHandle: string;
   /** The step tokens the retry carried. */
   readonly stepTokens: readonly string[];
   readonly tabId: number;
@@ -501,6 +503,7 @@ export const preflightAgentCall = async (input: AgentPreflightInput): Promise<Ag
     // The refusal reports the element that probed sensitive; the runtime issues the token for that element, so the retry must bind exactly it.
     element: sensitive.element,
     origin: sensitiveOrigin,
+    session: input.sessionHandle,
     tabId: input.tabId,
     toolName: input.toolName,
   };

@@ -1,5 +1,6 @@
 /* eslint-disable eslint/max-statements, max-lines, max-lines-per-function, max-expects, require-await, typescript/require-await, typescript-eslint/consistent-type-definitions -- one fake runtime serves every protocol branch, and its recorders read as one table */
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { AGENT_TAB_OUTSIDE_GROUP_ERROR } from '../browser-agent-checks';
 import { TAB_BUSY_ERROR, TAB_TAKEN_ERROR } from '../browser-caller';
 import type { BrowserCaller } from '../browser-caller';
@@ -120,6 +121,27 @@ const openAndShare = async (bridge: LocalAgentBrowserBridge, sessionHandle = HAN
   await bridge.shareActiveTab({ controllerId: CONTROLLER, sessionHandle });
 };
 
+const refusalSchema = z.object({
+  code: z.number(),
+  data: z.record(z.string(), z.unknown()).optional(),
+  message: z.string(),
+});
+
+/** The protocol error a bridge call rejected with, parsed so the test reads a checked shape. */
+const rejectionOf = async (
+  call: Promise<unknown>
+): Promise<z.infer<typeof refusalSchema> | undefined> => {
+  try {
+    await call;
+
+    return undefined;
+  } catch (error) {
+    const parsed = refusalSchema.safeParse(error);
+
+    return parsed.success ? parsed.data : undefined;
+  }
+};
+
 const snapshotParams = (sessionHandle = HANDLE) => ({
   arguments: {},
   authorized: [{ class: 'read', origin: 'https://app.example.com' }],
@@ -219,13 +241,45 @@ describe('local agent browser bridge', () => {
 
     await openAndShare(bridge);
 
-    await expect(bridge.callTool(CONTROLLER, snapshotParams())).rejects.toMatchObject({
+    const refusal = await rejectionOf(bridge.callTool(CONTROLLER, snapshotParams()));
+
+    expect(refusal).toMatchObject({
       code: LOCAL_AGENT_ERROR_CODES.needsPermission,
       data: {
         items: [
           { class: 'sensitive', origin: 'https://app.example.com', reason: 'typing a password' },
         ],
         stepToken: 'step-1',
+      },
+    });
+    // A pre-action need carries no `afterAction`: the CLI may retry it.
+    expect(refusal?.data?.['afterAction']).toBeUndefined();
+  });
+
+  it('marks a post-action refusal so the CLI never replays the action', async () => {
+    const fake = createFakeRuntime({
+      outcome: () => ({
+        afterAction: true,
+        items: [
+          { class: 'sensitive', origin: 'https://app.example.com', reason: 'downloading a file' },
+        ],
+        kind: 'needs_permission',
+        result: { error: 'needs permission', ok: false },
+        stepToken: 'step-download',
+      }),
+    });
+    const bridge = createRuntimeBrowserBridge({ runtime: () => fake.runtime });
+
+    await openAndShare(bridge);
+
+    await expect(bridge.callTool(CONTROLLER, snapshotParams())).rejects.toMatchObject({
+      code: LOCAL_AGENT_ERROR_CODES.needsPermission,
+      data: {
+        afterAction: true,
+        items: [
+          { class: 'sensitive', origin: 'https://app.example.com', reason: 'downloading a file' },
+        ],
+        stepToken: 'step-download',
       },
     });
   });

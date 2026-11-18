@@ -76,6 +76,8 @@ export type BrowserToolRunOutcome =
     }
   // The transport maps these onto JSON-RPC -32010 / -32012; the result carries the model-visible tool error.
   | {
+      /** The page ran before the refusal: the CLI must not auto-retry, only a human may. */
+      readonly afterAction?: boolean;
       readonly items: readonly BrowserPermissionItem[];
       readonly kind: 'needs_permission';
       readonly result: EvalTabResult;
@@ -307,12 +309,14 @@ export const createBrowserRuntime = ({
 
   const needsPermissionOutcome = (
     items: readonly BrowserPermissionItem[],
-    stepToken: string | undefined
+    stepToken: string | undefined,
+    afterAction?: boolean
   ): BrowserToolRunOutcome => ({
     items,
     kind: 'needs_permission',
     result: { error: NEEDS_PERMISSION_ERROR, ok: false },
     ...(stepToken === undefined ? {} : { stepToken }),
+    ...(afterAction === true ? { afterAction: true } : {}),
   });
 
   const claimTab = async ({ caller, from, tabId }: BrowserTabClaimInput): Promise<boolean> => {
@@ -384,12 +388,15 @@ export const createBrowserRuntime = ({
       try {
         const agentContext = caller.kind === 'agent' ? (agent ?? { authorized: [] }) : undefined;
         const argsRecord = parseToolArguments(toolArguments);
+        // Every step token is bound to the calling session, the tab, the tool and the exact arguments.
+        const sessionKey = caller.kind === 'agent' ? caller.sessionHandle : '';
         const issueSensitiveToken = (sensitive: BrowserSensitiveStep): string =>
           tokens.issue({
             argumentHash: hashBrowserToolArguments(argsRecord),
             element: sensitive.element,
             origin: sensitive.origin,
             reason: sensitive.reason,
+            session: sessionKey,
             tabId,
             toolName,
           });
@@ -408,6 +415,7 @@ export const createBrowserRuntime = ({
                 authorized: agentContext.authorized,
                 consumeStepToken: (token, binding) => tokens.consume(token, binding),
                 session,
+                sessionHandle: sessionKey,
                 stepTokens: agentContext.sensitive ?? [],
                 tabId,
                 toolName,
@@ -433,13 +441,14 @@ export const createBrowserRuntime = ({
           );
         }
 
-        // A download approval is post-action, so the gate cannot classify it on retry; a presented token bound to this tab, tool and argument set disables the guard once.
+        // A download approval is post-action, so the gate cannot classify it on retry; a presented token bound to this session, tab, tool and argument set disables the guard once.
         const downloadApproved =
           agentContext !== undefined && preflight !== undefined && preflight.ok
             ? (agentContext.sensitive ?? []).some(token =>
                 tokens.consume(token, {
                   argumentHash: hashBrowserToolArguments(argsRecord),
                   origin: preflight.origin,
+                  session: sessionKey,
                   tabId,
                   toolName,
                 })
@@ -529,9 +538,11 @@ export const createBrowserRuntime = ({
           const origin = preflight?.ok ? preflight.origin : '';
           const reason = SENSITIVE_REASON.download;
 
+          // The click already ran and the download was cancelled. `afterAction` tells the CLI not to replay it.
           return needsPermissionOutcome(
             [{ class: 'sensitive', origin, reason }],
-            preflight?.ok ? issueSensitiveToken({ origin, reason }) : undefined
+            preflight?.ok ? issueSensitiveToken({ origin, reason }) : undefined,
+            true
           );
         }
 

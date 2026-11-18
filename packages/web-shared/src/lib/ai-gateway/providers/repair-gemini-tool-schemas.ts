@@ -56,6 +56,13 @@ const TYPE_KEYWORDS: Record<string, Set<string>> = {
 
 const TYPED_KEYWORDS = new Set(Object.values(TYPE_KEYWORDS).flatMap(keywords => [...keywords]));
 
+const JSON_TYPES = new Set(Object.keys(TYPE_KEYWORDS));
+
+// Restricting types to the seven JSON types bounds a repaired node to seven branches.
+function isJsonType(type: unknown): type is string {
+  return typeof type === 'string' && JSON_TYPES.has(type);
+}
+
 function matchesType(type: string, value: unknown): boolean {
   switch (type) {
     case 'null':
@@ -143,7 +150,7 @@ function movesWithoutCopies(node: Record<string, unknown>, keys: string[]) {
  */
 function lowerMixedTypeArray(node: Record<string, unknown>): boolean {
   const types = node.type;
-  if (!Array.isArray(types) || !types.every(type => typeof type === 'string')) return false;
+  if (!Array.isArray(types) || !types.every(isJsonType)) return false;
   if (hasCombinator(node)) return false;
   const values: unknown[] = [
     ...(Array.isArray(node.enum) ? (node.enum as unknown[]) : []),
@@ -178,8 +185,8 @@ function lowerMixedTypeArray(node: Record<string, unknown>): boolean {
  * branch were booleans. Nullability becomes a null branch, which every Gemini
  * upstream accepts.
  *
- * Only an `anyOf` whose branches each have a distinct `type` is rewritten, so
- * that no subschema is copied into several branches. A node is also left
+ * Only an `anyOf` whose branches each have a distinct JSON `type` is rewritten,
+ * so that no subschema is copied into several branches. A node is also left
  * alone when a branch sets one of the moved keys to another value, or when no
  * branch could match, since merging those would change what the schema accepts.
  */
@@ -188,8 +195,9 @@ function distributeAnyOfSiblings(node: Record<string, unknown>): boolean {
   const keys = Object.keys(node).filter(key => !ANY_OF_KEYS.has(key));
   if (keys.length === 0) return false;
   const anyOf = node.anyOf as unknown[];
+  if (anyOf.length > JSON_TYPES.size) return false;
   const types = anyOf.map(branch =>
-    isRecord(branch) && typeof branch.type === 'string' ? branch.type : undefined
+    isRecord(branch) && isJsonType(branch.type) ? branch.type : undefined
   );
   if (types.some(type => type === undefined) || new Set(types).size !== types.length) {
     return false;
@@ -247,11 +255,16 @@ const SCHEMA_MAX_DEPTH = 64;
 function withinBudget(schema: unknown): boolean {
   const pending: { node: unknown; depth: number }[] = [{ node: schema, depth: 0 }];
   let visited = 0;
+  let overBudget = false;
   for (let frame = pending.pop(); frame !== undefined; frame = pending.pop()) {
     if (!isRecord(frame.node)) continue;
     if (++visited > SCHEMA_NODE_BUDGET || frame.depth > SCHEMA_MAX_DEPTH) return false;
     const depth = frame.depth + 1;
-    forEachChildSchema(frame.node, child => pending.push({ node: child, depth }));
+    forEachChildSchema(frame.node, child => {
+      if (visited + pending.length >= SCHEMA_NODE_BUDGET) overBudget = true;
+      else pending.push({ node: child, depth });
+    });
+    if (overBudget) return false;
   }
   return true;
 }

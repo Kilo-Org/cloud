@@ -152,6 +152,27 @@ describe('repairGeminiJsonSchema', () => {
     expect(repaired(property)).toEqual(expected);
   });
 
+  it.each([
+    [{ anyOf: [{ type: 'a1' }, { type: 'a2' }], enum: ['x', 'y'], title: 'T' }],
+    [{ type: ['a1', 'a2'], enum: ['x', 1] }],
+  ])('leaves %p alone when a type is not a JSON type', property => {
+    const expected = structuredClone(property);
+
+    expect(repaired(property)).toEqual(expected);
+  });
+
+  it('leaves a schema wider than the budget untouched', () => {
+    const leaf = { anyOf: [{ type: 'string' }], nullable: true, enum: ['a', 'null'] };
+    const schema = {
+      type: 'object',
+      properties: { leaf, wide: { anyOf: Array.from({ length: 100_001 }, () => true) } },
+    };
+    const expected = structuredClone(schema);
+
+    expect(repairGeminiJsonSchema(schema)).toBe(0);
+    expect(schema).toEqual(expected);
+  });
+
   it('leaves a schema deeper than the budget untouched', () => {
     const leaf = { anyOf: [{ type: 'string' }], nullable: true, enum: ['a', 'null'] };
     let deep: Record<string, unknown> = leaf;

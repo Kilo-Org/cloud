@@ -348,7 +348,10 @@ const buttonLabels = (tree: ReactTestRenderer): unknown[] =>
       const type = node.type as string;
       return type === 'Button' || type === 'StateAction';
     })
-    .map(action => action.find(node => (node.type as string) === 'Text').props.children);
+    .flatMap(action => {
+      const label = action.findAll(node => (node.type as string) === 'Text')[0];
+      return label === undefined ? [] : [label.props.children];
+    });
 
 /** The button carrying the given label, for the props a press alone cannot show. */
 function buttonOf(tree: ReactTestRenderer, label: unknown) {
@@ -357,7 +360,10 @@ function buttonOf(tree: ReactTestRenderer, label: unknown) {
       const type = node.type as string;
       return type === 'Button' || type === 'StateAction';
     })
-    .find(node => node.find(child => (child.type as string) === 'Text').props.children === label);
+    .find(
+      node =>
+        node.findAll(child => (child.type as string) === 'Text')[0]?.props.children === label
+    );
   if (button === undefined) {
     throw new TypeError(`No button ${String(label)}`);
   }

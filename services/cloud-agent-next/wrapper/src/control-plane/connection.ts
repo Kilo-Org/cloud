@@ -66,7 +66,7 @@ function outboxKindOf(frame: ControlPlaneWrapperFrame): OutboxKind {
 
 type WebSocketWithHeadersCtor = new (
   url: string,
-  options?: { headers?: Record<string, string> }
+  options?: { headers?: Record<string, string>; proxy?: string }
 ) => WebSocket;
 
 export type ControlPlaneHeartbeat = { active: boolean; degraded: boolean; workspaceBusy?: boolean };
@@ -83,6 +83,7 @@ export type ControlPlaneConnectionSnapshot = {
 export type ControlPlaneConnectionOptions = {
   url: string;
   credential: string;
+  proxyUrl?: string;
   allocationId: string;
   timers: ControlPlaneTimers;
   wrapperId?: string;
@@ -131,10 +132,6 @@ export function controlPlaneReconnectDelayMs(
   const base = Math.min(max, min * 2 ** Math.max(0, attempt - 1));
   const jitter = Math.floor(random() * Math.max(1, Math.floor(min / RECONNECT_JITTER_DIVISOR)));
   return base + jitter;
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function toText(data: unknown): string | undefined {
@@ -437,6 +434,7 @@ export function createControlPlaneConnection(
     let target: WebSocket;
     try {
       target = new WebSocketWithHeaders(options.url, {
+        proxy: options.proxyUrl,
         headers: {
           Authorization: `Bearer ${options.credential}`,
           [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION,
@@ -452,8 +450,8 @@ export function createControlPlaneConnection(
             : {}),
         },
       });
-    } catch (error) {
-      log(`control-plane connection failed: ${messageOf(error)}`);
+    } catch {
+      log('control-plane connection failed');
       reportDisconnectEpisode('connect_attempt');
       phase = 'idle';
       scheduleReconnect();

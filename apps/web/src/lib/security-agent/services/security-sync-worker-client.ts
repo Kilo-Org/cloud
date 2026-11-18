@@ -5,7 +5,10 @@ import {
   SECURITY_SYNC_WORKER_URL,
 } from '@kilocode/web-shared/lib/config.server';
 import { SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE } from '@kilocode/app-shared/security-agent';
-import { postSecurityWorkerJson } from './security-worker-request';
+import {
+  isDefinitiveSecurityWorkerRejection,
+  postSecurityWorkerJson,
+} from './security-worker-request';
 
 export type AcceptedSecurityWorkerCommand = {
   accepted: true;
@@ -66,11 +69,12 @@ export async function postSecurityWorkerCommand(params: {
     // The known disabled-routing 503 is returned before enqueueing, so it is a
     // definitive rejection. Any other 5xx (including a gateway 503) may have
     // been accepted and stays ambiguous transport.
-    const definitive =
-      response.status < 500 ||
-      (response.status === 503 &&
-        workerBody?.success === false &&
-        workerBody?.error === params.disabledRoutingError);
+    const definitive = isDefinitiveSecurityWorkerRejection({
+      status: response.status,
+      body: workerBody,
+      disabledRoutingError: params.disabledRoutingError,
+      requireSuccessFalse: true,
+    });
     throw new TRPCError({
       code: definitive ? 'PRECONDITION_FAILED' : 'BAD_GATEWAY',
       message: definitive ? failed : `${failed} Try again.`,

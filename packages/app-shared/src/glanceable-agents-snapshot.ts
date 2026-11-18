@@ -75,9 +75,9 @@ export type GlanceableNeedsInputKind = (typeof GLANCEABLE_NEEDS_INPUT_STATUSES)[
 export const glanceableAgentsSnapshotSchema = z.object({
   schemaVersion: z.literal(GLANCEABLE_SNAPSHOT_SCHEMA_VERSION),
   revision: z.number().int().min(1),
-  /** ISO 8601 timestamp. */
+  /** Snapshot write time; producers emit the `epochMsToIso` UTC form. */
   updatedAt: z.string(),
-  /** ISO 8601 timestamp; `updatedAt + GLANCEABLE_SNAPSHOT_EXPIRY_MS`. */
+  /** When the snapshot stops being eligible work; `updatedAt + GLANCEABLE_SNAPSHOT_EXPIRY_MS`. */
   expiresAt: z.string(),
   /** Opaque scope key; never a raw user or organization id. */
   scopeKey: z.string().min(1),
@@ -515,8 +515,10 @@ export function isIdleOnlyGlanceableWork(snapshot: GlanceableAgentsSnapshot): bo
 
 /**
  * True when `incoming` must be discarded in favour of `current`: a strictly
- * lower revision, or the same revision with an older `updatedAt`. ISO 8601
- * strings from `epochMsToIso` compare correctly as strings.
+ * lower revision, or the same revision with an older `updatedAt`. The tie is
+ * settled on the parsed instants so any ISO 8601 form orders chronologically;
+ * when either instant does not parse, the raw strings decide, matching the
+ * behavior before instants were parsed.
  */
 export function shouldDiscardGlanceableRevision(
   incoming: GlanceableAgentsSnapshot,
@@ -526,6 +528,11 @@ export function shouldDiscardGlanceableRevision(
     return true;
   }
   if (incoming.revision === current.revision) {
+    const incomingAt = timestampMs(incoming.updatedAt);
+    const currentAt = timestampMs(current.updatedAt);
+    if (incomingAt !== null && currentAt !== null) {
+      return incomingAt < currentAt;
+    }
     return incoming.updatedAt < current.updatedAt;
   }
   return false;

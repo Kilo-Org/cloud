@@ -2132,6 +2132,8 @@ function profileCreateIntent(
     runtimeAgents: resolved.runtimeAgents,
     builtinAgents: resolved.builtinAgents,
     modelContextLimits: resolved.modelContextLimits,
+    webSearchDisabled: resolved.webSearchDisabled,
+    webSearchProvider: resolved.webSearchProvider,
     kiloCommands: resolved.kiloCommands,
     runtimeInstructions: resolved.runtimeInstructions,
   };

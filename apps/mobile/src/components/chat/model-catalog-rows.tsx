@@ -49,7 +49,7 @@ export function RecommendedRow({
   const displayName = model.name.replace(/\s*\([^)]*\)\s*$/, '').trim();
   return (
     <Card>
-      <View className="flex-row items-start justify-between gap-3">
+      <View className="flex-row items-center justify-between gap-3">
         <Text className="min-w-0 shrink font-semibold">{displayName}</Text>
         <FitBadge fit={fit} />
       </View>

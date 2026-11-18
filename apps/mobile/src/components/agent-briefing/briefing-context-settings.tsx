@@ -8,7 +8,7 @@ import { ModelSelector } from '@/components/agents/model-selector';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FormField } from '@/components/ui/form-field';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
@@ -185,22 +185,23 @@ export function BriefingContextSettings({
       <Text variant="muted">{t('agentBriefing.scheduledContextHint')}</Text>
       <View className="flex-row items-center justify-between gap-3">
         <Text className="min-w-0 flex-1">{t('agentBriefing.scheduledContextEnabled')}</Text>
-        <Switch
-          value={preference.enabled}
-          disabled={offline || update.isPending}
-          accessibilityLabel={t('agentBriefing.scheduledContextEnabled')}
-          accessibilityState={{
+        {renderRowTrailing({
+          kind: 'switch',
+          value: preference.enabled,
+          disabled: offline || update.isPending,
+          accessibilityLabel: t('agentBriefing.scheduledContextEnabled'),
+          accessibilityState: {
             checked: preference.enabled,
             disabled: offline || update.isPending,
-          }}
-          onValueChange={next => {
+          },
+          onValueChange: next => {
             if (next) {
               void enable();
             } else {
               update.mutate({ organizationId, enabled: false, timezone, language: locale });
             }
-          }}
-        />
+          },
+        })}
       </View>
       <ModelSelector
         value={model}

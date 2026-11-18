@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
@@ -44,16 +44,17 @@ export function ReviewMemoryToggleCard({
             {t('codeReviewer.reviewMemory.on')}
           </Text>
         </Pressable>
-        <Switch
-          value={enabled}
-          disabled={disabled}
-          accessibilityLabel={t('codeReviewer.reviewMemory.title')}
-          accessibilityHint={
-            readOnly ? t('codeReviewer.reviewMemory.readOnlyDescription') : undefined
-          }
-          accessibilityState={{ disabled, busy: pending, checked: enabled }}
-          onValueChange={onChange}
-        />
+        {renderRowTrailing({
+          kind: 'switch',
+          value: enabled,
+          disabled,
+          accessibilityLabel: t('codeReviewer.reviewMemory.title'),
+          accessibilityHint: readOnly
+            ? t('codeReviewer.reviewMemory.readOnlyDescription')
+            : undefined,
+          accessibilityState: { disabled, busy: pending, checked: enabled },
+          onValueChange: onChange,
+        })}
       </View>
       {readOnly ? (
         <Text variant="muted" className="text-xs">

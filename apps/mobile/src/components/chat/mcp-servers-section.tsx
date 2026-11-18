@@ -8,7 +8,7 @@ import { Section } from '@/components/ui/section';
 import { Button } from '@/components/ui/button';
 import { Server } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
@@ -175,11 +175,12 @@ function McpServerRow({
             {row.url}
           </Text>
         </View>
-        <Switch
-          value={row.enabled}
-          accessibilityLabel={t('modelChat.mcp.enableServer', { name: row.name })}
-          onValueChange={onToggle}
-        />
+        {renderRowTrailing({
+          kind: 'switch',
+          value: row.enabled,
+          accessibilityLabel: t('modelChat.mcp.enableServer', { name: row.name }),
+          onValueChange: onToggle,
+        })}
       </View>
       {/* One line's height in every state, so checking -> tools -> unreachable
           never moves the controls under it. */}

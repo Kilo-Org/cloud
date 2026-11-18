@@ -10,7 +10,7 @@ import { Section } from '@/components/consent/section';
 import { type ConsentMode } from '@/components/consent/consent-mode';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
@@ -227,11 +227,12 @@ export function VoiceTranscriptionControl() {
   return (
     <View className="mt-3 flex-row items-center justify-between gap-3">
       <Text className="flex-1 text-sm text-muted-foreground">{label}</Text>
-      <Switch
-        value={allowed}
-        onValueChange={handleToggle}
-        accessibilityLabel={t('consent.onlineTranscription')}
-      />
+      {renderRowTrailing({
+        kind: 'switch',
+        value: allowed,
+        onValueChange: handleToggle,
+        accessibilityLabel: t('consent.onlineTranscription'),
+      })}
     </View>
   );
 }

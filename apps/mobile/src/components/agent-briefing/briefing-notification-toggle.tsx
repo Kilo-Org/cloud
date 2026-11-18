@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Newspaper } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-briefing';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
@@ -79,12 +79,13 @@ export function BriefingNotificationToggle() {
     <Card>
       <View className="flex-row items-center gap-3">
         <Text className="min-w-0 flex-1">{t('agentBriefing.title')}</Text>
-        <Switch
-          accessibilityLabel={t('agentBriefing.title')}
-          value={value}
-          disabled={unavailable}
-          onValueChange={setEnabled}
-        />
+        {renderRowTrailing({
+          kind: 'switch',
+          accessibilityLabel: t('agentBriefing.title'),
+          value,
+          disabled: unavailable,
+          onValueChange: setEnabled,
+        })}
       </View>
       <Text variant="caption">{t('agentBriefing.notificationsHint')}</Text>
       {preferences.isError ? (

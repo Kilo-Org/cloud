@@ -16,7 +16,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Eye, EyeOff, Lock, Trash2 } from '@/components/ui/icons';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
@@ -346,11 +346,12 @@ export function VariableEditForm({
         <Text {...HIDDEN_LABEL_PROPS} className="flex-1 text-sm font-medium text-foreground">
           {t('profiles.secrets.markSecret')}
         </Text>
-        <Switch
-          value={isSecret}
-          accessibilityLabel={t('profiles.secrets.markSecret')}
-          onValueChange={setIsSecret}
-        />
+        {renderRowTrailing({
+          kind: 'switch',
+          value: isSecret,
+          accessibilityLabel: t('profiles.secrets.markSecret'),
+          onValueChange: setIsSecret,
+        })}
       </View>
       <View className="flex-row gap-2">
         <Button variant="outline" className="flex-1" onPress={onCancel}>

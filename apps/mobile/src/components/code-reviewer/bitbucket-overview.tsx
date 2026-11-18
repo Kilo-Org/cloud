@@ -1,4 +1,3 @@
-import { selectionHaptic } from '@/lib/haptics';
 import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -18,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { RowGroup } from '@/components/ui/row-group';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -201,19 +200,18 @@ export function BitbucketOverview({
                       </Text>
                     ) : null}
                   </View>
-                  <Switch
-                    accessibilityLabel={t('codeReviewer.autoReviews')}
-                    value={config.data.isEnabled}
-                    disabled={
+                  {renderRowTrailing({
+                    kind: 'switch',
+                    accessibilityLabel: t('codeReviewer.autoReviews'),
+                    value: config.data.isEnabled,
+                    disabled:
                       !canEdit ||
                       toggle.isPending ||
-                      (!canEnableAutoReview && !config.data.isEnabled)
-                    }
-                    onValueChange={value => {
-                      selectionHaptic();
+                      (!canEnableAutoReview && !config.data.isEnabled),
+                    onValueChange: value => {
                       toggle.mutate({ isEnabled: value });
-                    }}
-                  />
+                    },
+                  })}
                 </View>
                 {isReady && !hasRepoSelection && (
                   <View className="gap-2 border-t-[0.5px] border-hair-soft pt-3">

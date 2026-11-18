@@ -25,8 +25,8 @@ import { FormField } from '@/components/ui/form-field';
 import { ClipboardPaste } from '@/components/ui/icons';
 import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Section } from '@/components/ui/section';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { configImportArchiveFromText } from '@/lib/config-import-archive';
@@ -273,18 +273,17 @@ export function ProfileConfigImportSheet({
           <Section
             key={section.category}
             label={t(section.titleKey)}
-            notice={
-              <Switch
-                value={selection[section.category]}
-                accessibilityLabel={t('profiles.importConfigIncludeSection', {
-                  name: t(section.titleKey),
-                })}
-                disabled={busy}
-                onValueChange={selected => {
-                  setSelection(current => ({ ...current, [section.category]: selected }));
-                }}
-              />
-            }
+            notice={renderRowTrailing({
+              kind: 'switch',
+              value: selection[section.category],
+              accessibilityLabel: t('profiles.importConfigIncludeSection', {
+                name: t(section.titleKey),
+              }),
+              disabled: busy,
+              onValueChange: selected => {
+                setSelection(current => ({ ...current, [section.category]: selected }));
+              },
+            })}
           >
             <RowGroup>
               {section.items.map(item => (

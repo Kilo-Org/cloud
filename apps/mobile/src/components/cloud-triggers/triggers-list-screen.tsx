@@ -23,8 +23,8 @@ import { Copy, Plus, Workflow } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { RowGroup } from '@/components/ui/row-group';
 import { RowSkeleton } from '@/components/ui/row-skeleton';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Section } from '@/components/ui/section';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { copyWebhookUrl } from '@/lib/cloud-triggers/copy-webhook-url';
@@ -82,14 +82,13 @@ function TriggerRow({
         subtitle={details}
         accessibilityLabel={trigger.triggerId}
         onPress={onOpen}
-        trailing={
-          <Switch
-            accessibilityLabel={t('cloudAgent.triggers.activeTitle')}
-            value={trigger.isActive}
-            onValueChange={onToggle}
-            disabled={busy || !canToggle}
-          />
-        }
+        trailing={renderRowTrailing({
+          kind: 'switch',
+          accessibilityLabel: t('cloudAgent.triggers.activeTitle'),
+          value: trigger.isActive,
+          onValueChange: onToggle,
+          disabled: busy || !canToggle,
+        })}
       />
       {showsInboundUrl ? (
         // The inbound URL is a value of its own rather than the row's subtitle:

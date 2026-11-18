@@ -18,20 +18,18 @@ import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_MCP_SERVERS } from '@/lib/agent-profile-forms';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { settleSaveAttempt } from '@/lib/surface-feedback';
-import { cn } from '@/lib/utils';
 
 /**
  * The save's refusal: the per-profile server cap, a name the server already
@@ -306,20 +304,22 @@ export function McpFormSheet({
         />
 
         <RowGroup>
-          <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
+          <RowFrame
+            trailing={{
+              kind: 'switch',
+              value: enabled,
+              disabled: isSaving,
+              accessibilityLabel: t('common.enabled'),
+              onValueChange: setEnabled,
+            }}
+          >
             <Text
               {...HIDDEN_LABEL_PROPS}
               className="min-w-0 flex-1 text-sm font-medium text-foreground"
             >
               {t('common.enabled')}
             </Text>
-            <Switch
-              value={enabled}
-              disabled={isSaving}
-              accessibilityLabel={t('common.enabled')}
-              onValueChange={setEnabled}
-            />
-          </View>
+          </RowFrame>
         </RowGroup>
         <View className="h-3" />
       </ScrollView>

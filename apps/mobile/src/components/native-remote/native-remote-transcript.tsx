@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { Skeleton } from '@/components/ui/skeleton';
 import { transcriptText } from '@/lib/native-remote/projections';
@@ -162,11 +162,12 @@ function NativeRemoteComposer({ remote }: { remote: NativeRemoteSession }) {
       />
       <View className="flex-row items-center justify-between gap-3">
         <Text className="min-w-0 flex-1">{t('nativeRemote.queueIfOffline')}</Text>
-        <Switch
-          accessibilityLabel={t('nativeRemote.queueIfOffline')}
-          value={queue}
-          onValueChange={setQueue}
-        />
+        {renderRowTrailing({
+          kind: 'switch',
+          accessibilityLabel: t('nativeRemote.queueIfOffline'),
+          value: queue,
+          onValueChange: setQueue,
+        })}
       </View>
       <View className="flex-row flex-wrap gap-2">
         <Button

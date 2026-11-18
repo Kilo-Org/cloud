@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- One reviewer overview: each read state (loading, connect, error, ready) returns its own surface, and the ready branch's row config is the picker call plus the toggle wiring. */
-import { selectionHaptic } from '@/lib/haptics';
 import { type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -25,7 +24,7 @@ import { Card } from '@/components/ui/card';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { RowGroup } from '@/components/ui/row-group';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 import { Bot, ScrollText } from '@/components/ui/icons';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -290,17 +289,16 @@ export function PlatformOverviewScreen({
                       </Text>
                     ) : null}
                   </View>
-                  <Switch
-                    accessibilityLabel={t('codeReviewer.autoReviews')}
-                    value={data.isEnabled}
-                    disabled={
-                      !canEdit || toggle.isPending || (!hasRepoSelection && !data.isEnabled)
-                    }
-                    onValueChange={value => {
-                      selectionHaptic();
+                  {renderRowTrailing({
+                    kind: 'switch',
+                    accessibilityLabel: t('codeReviewer.autoReviews'),
+                    value: data.isEnabled,
+                    disabled:
+                      !canEdit || toggle.isPending || (!hasRepoSelection && !data.isEnabled),
+                    onValueChange: value => {
                       toggle.mutate({ isEnabled: value });
-                    }}
-                  />
+                    },
+                  })}
                 </View>
                 {!hasRepoSelection && (
                   <View className="gap-2 border-t-[0.5px] border-hair-soft pt-3">

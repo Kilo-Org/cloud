@@ -24,12 +24,11 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { FormField } from '@/components/ui/form-field';
 import { FormFieldLabel } from '@/components/ui/form-field-label';
+import { RowFrame } from '@/components/ui/row-frame';
 import { RowGroup } from '@/components/ui/row-group';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { HIDDEN_LABEL_PROPS } from '@/lib/a11y/hidden-label';
-import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { MAX_PROFILE_AGENTS } from '@/lib/agent-profile-forms';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
@@ -37,7 +36,6 @@ import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { SCREEN_BODY_CLASS } from '@/lib/layout';
 import { settleSaveAttempt } from '@/lib/surface-feedback';
-import { cn } from '@/lib/utils';
 
 const ERROR_FIELDS = {
   'slug-required': 'slug',
@@ -377,9 +375,19 @@ export function AgentFormSheet({
             {PERMISSION_TOOLS.map(tool => {
               const enabled = !disabledTools.includes(tool);
               return (
-                <View
+                <RowFrame
                   key={tool}
-                  className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}
+                  trailing={{
+                    kind: 'switch',
+                    value: enabled,
+                    disabled: isSaving || wholeToolAction !== undefined,
+                    accessibilityLabel: tool,
+                    onValueChange: next => {
+                      setDisabledTools(current =>
+                        next ? current.filter(item => item !== tool) : [...current, tool]
+                      );
+                    },
+                  }}
                 >
                   <Text
                     variant="mono"
@@ -388,17 +396,7 @@ export function AgentFormSheet({
                   >
                     {tool}
                   </Text>
-                  <Switch
-                    value={enabled}
-                    disabled={isSaving || wholeToolAction !== undefined}
-                    accessibilityLabel={tool}
-                    onValueChange={next => {
-                      setDisabledTools(current =>
-                        next ? current.filter(item => item !== tool) : [...current, tool]
-                      );
-                    }}
-                  />
-                </View>
+                </RowFrame>
               );
             })}
           </RowGroup>

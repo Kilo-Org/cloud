@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { Card } from '@/components/ui/card';
 import { RowChevron } from '@/components/ui/row-chevron';
 import { RowFrame } from '@/components/ui/row-frame';
-import { Switch } from '@/components/ui/switch';
+import { renderRowTrailing } from '@/components/ui/row-trailing';
 import { Text } from '@/components/ui/text';
 
 /**
@@ -39,14 +39,14 @@ export function SettingsSection({
             <Text variant="heading">{title}</Text>
             <Text variant="caption">{description}</Text>
           </View>
-          {showsSwitch ? (
-            <Switch
-              value={enabled}
-              disabled={switchDisabled}
-              onValueChange={onEnabledChange}
-              accessibilityLabel={title}
-            />
-          ) : null}
+          {showsSwitch &&
+            renderRowTrailing({
+              kind: 'switch',
+              value: enabled,
+              disabled: switchDisabled,
+              onValueChange: onEnabledChange,
+              accessibilityLabel: title,
+            })}
         </View>
       </Card>
       {!showsSwitch || enabled ? children : null}

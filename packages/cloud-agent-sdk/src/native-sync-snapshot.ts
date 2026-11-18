@@ -5,7 +5,12 @@ import {
   type Kilo2Message,
   type Kilo2Session,
 } from '@kilocode/session-ingest-contracts';
-import { kilo2AssetKey, readKilo2FileReferences, readKilo2Messages } from './kilo2-source-messages';
+import {
+  kilo2AssetKey,
+  readKilo2FileReferences,
+  readKilo2Messages,
+  type Kilo2FileReference,
+} from './kilo2-source-messages';
 import type { SessionSnapshot } from './types';
 
 // The intersection merges validated contract fields with the full JSON tree,
@@ -175,6 +180,62 @@ function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+/** Maximum simultaneous snapshot JSON blob reads. */
+const SNAPSHOT_READ_CONCURRENCY = 4;
+// Binary attachment reads pin up to the per-blob byte cap each, on top of the
+// retained base64 strings, so they run with a tighter window.
+const SNAPSHOT_ASSET_READ_CONCURRENCY = 2;
+
+/** Hand the buffer's base64 form to `sink` without holding full copies alive. */
+function viewBytesAsBase64(buffer: ArrayBuffer, sink: (base64: string) => void): void {
+  const bytes = new Uint8Array(buffer);
+  const chunks: string[] = [];
+  for (let start = 0; start < bytes.length; start += 0x8000) {
+    chunks.push(String.fromCharCode(...bytes.subarray(start, start + 0x8000)));
+  }
+  sink(btoa(chunks.join('')));
+}
+
+/**
+ * Resolve independent reads with bounded parallelism. Task index `i` starts
+ * before `i+1`, with at most `limit` in flight; queued tasks stay unsent after
+ * any task fails. The first started failing task's error settles the runner,
+ * after in-flight reads finish, with no unhandled rejections.
+ */
+async function readWithBoundedConcurrency<T>(
+  limit: number,
+  tasks: (() => Promise<T>)[]
+): Promise<T[]> {
+  const results: T[] = new Array<T>(tasks.length);
+  const workers: Promise<void>[] = [];
+  let next = 0;
+  let failedIndex = -1;
+  let failure: unknown;
+  const worker = async (): Promise<void> => {
+    while (failure === undefined) {
+      const task = tasks[next];
+      if (task === undefined) return;
+      const index = next++;
+      try {
+        results[index] = await task();
+      } catch (error) {
+        // Keep the earliest started failure regardless of settlement order.
+        if (failedIndex === -1 || index < failedIndex) {
+          failedIndex = index;
+          failure = error;
+        }
+        return;
+      }
+    }
+  };
+  for (let index = 0; index < Math.min(limit, tasks.length); index++) {
+    workers.push(worker());
+  }
+  await Promise.all(workers);
+  if (failure !== undefined) throw failure;
+  return results;
+}
+
 function snapshotChanged(): Error & { code: string } {
   return Object.assign(new Error('The native session changed while reading its snapshot'), {
     code: 'revision_changed',
@@ -185,7 +246,8 @@ async function resolveSnapshotAssets(
   snapshot: NativeSnapshot,
   resolved: ResolvedEntity[],
   path: string,
-  readAsset?: NativeAssetReader
+  readAsset?: NativeAssetReader,
+  resolvedBlobs: Map<string, { bytes: number; base64: string }> = new Map()
 ): Promise<Record<string, string>> {
   const mappings = new Map<string, z.infer<typeof assetMappingSchema>>();
   for (const item of resolved) {
@@ -197,8 +259,11 @@ async function resolveSnapshotAssets(
     if (mappings.has(key)) throw new Error('Native snapshot has ambiguous asset mappings');
     mappings.set(key, mapping);
   }
+  const wants: { file: Kilo2FileReference; hash: string; bytes: number }[] = [];
   const assetURLs: Record<string, string> = {};
-  const blobs = new Map<string, { bytes: number; base64: string }>();
+  const missing: { hash: string; bytes: number }[] = [];
+  const queuedHashes = new Set<string>();
+  const claimedBytes = new Map<string, number>();
   for (const item of snapshot.messages) {
     if (item.incomplete) continue;
     for (const file of readKilo2FileReferences(item.message)) {
@@ -235,31 +300,41 @@ async function resolveSnapshotAssets(
           }
         );
       }
-      let blob = blobs.get(mapping.blob.hash);
-      if (blob && blob.bytes !== mapping.blob.bytes) {
+      const advertised = mapping.blob.bytes;
+      const cached = resolvedBlobs.get(mapping.blob.hash);
+      const claimed = claimedBytes.get(mapping.blob.hash) ?? cached?.bytes;
+      if (claimed !== undefined && claimed !== advertised) {
         throw new Error('Native asset mappings disagree about blob size');
       }
-      if (!blob) {
-        const buffer = await readAsset(`${path}/blobs/${mapping.blob.hash}`, mapping.blob.bytes);
-        if (buffer.byteLength !== mapping.blob.bytes) {
-          throw Object.assign(
-            new Error('Native attachment bytes do not match the authorized blob size'),
-            {
-              code: 'blob_hash_mismatch',
-            }
-          );
-        }
-        const bytes = new Uint8Array(buffer);
-        const chunks: string[] = [];
-        for (let start = 0; start < bytes.length; start += 0x8000) {
-          chunks.push(String.fromCharCode(...bytes.subarray(start, start + 0x8000)));
-        }
-        blob = { bytes: buffer.byteLength, base64: btoa(chunks.join('')) };
-        blobs.set(mapping.blob.hash, blob);
+      claimedBytes.set(mapping.blob.hash, advertised);
+      if (cached === undefined && !queuedHashes.has(mapping.blob.hash)) {
+        queuedHashes.add(mapping.blob.hash);
+        missing.push({ hash: mapping.blob.hash, bytes: advertised });
       }
-      assetURLs[kilo2AssetKey(file.id, file.uri, file.mime)] =
-        `data:${file.mime};base64,${blob.base64}`;
+      wants.push({ file, hash: mapping.blob.hash, bytes: advertised });
     }
+  }
+  if (!readAsset) return assetURLs;
+  await readWithBoundedConcurrency(
+    SNAPSHOT_ASSET_READ_CONCURRENCY,
+    missing.map(({ hash, bytes }) => async () => {
+      const buffer = await readAsset(`${path}/blobs/${hash}`, bytes);
+      if (buffer.byteLength !== bytes) {
+        throw Object.assign(
+          new Error('Native attachment bytes do not match the authorized blob size'),
+          {
+            code: 'blob_hash_mismatch',
+          }
+        );
+      }
+      viewBytesAsBase64(buffer, base64 => resolvedBlobs.set(hash, { bytes, base64 }));
+    })
+  );
+  for (const want of wants) {
+    const cached = resolvedBlobs.get(want.hash);
+    if (!cached) throw new Error('Native asset read was skipped');
+    assetURLs[kilo2AssetKey(want.file.id, want.file.uri, want.file.mime)] =
+      `data:${want.file.mime};base64,${cached.base64}`;
   }
   return assetURLs;
 }
@@ -342,7 +417,9 @@ function reconstructMessages(
 async function readSnapshot(
   request: Request,
   sessionID: string,
-  readAsset?: NativeAssetReader
+  readAsset?: NativeAssetReader,
+  resolvedEntities: Map<string, unknown> = new Map(),
+  resolvedAssetBlobs: Map<string, { bytes: number; base64: string }> = new Map()
 ): Promise<NativeSnapshot> {
   const path = `/v1/sessions/${encodeURIComponent(sessionID)}`;
   const state = stateSchema.parse(await request<unknown>(path));
@@ -384,7 +461,11 @@ async function readSnapshot(
   } while (cursor !== null);
 
   const resolved: ResolvedEntity[] = [];
-  const blobs = new Map<string, unknown>();
+  // Collect blob-backed entities in appearance order and read each distinct
+  // body once, concurrently within the bounded window. Content-addressed
+  // entries cached from a previous retry attempt are reused as-is.
+  const pending: { entity: NativeEntity; hash: string }[] = [];
+  const hashes = new Set<string>();
   for (const entity of entities) {
     if ('value' in entity) {
       resolved.push({ entity, value: entity.value });
@@ -393,14 +474,23 @@ async function readSnapshot(
     // Bare asset blob references are raw bytes, not entity JSON. Resolve only
     // explicit inline mappings bound to authoritative native attachment positions.
     if (entity.kind === 'asset') continue;
-    if (!blobs.has(entity.blob.hash)) {
-      // Non-asset entity bodies are canonical JSON.
-      blobs.set(
-        entity.blob.hash,
-        z.json().parse(await request<unknown>(`${path}/blobs/${entity.blob.hash}`))
-      );
-    }
-    resolved.push({ entity, value: blobs.get(entity.blob.hash) });
+    pending.push({ entity, hash: entity.blob.hash });
+    hashes.add(entity.blob.hash);
+  }
+  await readWithBoundedConcurrency(
+    SNAPSHOT_READ_CONCURRENCY,
+    [...hashes]
+      .filter(hash => !resolvedEntities.has(hash))
+      .map(hash => async () => {
+        // Non-asset entity bodies are canonical JSON.
+        const value = z.json().parse(await request<unknown>(`${path}/blobs/${hash}`));
+        resolvedEntities.set(hash, value);
+      })
+  );
+  for (const item of pending) {
+    const value = resolvedEntities.get(item.hash);
+    if (value === undefined) throw new Error('Native snapshot blob read was skipped');
+    resolved.push({ entity: item.entity, value });
   }
   let session: NativeSnapshotSession | undefined;
   for (const item of resolved) {
@@ -418,7 +508,13 @@ async function readSnapshot(
     messages: reconstructMessages(resolved, state.position),
     entities,
   };
-  const assetURLs = await resolveSnapshotAssets(snapshot, resolved, path, readAsset);
+  const assetURLs = await resolveSnapshotAssets(
+    snapshot,
+    resolved,
+    path,
+    readAsset,
+    resolvedAssetBlobs
+  );
   if (Object.keys(assetURLs).length > 0) snapshot.assetURLs = assetURLs;
   return snapshot;
 }
@@ -427,12 +523,15 @@ async function readSnapshot(
  * Read one revision-consistent native snapshot, pinning even its first entity
  * page to the inspected state. Requests JSON-decode entity blobs and surface
  * service errors with a `code` property. Revision races and reclaimed blobs
- * restart from state, at most three complete attempts. Reads have a two-minute
- * total deadline, a 15-second request deadline, and non-cooperative cancellation.
- * The optional binary reader must use the same session/tenant authorization as
- * JSON reads and bound streamed bytes to the advertised blob size. Stored media
- * requires it; authorized bytes become content-bound data URLs without modifying
- * canonical messages or exposing credentials.
+ * restart from state, at most three complete attempts; content-addressed blob
+ * and attachment reads settled by an earlier attempt are reused, and the rest
+ * resolve with a small bounded pool rather than one request at a time. Reads
+ * have a two-minute total deadline, a 15-second request deadline, and
+ * non-cooperative cancellation. The optional binary reader must use the same
+ * session/tenant authorization as JSON reads and bound streamed bytes to the
+ * advertised blob size. Stored media requires it; authorized bytes become
+ * content-bound data URLs without modifying canonical messages or exposing
+ * credentials.
  */
 export async function fetchNativeSnapshot(
   request: Request,
@@ -485,10 +584,20 @@ export async function fetchNativeSnapshot(
     ? (path: string, advertisedBytes: number) =>
         runRequest(() => readAsset(path, advertisedBytes, { signal: controller.signal }))
     : undefined;
+  // Content-addressed reads already settled stay cached across retry
+  // attempts; an unchanged body cannot return different bytes.
+  const resolvedEntities = new Map<string, unknown>();
+  const resolvedBlobs = new Map<string, { bytes: number; base64: string }>();
   try {
     for (let attempt = 0; ; attempt++) {
       try {
-        return await readSnapshot(cancellable, sessionID, cancellableAsset);
+        return await readSnapshot(
+          cancellable,
+          sessionID,
+          cancellableAsset,
+          resolvedEntities,
+          resolvedBlobs
+        );
       } catch (error) {
         if (
           controller.signal.aborted ||

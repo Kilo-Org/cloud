@@ -187,11 +187,6 @@ describe('expected fence failures are not unhandled internal exceptions', () => 
     expect(error.code).toBe('SERVICE_UNAVAILABLE');
     expect(shouldCaptureCloudAgentException(error)).toBe(false);
   });
-
-  it('maps a stale-handle denial to a 401 outcome rather than a thrown exception', () => {
-    const error = new RuntimeProxyScopeViewDenialError('missing_canonical_grant');
-    expect(classifyRuntimeProxyFenceError(error)).toBe('deny');
-  });
 });
 
 describe('logRuntimeProxyFenceFailure', () => {

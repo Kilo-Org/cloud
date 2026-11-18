@@ -1,15 +1,58 @@
 import { Platform, StatusBar, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useScreenInsets } from '@/lib/screen-insets';
+
+/**
+ * The native startup metrics, or null where the runtime does not expose them.
+ *
+ * Expo's root `SafeAreaProvider` starts from no metrics on native, so the
+ * provider answers 0 for the first frames; the startup metrics are the same
+ * `statusBars or displayCutout` union read from the window before React asked.
+ * A partial `react-native-safe-area-context` mock omits the export and vitest
+ * throws on the property access itself rather than answering undefined, so it
+ * is read behind a guard (the same one the sheet shell uses for `BackHandler`).
+ */
+function readInitialWindowMetrics(): {
+  insets: { top: number };
+  frame: { height: number };
+} | null {
+  try {
+    return initialWindowMetrics ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The window's own top inset, known before the safe-area provider answers.
+ *
+ * The Android full detent reserves this inset. Resolved from the provider's
+ * first, still-empty frame it fell back to `StatusBar.currentHeight`, which
+ * stops at the status bar and leaves out the display cutout: the list settings
+ * sheet presented with its edge - and the header under it - 13.7 dp inside a
+ * 51.8 dp inset. The startup metrics carry the full inset for the window the
+ * app started in, so they stand in until the provider answers; a window that is
+ * no longer that one (rotated, resized) keeps the status-bar fallback.
+ */
+function resolveWindowTopInset(top: number, windowHeight: number): number {
+  if (top > 0) {
+    return top;
+  }
+  const initial = readInitialWindowMetrics();
+  if (initial && Math.abs(initial.frame.height - windowHeight) < 1) {
+    return initial.insets.top;
+  }
+  return StatusBar.currentHeight ?? 0;
+}
 
 // Android formSheets can't hit 1.0 without clipping under the status bar, so
 // the "full" detent is capped just below the top inset there; iOS can use 1.
 export function useFormSheetDetents() {
   const { height } = useWindowDimensions();
   const { top } = useSafeAreaInsets();
-  const androidTopInset = top > 0 ? top : (StatusBar.currentHeight ?? 0);
+  const androidTopInset = resolveWindowTopInset(top, height);
   const androidFullSheetDetent =
     height > 0 ? Math.max(0.5, (height - androidTopInset) / height) : 1;
   const fullSheetDetent = Platform.OS === 'android' ? androidFullSheetDetent : 1;

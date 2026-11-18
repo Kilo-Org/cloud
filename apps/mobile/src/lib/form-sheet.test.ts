@@ -13,11 +13,15 @@ const mocks = vi.hoisted(() => {
   const insets = { top: 0, bottom: 0, left: 0, right: 0 };
   const statusBar = { currentHeight: null as number | null };
   const dimensions = { height: 800 };
+  // The native startup metrics: a frame height of 0 matches no window, which is
+  // the state a runtime without them reports.
+  const initial = { insets: { top: 0 }, frame: { height: 0 } };
   return {
     platform,
     insets,
     statusBar,
     dimensions,
+    initial,
     useSafeAreaInsets: vi.fn(() => insets),
     useWindowDimensions: vi.fn(() => dimensions),
   };
@@ -31,6 +35,7 @@ vi.mock('react-native', () => ({
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: mocks.useSafeAreaInsets,
+  initialWindowMetrics: mocks.initial,
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -43,6 +48,8 @@ describe('useFormSheetDetents', () => {
     mocks.insets.top = 0;
     mocks.statusBar.currentHeight = null;
     mocks.dimensions.height = 800;
+    mocks.initial.insets.top = 0;
+    mocks.initial.frame.height = 0;
     vi.clearAllMocks();
   });
 
@@ -63,6 +70,28 @@ describe('useFormSheetDetents', () => {
     });
   });
 
+  it('takes the inset the startup metrics carry while the provider answers 0', () => {
+    // The provider has not measured yet and answers 0. `StatusBar.currentHeight`
+    // stops at the status bar and leaves out the display cutout, which put the
+    // list settings sheet 13.7 dp inside the top inset; the startup metrics are
+    // the same native read the provider will report.
+    mocks.dimensions.height = 914;
+    mocks.statusBar.currentHeight = 24;
+    mocks.initial.insets.top = 51.8;
+    mocks.initial.frame.height = 914;
+
+    expect(useFormSheetDetents()).toEqual({ fullSheetDetent: (914 - 51.8) / 914 });
+  });
+
+  it('ignores startup metrics that describe another window', () => {
+    mocks.dimensions.height = 914;
+    mocks.statusBar.currentHeight = 24;
+    mocks.initial.insets.top = 51.8;
+    mocks.initial.frame.height = 480;
+
+    expect(useFormSheetDetents()).toEqual({ fullSheetDetent: (914 - 24) / 914 });
+  });
+
   it('keeps the iOS detent at 1', () => {
     mocks.platform.OS = 'ios';
     mocks.insets.top = 47;
@@ -77,6 +106,8 @@ describe('useFormSheetScreenOptions', () => {
     mocks.insets.top = 0;
     mocks.statusBar.currentHeight = null;
     mocks.dimensions.height = 800;
+    mocks.initial.insets.top = 0;
+    mocks.initial.frame.height = 0;
     vi.clearAllMocks();
   });
 

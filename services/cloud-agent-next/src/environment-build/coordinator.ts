@@ -294,7 +294,7 @@ export class EnvironmentBuildCoordinator {
   ): Promise<string | null> {
     const now = this.deps.now();
     const buildId = this.deps.uuid();
-    const record: BuildInputRecord = { ...buildInputRecordOf(input), target };
+    const record: BuildInputRecord = buildInputRecordOf(input, target);
     const runtimeRelease = await this.deps.provider.runtimeReleaseId();
     const admitted = this.deps.transaction(() => {
       if (this.deps.store.activeBuild() !== null) return false;

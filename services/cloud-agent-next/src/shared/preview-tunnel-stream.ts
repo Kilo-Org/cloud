@@ -77,6 +77,7 @@ export class InboundBody {
             return;
           }
           if (this.queuedBytes === 0) {
+            this.release();
             controller.close();
             callbacks.onClosed?.();
             return;
@@ -91,7 +92,9 @@ export class InboundBody {
           const chunk = buffer.slice(this.readOffset, this.readOffset + bytes);
           this.readOffset = (this.readOffset + bytes) % buffer.length;
           this.queuedBytes -= bytes;
-          if (this.queuedBytes === 0) this.release();
+          // Keep the storage for the life of the body, so a reader that keeps up
+          // does not allocate a new window for each frame.
+          if (this.queuedBytes === 0) this.readOffset = 0;
           controller.enqueue(chunk);
           callbacks.onConsumed(chunk.byteLength);
         },

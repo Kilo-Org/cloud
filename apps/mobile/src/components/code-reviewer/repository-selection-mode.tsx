@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
+import { RowGroup } from '@/components/ui/row-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -28,18 +29,23 @@ export function RepositoryModeChoice({
   const { t } = useTranslation();
   return (
     <RadioGroup label={t('common.repositories')}>
-      {(['all', 'selected'] as const).map(option => (
-        <ChoiceRow
-          key={option}
-          label={option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')}
-          selected={mode === option}
-          disabled={disabled}
-          className="border-b-[0.5px] border-hair-soft"
-          onPress={() => {
-            onSelect(option);
-          }}
-        />
-      ))}
+      {/* The two modes are one grouped card, as Security Agent's repository
+          picker draws them: a bare pair let their text sit in the gutter column
+          the explanation below starts on, so the choice read as loose text
+          rather than as a setting. */}
+      <RowGroup>
+        {(['all', 'selected'] as const).map(option => (
+          <ChoiceRow
+            key={option}
+            label={option === 'all' ? t('common.allRepositories') : t('common.selectedRepositories')}
+            selected={mode === option}
+            disabled={disabled}
+            onPress={() => {
+              onSelect(option);
+            }}
+          />
+        ))}
+      </RowGroup>
     </RadioGroup>
   );
 }

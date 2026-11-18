@@ -18,7 +18,13 @@ const config = vi.hoisted(() => ({
   fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
   refetch: vi.fn(),
 }));
-const catalog = vi.hoisted(() => ({ models: [], isLoading: false, isError: false }));
+const catalog = vi.hoisted(() => ({
+  models: [] as unknown[],
+  isLoading: false,
+  isError: false,
+  error: undefined as Error | undefined,
+  fetchStatus: 'idle' as 'fetching' | 'paused' | 'idle',
+}));
 const connectivity = vi.hoisted(() => ({ status: 'online' as 'online' | 'offline' | 'unknown' }));
 
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
@@ -46,8 +52,6 @@ vi.mock('@/lib/hooks/use-available-models', () => ({
   useAvailableModels: () => ({
     ...catalog,
     isFetching: false,
-    fetchStatus: 'idle',
-    error: undefined,
     refetch: vi.fn(),
   }),
 }));
@@ -123,6 +127,8 @@ beforeEach(() => {
   catalog.models = [];
   catalog.isLoading = false;
   catalog.isError = false;
+  catalog.error = undefined;
+  catalog.fetchStatus = 'idle';
 });
 
 afterEach(() => {
@@ -153,5 +159,34 @@ describe('AnalysisSettingsScreen config load failure variant', () => {
 
     const screen = errorVariantScreen(renderer);
     expect(screen.props.variant).toBe('server');
+  });
+});
+
+describe('AnalysisSettingsScreen catalogue failure variant', () => {
+  it('names the server when the catalogue read answered an HTTP status', async () => {
+    // The screen mounts with a settled config, so the QueryError under test is
+    // the catalogue row's, and the catalogue error carries its own status.
+    config.data = { isEnabled: true };
+    catalog.isError = true;
+    catalog.error = Object.assign(new Error('Failed to fetch models: 500 Internal Server Error'), {
+      name: 'ModelCatalogFetchError',
+      status: 500,
+    });
+
+    const { renderer } = await mount();
+
+    const row = errorVariantScreen(renderer);
+    expect(row.props.variant).toBe('server');
+  });
+
+  it('names the connection when the catalogue read never reached the server', async () => {
+    config.data = { isEnabled: true };
+    catalog.isError = true;
+    catalog.error = new TypeError('Network request failed');
+
+    const { renderer } = await mount();
+
+    const row = errorVariantScreen(renderer);
+    expect(row.props.variant).toBe('offline');
   });
 });

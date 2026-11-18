@@ -55,6 +55,20 @@ describe('classifyReadFailureVariant', () => {
     ).toBe('server');
   });
 
+  it('reads the model-catalogue error status field', () => {
+    // `ModelCatalogFetchError` carries the answer's status as a property.
+    expect(
+      variantFor({
+        errors: [
+          Object.assign(new Error('Failed to fetch models: 401 Unauthorized'), {
+            name: 'ModelCatalogFetchError',
+            status: 401,
+          }),
+        ],
+      })
+    ).toBe('server');
+  });
+
   it('names the connection for a failed read with no server evidence', () => {
     expect(
       variantFor({ errors: [new TypeError('failure')], isPaused: false, connectivity: 'online' })

@@ -114,7 +114,8 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const {
     models,
     isLoading: modelsLoading,
-    isError: modelsError,
+    isError: modelsUnavailableFlag,
+    error: modelsError,
     fetchStatus: modelsFetchStatus,
     refetch: refetchModels,
   } = useAvailableModels(isPersonalSecurityScope(scope) ? undefined : scope);
@@ -203,7 +204,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   // A failed catalogue refetch keeps the last list. Hide the rows only when the
   // failure left nothing to show, so an offline visit with a warm catalogue keeps
   // the current slugs readable and pickable, as the new-session picker does.
-  const modelsUnavailable = modelsError && models.length === 0;
+  const modelsUnavailable = modelsUnavailableFlag && models.length === 0;
   const modelsFailureVariant = classifyReadFailureVariant({
     errors: modelsError ? [modelsError] : [],
     isPaused: modelsFetchStatus === 'paused',

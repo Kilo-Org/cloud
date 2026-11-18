@@ -187,6 +187,8 @@ type ModelCatalogEndpoint = 'models' | 'org-defaults';
  */
 class ModelCatalogFetchError extends Error {
   readonly [TELEMETRY_DESCRIPTION_KEY]: TelemetryDescription;
+  /** The answer's HTTP status, so failure classifiers can name the server answer. */
+  readonly status: number;
 
   constructor(args: {
     endpoint: ModelCatalogEndpoint;
@@ -197,6 +199,7 @@ class ModelCatalogFetchError extends Error {
   }) {
     super(args.message);
     this.name = 'ModelCatalogFetchError';
+    this.status = args.status;
     const expected = isExpectedHttpStatus(args.status);
     this[TELEMETRY_DESCRIPTION_KEY] = {
       level: expected ? 'warning' : 'error',

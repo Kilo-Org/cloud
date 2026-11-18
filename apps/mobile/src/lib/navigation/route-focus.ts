@@ -82,3 +82,20 @@ export function useRouteFocused(): boolean {
 
   return useSyncExternalStore(subscribe, getSnapshot, () => true);
 }
+
+/**
+ * Read the caller's screen focus now, not through a subscription: the caller
+ * needs the answer as of this exact moment, after it dispatched a removal the
+ * navigator may already be applying. A screen a pop is carrying away reports
+ * unfocused by the time its own code runs again, so the read tells a granted
+ * removal from a refused one; the subscription based `useRouteFocused` would
+ * return the value the previous render captured instead.
+ *
+ * Safe outside a navigator: it reports focused there, the same fail-open the
+ * hook above uses, so a harness that mocks `expo-router` partially still sees
+ * a screen that owes its next edit a prompt.
+ */
+export function useNavigationFocusRead(): () => boolean {
+  const navigation = useContext(NavigationContext) as FocusableNavigation | undefined;
+  return useCallback(() => navigation?.isFocused?.() ?? true, [navigation]);
+}

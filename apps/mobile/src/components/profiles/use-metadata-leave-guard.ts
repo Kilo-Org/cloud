@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { isLeaveAction } from '@/lib/navigation/leave-actions';
 import { clearAcceptedBack } from '@/lib/navigation/leave-settle';
+import { useNavigationFocusRead } from '@/lib/navigation/route-focus';
 
 export type MetadataLeaveGuard = Readonly<{
   /** Wire this to the metadata form's `onDirtyChange`. */
@@ -52,6 +53,7 @@ export function useMetadataLeaveGuard({
 }>): MetadataLeaveGuard {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
+  const navigationFocusRead = useNavigationFocusRead();
   const [dirty, setDirty] = useState(false);
   const dirtyRef = useRef(false);
   const [leaveAllowed, setLeaveAllowed] = useState(false);
@@ -63,9 +65,10 @@ export function useMetadataLeaveGuard({
   // the create just saved still differs from a fresh form, and the recompute
   // would re-arm the guard in the render after the clear, turning the route's
   // removal into a prompt about a save that already landed. The latch clears
-  // again once the leave has settled: the push-then-retire hand-off drops the
-  // retire when the source becomes focused again, so the create screen can
-  // survive its own leave and must keep asking about a later edit.
+  // again once the leave has settled and the route is still focused: the
+  // push-then-retire hand-off drops the retire when the source becomes focused
+  // again, so the create screen can survive its own leave and must keep asking
+  // about a later edit.
   if (isDirty !== undefined && !leavingRef.current) {
     const next = isDirty();
     if (next !== dirty) {
@@ -169,26 +172,28 @@ export function useMetadataLeaveGuard({
     const replay = replayRef.current;
     replayRef.current = null;
     replay?.();
-    // The removal is dispatched. The disarm covered exactly that replay: from
-    // here on, an edit means the navigator kept this screen (its retire was
-    // refused) and the guard owes it a prompt again, so the disarm clears in
-    // this effect, after the replay is out — never during render, where a
-    // state update alongside the navigator's own subscription re-renders in a
-    // loop.
-    setLeaveAllowed(false);
-    // The removal handler's ref follows the committed state (the effect above
-    // it). A Discard that the navigator granted popped the route, so the sync
-    // already ran with `false` before any later render; a Discard the navigator
-    // kept — the surviving hand-off case — commits this effect with `dirty`
-    // still true from the edit, so re-syncing here re-arms the handler and the
-    // next Back asks again. The render-phase recompute writes state only; the
-    // ref it leaves behind stays the discarded render's `false`, so without
-    // this write a kept screen's Back takes the silent-leave branch.
-    if (isDirty !== undefined && !leavingRef.current) {
-      dirtyRef.current = isDirty();
-      setDirty(dirtyRef.current);
+    // The removal has been dispatched. The disarm that covered the replay —
+    // `leaveAllowed` — stays set from here: re-enabling `usePreventRemove`
+    // while the granted removal is still animating is the option change that
+    // landed after a transition began, the header-remount shape the hook's own
+    // note above records for the leave-without-asking path. The latch releases
+    // only on a post-dispatch focus read that answers for this moment: a
+    // focused route is not the route the pop is carrying away, so a refused
+    // replay re-arms here, while a granted pop reports unfocused the moment
+    // its dispatch runs and never releases the latch — the unmount takes it.
+    // Every consumer releases with the focus evidence — a manual-dirty screen
+    // edits again after a refused leave just as a derived one does — and only
+    // the derived screen's dirty test and ref sync that to the form's own
+    // computation.
+    if (navigationFocusRead()) {
+      setLeaveAllowed(false);
+      if (isDirty !== undefined && !leavingRef.current) {
+        const next = isDirty();
+        dirtyRef.current = next;
+        setDirty(next);
+      }
     }
-  }, [leaveCount, isDirty]);
+  }, [leaveCount, isDirty, navigationFocusRead]);
 
   return { handleDirtyChange, leaveWithoutAsking, dialog };
 }

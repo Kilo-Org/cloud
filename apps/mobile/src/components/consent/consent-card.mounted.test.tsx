@@ -130,7 +130,7 @@ function findButton(root: I, label: string): I {
   const nodes = root.findAll(
     n =>
       typeof n.type === 'string' &&
-      (n.type === 'Button' || n.type === 'Pressable') &&
+      ((n.type as string) === 'Button' || (n.type as string) === 'Pressable') &&
       (n.props.accessibilityLabel as string | undefined) === label
   );
   const btn = nodes[0];
@@ -583,7 +583,7 @@ describe('ConsentCard', () => {
     const retryNodes = renderer.root.findAll(
       n =>
         typeof n.type === 'string' &&
-        n.type === 'Pressable' &&
+        (n.type as string) === 'Pressable' &&
         (n.props.accessibilityLabel as string | undefined) === i18n.t('common.retry')
     );
     expect(retryNodes).toHaveLength(0);

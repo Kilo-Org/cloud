@@ -4704,7 +4704,7 @@
     "title": "인공지능 가드레일",
     "permissionDenied": "조직 소유자와 관리자만 인공지능 가드레일을 관리할 수 있습니다.",
     "unavailableTitle": "인공지능 가드레일이 활성화되어 있지 않습니다",
-    "unavailable": "Kilo는 요청에 따라 조직에 인공지능 가드레일을 활성화합니다. {{supportEmail}}로 문의하시면 조직 소유자가 웹 설정에서 활성화할 수 있습니다.",
+    "unavailable": "Kilo는 요청에 따라 조직에 인공지능 가드레일을 활성화합니다. {{supportEmail}}로 문의하시면 Kilo 팀이 조직을 위해 활성화해 드립니다.",
     "contactSupport": "지원팀에 문의",
     "loadError": "인공지능 가드레일을 불러오지 못했습니다",
     "statusSaving": "저장 중…",

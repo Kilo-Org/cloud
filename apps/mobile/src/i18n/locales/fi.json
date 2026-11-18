@@ -4704,7 +4704,7 @@
     "title": "AI-suojakaiteet",
     "permissionDenied": "Vain organisaation omistajat ja ylläpitäjät voivat hallita AI-suojakaiteita.",
     "unavailableTitle": "AI-suojakaiteet eivät ole käytössä",
-    "unavailable": "Kilo ottaa AI-suojakaiteet käyttöön organisaatiolle pyynnöstä. Ota yhteyttä osoitteeseen {{supportEmail}}, ja organisaation omistaja voi ottaa ne käyttöön verkkopalvelun asetuksista.",
+    "unavailable": "Kilo ottaa AI-suojakaiteet käyttöön organisaatiolle pyynnöstä. Ota yhteyttä osoitteeseen {{supportEmail}}, ja Kilo-tiimi ottaa ne käyttöön organisaatiollesi.",
     "contactSupport": "Ota yhteyttä tukeen",
     "loadError": "AI-suojakaiteita ei voitu ladata",
     "statusSaving": "Tallennetaan…",

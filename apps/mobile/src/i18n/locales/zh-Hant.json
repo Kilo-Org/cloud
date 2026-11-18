@@ -4704,7 +4704,7 @@
     "title": "AI 護欄",
     "permissionDenied": "只有組織擁有者與管理員可以管理 AI 護欄。",
     "unavailableTitle": "未啟用 AI 護欄",
-    "unavailable": "Kilo 可依請求為組織啟用 AI 護欄。請聯絡 {{supportEmail}}，組織擁有者可以在網頁版的設定中開啟。",
+    "unavailable": "Kilo 可依請求為組織啟用 AI 護欄。請聯絡 {{supportEmail}}，Kilo 團隊會為你的組織開啟。",
     "contactSupport": "聯絡客服",
     "loadError": "無法載入 AI 護欄",
     "statusSaving": "儲存中…",

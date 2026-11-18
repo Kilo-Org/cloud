@@ -4704,7 +4704,7 @@
     "title": "የAI ጥበቃ ገደቦች",
     "permissionDenied": "የAI ጥበቃ ገደቦችን ማስተዳደር የሚችሉት የድርጅቱ ባለቤቶች እና አስተዳዳሪዎች ብቻ ናቸው።",
     "unavailableTitle": "የAI ጥበቃ ገደቦች አልነቁም",
-    "unavailable": "Kilo የAI ጥበቃ ገደቦችን ለድርጅት በጥያቄ ላይ ያነቃል። {{supportEmail}} ያግኙ፣ እና የድርጅቱ ባለቤት ከድሩ ላይ ካሉት ቅንብሮች ሊያነቃቸው ይችላል።",
+    "unavailable": "Kilo የAI ጥበቃ ገደቦችን ለድርጅት በጥያቄ ላይ ያነቃል። {{supportEmail}} ያግኙ፣ እና የKilo ቡድን ለድርጅትዎ ያነቃዋል።",
     "contactSupport": "የድጋፍ ቡድኑን አግኝ",
     "loadError": "የAI ጥበቃ ገደቦችን መጫን አልተቻለም",
     "statusSaving": "በማስቀመጥ ላይ…",

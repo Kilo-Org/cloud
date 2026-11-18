@@ -172,7 +172,7 @@ describe('OrganizationGuardrailsScreen not-enabled state', () => {
     const texts = collectText(renderer.toJSON());
 
     expect(texts.join(' ')).toContain(EXPECTED_REASON);
-    expect(texts.join(' ')).toContain(`Contact ${SUPPORT_EMAIL}, and an organization owner`);
+    expect(texts.join(' ')).toContain(`Contact ${SUPPORT_EMAIL}, and the Kilo team`);
     expect(texts.join(' ')).not.toContain('{{supportEmail}}');
 
     act(() => {

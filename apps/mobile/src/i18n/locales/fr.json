@@ -4774,7 +4774,7 @@
     "title": "Garde-fous IA",
     "permissionDenied": "Seuls les propriétaires et administrateurs de l'organisation peuvent gérer les garde-fous IA.",
     "unavailableTitle": "Les garde-fous IA ne sont pas activés",
-    "unavailable": "Kilo active les garde-fous IA pour une organisation sur demande. Contactez {{supportEmail}}, et un propriétaire de l'organisation peut les activer depuis les paramètres sur le web.",
+    "unavailable": "Kilo active les garde-fous IA pour une organisation sur demande. Contactez {{supportEmail}}, et l'équipe Kilo les active pour votre organisation.",
     "contactSupport": "Contacter l'assistance",
     "loadError": "Impossible de charger les garde-fous IA",
     "statusSaving": "Enregistrement…",

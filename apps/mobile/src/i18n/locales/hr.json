@@ -4774,7 +4774,7 @@
     "title": "Zaštitne mjere umjetne inteligencije",
     "permissionDenied": "Samo vlasnici i administratori organizacije mogu upravljati zaštitnim mjerama umjetne inteligencije.",
     "unavailableTitle": "Zaštitne mjere umjetne inteligencije nisu omogućene",
-    "unavailable": "Kilo na zahtjev omogućuje zaštitne mjere umjetne inteligencije za organizaciju. Kontaktirajte {{supportEmail}}, a vlasnik organizacije može ih uključiti u postavkama na webu.",
+    "unavailable": "Kilo na zahtjev omogućuje zaštitne mjere umjetne inteligencije za organizaciju. Kontaktirajte {{supportEmail}}, a Kilo tim ih uključuje za vašu organizaciju.",
     "contactSupport": "Obrati se podršci",
     "loadError": "Nije moguće učitati zaštitne mjere umjetne inteligencije.",
     "statusSaving": "Spremanje…",

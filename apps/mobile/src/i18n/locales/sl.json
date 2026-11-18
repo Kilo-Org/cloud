@@ -4844,7 +4844,7 @@
     "title": "AI varovala",
     "permissionDenied": "Samo lastniki in skrbniki organizacije lahko upravljajo AI varovala.",
     "unavailableTitle": "AI varovala niso omogočena",
-    "unavailable": "Kilo na zahtevo omogoči AI varovala za organizacijo. Obrnite se na {{supportEmail}}, lastnik organizacije pa jih lahko vklopi v nastavitvah na spletu.",
+    "unavailable": "Kilo na zahtevo omogoči AI varovala za organizacijo. Obrnite se na {{supportEmail}}, skupaj Kilo jih vklopi za vašo organizacijo.",
     "contactSupport": "Obrni se na podporo",
     "loadError": "AI varoval ni bilo mogoče naložiti",
     "statusSaving": "Shranjevanje…",

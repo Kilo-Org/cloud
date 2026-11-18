@@ -4774,7 +4774,7 @@
     "title": "MI aizsargbarjeras",
     "permissionDenied": "MI aizsargbarjeras var pārvaldīt tikai organizācijas īpašnieki un administratori.",
     "unavailableTitle": "MI aizsargbarjeras nav iespējotas",
-    "unavailable": "Kilo pēc pieprasījuma iespējo MI aizsargbarjeras organizācijai. Sazinieties ar {{supportEmail}}, un organizācijas īpašnieks var tās ieslēgt tīmekļa iestatījumos.",
+    "unavailable": "Kilo pēc pieprasījuma iespējo MI aizsargbarjeras organizācijai. Sazinieties ar {{supportEmail}}, un Kilo komanda tās ieslēdz jūsu organizācijai.",
     "contactSupport": "Sazināties ar atbalsta dienestu",
     "loadError": "Neizdevās ielādēt MI aizsargbarjeras",
     "statusSaving": "Saglabā…",

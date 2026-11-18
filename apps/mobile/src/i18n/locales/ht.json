@@ -4704,7 +4704,7 @@
     "title": "Gadriy IA",
     "permissionDenied": "Sèlman pwopriyetè ak administratè òganizasyon an ka jere Gadriy IA.",
     "unavailableTitle": "Gadriy IA pa aktive",
-    "unavailable": "Kilo aktive Gadriy IA pou yon òganizasyon sou demann. Kontakte {{supportEmail}}, epi yon pwopriyetè òganizasyon ka aktive l nan paramèt yo sou sit entènèt la.",
+    "unavailable": "Kilo aktive Gadriy IA pou yon òganizasyon sou demann. Kontakte {{supportEmail}}, ekip Kilo ap aktive l pou òganizasyon w.",
     "contactSupport": "Kontakte ekip sipò a",
     "loadError": "Gadriy IA pa t kapab chaje",
     "statusSaving": "Ap anrejistre…",

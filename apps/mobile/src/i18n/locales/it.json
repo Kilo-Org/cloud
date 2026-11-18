@@ -4774,7 +4774,7 @@
     "title": "Protezioni AI",
     "permissionDenied": "Solo i proprietari e gli amministratori dell'organizzazione possono gestire le Protezioni AI.",
     "unavailableTitle": "Protezioni AI non abilitate",
-    "unavailable": "Kilo abilita le Protezioni AI per un'organizzazione su richiesta. Contatta {{supportEmail}} e un proprietario dell'organizzazione può attivarle dalle impostazioni sul web.",
+    "unavailable": "Kilo abilita le Protezioni AI per un'organizzazione su richiesta. Contatta {{supportEmail}} e il team Kilo le attiva per la tua organizzazione.",
     "contactSupport": "Contatta l'assistenza",
     "loadError": "Impossibile caricare le Protezioni AI",
     "statusSaving": "Salvataggio…",

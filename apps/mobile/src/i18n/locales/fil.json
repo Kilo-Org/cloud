@@ -4704,7 +4704,7 @@
     "title": "Mga AI Guardrail",
     "permissionDenied": "Ang mga owner at admin lang ng organisasyon ang puwedeng mamahala ng Mga AI Guardrail.",
     "unavailableTitle": "Hindi naka-enable ang Mga AI Guardrail",
-    "unavailable": "Ini-enable ng Kilo ang Mga AI Guardrail para sa isang organisasyon kapag hiniling. Makipag-ugnayan sa {{supportEmail}}, at puwedeng i-on ito ng owner ng organisasyon mula sa mga setting sa web.",
+    "unavailable": "Ini-enable ng Kilo ang Mga AI Guardrail para sa isang organisasyon kapag hiniling. Makipag-ugnayan sa {{supportEmail}}, at i-on ito ng Kilo team para sa iyong organisasyon.",
     "contactSupport": "Makipag-ugnayan sa suporta",
     "loadError": "Hindi ma-load ang Mga AI Guardrail",
     "statusSaving": "Sine-save…",

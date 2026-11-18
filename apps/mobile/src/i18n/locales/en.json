@@ -4704,7 +4704,7 @@
     "title": "AI Guardrails",
     "permissionDenied": "Only organization owners and admins can manage AI Guardrails.",
     "unavailableTitle": "AI Guardrails is not enabled",
-    "unavailable": "Kilo enables AI Guardrails for an organization on request. Contact {{supportEmail}}, and an organization owner can turn it on from the settings on the web.",
+    "unavailable": "Kilo enables AI Guardrails for an organization on request. Contact {{supportEmail}}, and the Kilo team turns it on for your organization.",
     "contactSupport": "Contact support",
     "loadError": "AI Guardrails couldn't load",
     "statusSaving": "Saving…",

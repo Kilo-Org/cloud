@@ -4914,7 +4914,7 @@
     "title": "Ráillí Cosanta AI",
     "permissionDenied": "Ní féidir ach le húinéirí agus riarthóirí na heagraíochta Ráillí Cosanta AI a bhainistiú.",
     "unavailableTitle": "Níl Ráillí Cosanta AI cumasaithe",
-    "unavailable": "Cumasaíonn Kilo Ráillí Cosanta AI d'eagraíocht ar iarratas. Déan teagmháil le {{supportEmail}}, agus is féidir le húinéir na heagraíochta iad a chur ar siúl ó na socruithe ar an ngréasán.",
+    "unavailable": "Cumasaíonn Kilo Ráillí Cosanta AI d'eagraíocht ar iarratas. Déan teagmháil le {{supportEmail}}, agus déanfaidh foireann Kilo iad a chur ar siúl d'eagraíocht.",
     "contactSupport": "Déan teagmháil leis an bhfoireann tacaíochta",
     "loadError": "Níorbh fhéidir Ráillí Cosanta AI a lódáil",
     "statusSaving": "Ag sábháil…",

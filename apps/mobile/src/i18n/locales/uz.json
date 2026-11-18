@@ -4704,7 +4704,7 @@
     "title": "AI himoya to'siqlari",
     "permissionDenied": "Faqat tashkilot egalari va administratorlari AI himoya to'siqlarini boshqara oladi.",
     "unavailableTitle": "AI himoya to'siqlari yoqilmagan",
-    "unavailable": "Kilo so'rov bo'yicha tashkilot uchun AI himoya to'siqlarini yoqadi. {{supportEmail}} bilan bog'laning, tashkilot egasi ularni veb-saytdagi sozlamalardan yoqishi mumkin.",
+    "unavailable": "Kilo so'rov bo'yicha tashkilot uchun AI himoya to'siqlarini yoqadi. {{supportEmail}} bilan bog'laning, Kilo jamoasi ularni tashkilotingiz uchun yoqadi.",
     "contactSupport": "Yordam xizmatiga murojaat qilish",
     "loadError": "AI himoya to'siqlarini yuklab bo'lmadi",
     "statusSaving": "Saqlanmoqda…",

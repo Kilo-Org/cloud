@@ -4704,7 +4704,7 @@
     "title": "Izivikelo ze-AI",
     "permissionDenied": "Abanikazi benhlangano nabaphathi kuphela abangaphatha izivikelo ze-AI.",
     "unavailableTitle": "Izivikelo ze-AI azivuliwe",
-    "unavailable": "I-Kilo ivula Izivikelo ze-AI zenhlangano uma ziceliwe. Xhumana ne-{{supportEmail}}, futhi umnikazi wenhlangano angazivula kusuka kuzilungiselelo kuwebhu.",
+    "unavailable": "I-Kilo ivula Izivikelo ze-AI zenhlangano uma ziceliwe. Xhumana ne-{{supportEmail}}, futhi iqembu le-Kilo lizizula kuzilungiselelo zenhlangano yakho.",
     "contactSupport": "Xhumana nethimba losizo",
     "loadError": "Izivikelo ze-AI azikwazanga ukulayisha",
     "statusSaving": "Kuyagcinwa…",

@@ -4704,7 +4704,7 @@
     "title": "Mbrojtëset e IA-së",
     "permissionDenied": "Vetëm pronarët dhe administratorët e organizatës mund të menaxhojnë Mbrojtëset e IA-së.",
     "unavailableTitle": "Mbrojtëset e IA-së nuk janë aktivizuar",
-    "unavailable": "Kilo aktivizon Mbrojtëset e IA-së për një organizatë sipas kërkesës. Kontakto {{supportEmail}}, dhe pronari i organizatës mund t'i aktivizojë nga cilësimet në ueb.",
+    "unavailable": "Kilo aktivizon Mbrojtëset e IA-së për një organizatë sipas kërkesës. Kontakto {{supportEmail}}, dhe ekipi i Kilo i aktivizon për organizatën tuaj.",
     "contactSupport": "Kontakto mbështetjen",
     "loadError": "Mbrojtëset e IA-së nuk u ngarkuan dot",
     "statusSaving": "Po ruhet…",

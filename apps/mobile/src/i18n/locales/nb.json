@@ -4704,7 +4704,7 @@
     "title": "KI-vernetiltak",
     "permissionDenied": "Bare organisasjonseiere og administratorer kan administrere KI-vernetiltak.",
     "unavailableTitle": "KI-vernetiltak er ikke aktivert",
-    "unavailable": "Kilo aktiverer KI-vernetiltak for en organisasjon på forespørsel. Kontakt {{supportEmail}}, så kan en organisasjonseier slå det på fra innstillingene på nettsiden.",
+    "unavailable": "Kilo aktiverer KI-vernetiltak for en organisasjon på forespørsel. Kontakt {{supportEmail}}, og Kilo-teamet slår dem på for organisasjonen din.",
     "contactSupport": "Kontakt kundestøtte",
     "loadError": "KI-vernetiltak kunne ikke lastes inn",
     "statusSaving": "Lagrer…",

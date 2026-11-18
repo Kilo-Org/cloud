@@ -4704,7 +4704,7 @@
     "title": "KI-Guardrails",
     "permissionDenied": "Nur Inhaber und Admins der Organisation können KI-Guardrails verwalten.",
     "unavailableTitle": "KI-Guardrails sind nicht aktiviert",
-    "unavailable": "Kilo aktiviert KI-Guardrails für eine Organisation auf Anfrage. Kontaktiere {{supportEmail}}, und ein Inhaber der Organisation kann sie in den Einstellungen im Web einschalten.",
+    "unavailable": "Kilo aktiviert KI-Guardrails für eine Organisation auf Anfrage. Kontaktiere {{supportEmail}}, und das Kilo-Team schaltet sie für deine Organisation ein.",
     "contactSupport": "Support kontaktieren",
     "loadError": "KI-Guardrails konnten nicht geladen werden",
     "statusSaving": "Wird gespeichert…",

@@ -4704,7 +4704,7 @@
     "title": "AIガードレール",
     "permissionDenied": "AIガードレールを管理できるのは組織の所有者と管理者のみです。",
     "unavailableTitle": "AIガードレールは有効になっていません",
-    "unavailable": "Kiloは、リクエストに応じて組織のAIガードレールを有効にします。{{supportEmail}} までお問い合わせください。組織の所有者はWebの設定から有効にできます。",
+    "unavailable": "Kiloは、リクエストに応じて組織のAIガードレールを有効にします。{{supportEmail}} までお問い合わせください。Kiloチームがお使いの組織に対して有効にします。",
     "contactSupport": "サポートに連絡",
     "loadError": "AIガードレールを読み込めませんでした",
     "statusSaving": "保存中…",

@@ -4704,7 +4704,7 @@
     "title": "Gervigreindarvarnir",
     "permissionDenied": "Aðeins eigendur og stjórnendur samtaka geta stýrt Gervigreindarvörnum.",
     "unavailableTitle": "Gervigreindarvarnir eru ekki virkjaðar",
-    "unavailable": "Kilo virkjar Gervigreindarvarnir fyrir samtök að beiðni. Hafðu samband við {{supportEmail}}, og eigandi samtaka getur virkjað þær í stillingunum á vefnum.",
+    "unavailable": "Kilo virkjar Gervigreindarvarnir fyrir samtök að beiðni. Hafðu samband við {{supportEmail}}, og Kilo teymið virkjar þær fyrir félagið þitt.",
     "contactSupport": "Hafa samband við þjónustuver",
     "loadError": "Ekki tókst að hlaða Gervigreindarvörnum",
     "statusSaving": "Vista…",

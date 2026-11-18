@@ -4704,7 +4704,7 @@
     "title": "AI kaitsepiirangud",
     "permissionDenied": "AI kaitsepiiranguid saavad hallata ainult organisatsiooni omanikud ja administraatorid.",
     "unavailableTitle": "AI kaitsepiirangud pole lubatud",
-    "unavailable": "Kilo lubab organisatsioonile AI kaitsepiirangud soovi korral. Võta ühendust aadressil {{supportEmail}} ja organisatsiooni omanik saab need veebi seadetest sisse lülitada.",
+    "unavailable": "Kilo lubab organisatsioonile AI kaitsepiirangud soovi korral. Võta ühendust aadressil {{supportEmail}} ja Kilo meeskond lülitab need teie organisatsiooni jaoks sisse.",
     "contactSupport": "Võta ühendust toega",
     "loadError": "AI kaitsepiiranguid ei õnnestunud laadida",
     "statusSaving": "Salvestamine…",

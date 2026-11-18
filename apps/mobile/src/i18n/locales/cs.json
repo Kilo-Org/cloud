@@ -4844,7 +4844,7 @@
     "title": "Ochranná pravidla AI",
     "permissionDenied": "Ochranná pravidla AI mohou spravovat jen vlastníci a správci organizace.",
     "unavailableTitle": "Ochranná pravidla AI nejsou povolena",
-    "unavailable": "Kilo povoluje ochranná pravidla AI pro organizaci na vyžádání. Kontaktujte {{supportEmail}} a vlastník organizace je může zapnout v nastavení na webu.",
+    "unavailable": "Kilo povoluje ochranná pravidla AI pro organizaci na vyžádání. Kontaktujte {{supportEmail}} a tým Kilo je zapne pro vaši organizaci.",
     "contactSupport": "Kontaktovat podporu",
     "loadError": "Ochranná pravidla AI se nepodařilo načíst",
     "statusSaving": "Ukládání…",

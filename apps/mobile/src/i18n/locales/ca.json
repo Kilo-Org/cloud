@@ -4774,7 +4774,7 @@
     "title": "Salvaguardes d'IA",
     "permissionDenied": "Només els propietaris i els administradors de l'organització poden gestionar les salvaguardes d'IA.",
     "unavailableTitle": "Les salvaguardes d'IA no estan activades",
-    "unavailable": "Kilo activa les salvaguardes d'IA per a una organització a petició. Contacta amb {{supportEmail}} i un propietari de l'organització les pot activar des de la configuració del web.",
+    "unavailable": "Kilo activa les salvaguardes d'IA per a una organització a petició. Contacta amb {{supportEmail}} i l'equip de Kilo les activa per a la teva organització.",
     "contactSupport": "Contacta amb l'equip de suport",
     "loadError": "No s'han pogut carregar les salvaguardes d'IA",
     "statusSaving": "S'està desant…",

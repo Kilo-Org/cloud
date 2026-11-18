@@ -4774,7 +4774,7 @@
     "title": "Barreras de seguridad de IA",
     "permissionDenied": "Solo los propietarios y administradores de la organización pueden gestionar las barreras de seguridad de IA.",
     "unavailableTitle": "Las barreras de seguridad de IA no están habilitadas",
-    "unavailable": "Kilo habilita las barreras de seguridad de IA para una organización a petición. Contacta con {{supportEmail}} y un propietario de la organización podrá activarlas desde la configuración en la web.",
+    "unavailable": "Kilo habilita las barreras de seguridad de IA para una organización a petición. Contacta con {{supportEmail}} y el equipo de Kilo las activa para tu organización.",
     "contactSupport": "Contactar con soporte técnico",
     "loadError": "No se pudieron cargar las barreras de seguridad de IA",
     "statusSaving": "Guardando…",

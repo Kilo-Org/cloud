@@ -4774,7 +4774,7 @@
     "title": "Bariere de protecție AI",
     "permissionDenied": "Doar proprietarii și administratorii organizației pot gestiona barierele de protecție AI.",
     "unavailableTitle": "Barierele de protecție AI nu sunt activate",
-    "unavailable": "Kilo activează barierele de protecție AI pentru o organizație la cerere. Contactează {{supportEmail}}, iar un proprietar al organizației le poate activa din setările de pe web.",
+    "unavailable": "Kilo activează barierele de protecție AI pentru o organizație la cerere. Contactează {{supportEmail}}, iar echipa Kilo le activează pentru organizația dumneavoastră.",
     "contactSupport": "Contactează asistența",
     "loadError": "Barierele de protecție AI nu au putut fi încărcate",
     "statusSaving": "Se salvează…",

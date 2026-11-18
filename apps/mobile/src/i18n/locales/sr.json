@@ -4774,7 +4774,7 @@
     "title": "VI zaštitne mere",
     "permissionDenied": "Samo vlasnici i administratori organizacije mogu da upravljaju VI zaštitnim merama.",
     "unavailableTitle": "VI zaštitne mere nisu omogućene",
-    "unavailable": "Kilo omogućava VI zaštitne mere za organizaciju na zahtev. Kontaktirajte {{supportEmail}}, a vlasnik organizacije ih može uključiti u podešavanjima na vebu.",
+    "unavailable": "Kilo omogućava VI zaštitne mere za organizaciju na zahtev. Kontaktirajte {{supportEmail}}, a Kilo tim ih uključuje za vašu organizaciju.",
     "contactSupport": "Kontaktiraj podršku",
     "loadError": "VI zaštitne mere nisu mogle da se učitaju",
     "statusSaving": "Čuvanje…",

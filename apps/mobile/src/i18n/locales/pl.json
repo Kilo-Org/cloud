@@ -4844,7 +4844,7 @@
     "title": "Zabezpieczenia AI",
     "permissionDenied": "Tylko właściciele i administratorzy organizacji mogą zarządzać Zabezpieczeniami AI.",
     "unavailableTitle": "Zabezpieczenia AI nie są włączone",
-    "unavailable": "Kilo włącza Zabezpieczenia AI dla organizacji na życzenie. Skontaktuj się z {{supportEmail}}, a właściciel organizacji może je włączyć w ustawieniach w wersji internetowej.",
+    "unavailable": "Kilo włącza Zabezpieczenia AI dla organizacji na życzenie. Skontaktuj się z {{supportEmail}}, a zespół Kilo włącza je dla Twojej organizacji.",
     "contactSupport": "Skontaktuj się z pomocą techniczną",
     "loadError": "Nie udało się załadować Zabezpieczeń AI",
     "statusSaving": "Zapisywanie…",

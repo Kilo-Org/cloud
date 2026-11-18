@@ -4704,7 +4704,7 @@
     "title": "AA babes-mugak",
     "permissionDenied": "Erakundearen jabeek eta administratzaileek soilik kudea ditzakete AA babes-mugak.",
     "unavailableTitle": "AA babes-mugak ez daude gaituta",
-    "unavailable": "Kilok eskaeraren arabera gaitzen dizkio AA babes-mugak erakunde bati. Jarri harremanetan {{supportEmail}}, eta erakundearen jabe batek webean ezarpenetatik gaitu ahal izango ditu.",
+    "unavailable": "Kilok eskaeraren arabera gaitzen dizkio AA babes-mugak erakunde bati. Jarri harremanetan {{supportEmail}}, eta Kilo taldeak zure erakundearentzako gaituko ditu.",
     "contactSupport": "Jarri harremanetan laguntza-taldearekin",
     "loadError": "Ezin izan dira kargatu AA babes-mugak",
     "statusSaving": "Gordetzen…",

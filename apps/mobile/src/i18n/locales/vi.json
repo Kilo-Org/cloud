@@ -4704,7 +4704,7 @@
     "title": "Rào chắn AI",
     "permissionDenied": "Chỉ chủ sở hữu và quản trị viên tổ chức mới có thể quản lý Rào chắn AI.",
     "unavailableTitle": "Rào chắn AI chưa được bật",
-    "unavailable": "Kilo bật Rào chắn AI cho một tổ chức theo yêu cầu. Liên hệ {{supportEmail}}, và chủ sở hữu tổ chức có thể bật tính năng này từ phần cài đặt trên web.",
+    "unavailable": "Kilo bật Rào chắn AI cho một tổ chức theo yêu cầu. Liên hệ {{supportEmail}}, và đội Kilo sẽ bật tính năng này cho tổ chức của bạn.",
     "contactSupport": "Liên hệ hỗ trợ",
     "loadError": "Không thể tải Rào chắn AI",
     "statusSaving": "Đang lưu…",

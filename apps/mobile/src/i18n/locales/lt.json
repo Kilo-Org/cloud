@@ -4844,7 +4844,7 @@
     "title": "DI apsaugos priemonės",
     "permissionDenied": "Tik organizacijos savininkai ir administratoriai gali valdyti DI apsaugos priemones.",
     "unavailableTitle": "DI apsaugos priemonės neįjungtos",
-    "unavailable": "Kilo pagal užklausą įjungia DI apsaugos priemones organizacijai. Susisiekite su {{supportEmail}}, o organizacijos savininkas gali jas įjungti nustatymuose žiniatinklyje.",
+    "unavailable": "Kilo pagal užklausą įjungia DI apsaugos priemones organizacijai. Susisiekite su {{supportEmail}}, o Kilo komanda jas įjungia jūsų organizacijai.",
     "contactSupport": "Kreiptis į pagalbos tarnybą",
     "loadError": "Nepavyko įkelti DI apsaugos priemonių",
     "statusSaving": "Išsaugoma…",

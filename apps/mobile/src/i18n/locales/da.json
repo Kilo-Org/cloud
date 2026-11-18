@@ -4704,7 +4704,7 @@
     "title": "AI-sikkerhedsgrænser",
     "permissionDenied": "Kun organisationens ejere og administratorer kan administrere AI-sikkerhedsgrænser.",
     "unavailableTitle": "AI-sikkerhedsgrænser er ikke aktiveret",
-    "unavailable": "Kilo aktiverer AI-sikkerhedsgrænser for en organisation efter anmodning. Kontakt {{supportEmail}}, og en organisationsejer kan slå dem til fra indstillingerne på nettet.",
+    "unavailable": "Kilo aktiverer AI-sikkerhedsgrænser for en organisation efter anmodning. Kontakt {{supportEmail}}, og Kilo-teamet slår dem til for din organisation.",
     "contactSupport": "Kontakt support",
     "loadError": "AI-sikkerhedsgrænser kunne ikke indlæses",
     "statusSaving": "Gemmer…",

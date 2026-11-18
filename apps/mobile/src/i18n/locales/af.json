@@ -4704,7 +4704,7 @@
     "title": "KI-veiligheidsreëls",
     "permissionDenied": "Slegs organisasie-eienaars en -administrateurs kan KI-veiligheidsreëls bestuur.",
     "unavailableTitle": "KI-veiligheidsreëls is nie geaktiveer nie",
-    "unavailable": "Kilo aktiveer KI-veiligheidsreëls vir 'n organisasie op versoek. Kontak {{supportEmail}}, en 'n organisasie-eienaar kan dit in die instellings op die web aanskakel.",
+    "unavailable": "Kilo aktiveer KI-veiligheidsreëls vir 'n organisasie op versoek. Kontak {{supportEmail}}, en die Kilo-span skakel dit vir jou organisasie aan.",
     "contactSupport": "Kontak ondersteuning",
     "loadError": "KI-veiligheidsreëls kon nie laai nie",
     "statusSaving": "Stoor tans…",

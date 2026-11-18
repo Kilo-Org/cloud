@@ -4774,7 +4774,7 @@
     "title": "AI zaštitna ograničenja",
     "permissionDenied": "Samo vlasnici i administratori organizacije mogu upravljati AI zaštitnim ograničenjima.",
     "unavailableTitle": "AI zaštitna ograničenja nisu omogućena",
-    "unavailable": "Kilo omogućava AI zaštitna ograničenja za organizaciju na zahtjev. Kontaktirajte {{supportEmail}}, a vlasnik organizacije ih može uključiti iz postavki na webu.",
+    "unavailable": "Kilo omogućava AI zaštitna ograničenja za organizaciju na zahtjev. Kontaktirajte {{supportEmail}}, a Kilo tim ih uključuje za vašu organizaciju.",
     "contactSupport": "Kontaktiraj podršku",
     "loadError": "Učitavanje AI zaštitnih ograničenja nije uspjelo",
     "statusSaving": "Čuvanje…",

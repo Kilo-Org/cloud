@@ -4844,7 +4844,7 @@
     "title": "AI ochranné mechanizmy",
     "permissionDenied": "AI ochranné mechanizmy môžu spravovať iba vlastníci organizácie a správcovia.",
     "unavailableTitle": "AI ochranné mechanizmy nie sú zapnuté",
-    "unavailable": "Kilo zapína AI ochranné mechanizmy pre organizáciu na požiadanie. Kontaktujte {{supportEmail}} a vlastník organizácie ich môže zapnúť v nastaveniach na webe.",
+    "unavailable": "Kilo zapína AI ochranné mechanizmy pre organizáciu na požiadanie. Kontaktujte {{supportEmail}} a tím Kilo ich zapne pre vašu organizáciu.",
     "contactSupport": "Kontaktovať podporu",
     "loadError": "AI ochranné mechanizmy sa nepodarilo načítať",
     "statusSaving": "Ukladá sa…",

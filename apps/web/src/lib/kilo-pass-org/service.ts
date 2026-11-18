@@ -1547,17 +1547,13 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
             billingCycle: organization_seats_purchases.billing_cycle,
             expiresAt: organization_seats_purchases.expires_at,
             seatCount: organization_seats_purchases.seat_count,
+            status: organization_seats_purchases.subscription_status,
           })
           .from(organization_seats_purchases)
-          .where(
-            and(
-              eq(organization_seats_purchases.organization_id, organizationId),
-              eq(organization_seats_purchases.subscription_status, 'active')
-            )
-          )
+          .where(eq(organization_seats_purchases.organization_id, organizationId))
           .orderBy(desc(organization_seats_purchases.created_at))
           .limit(1);
-    if (!row && !seatPurchase) {
+    if (!row && seatPurchase?.status !== 'active') {
       throw new TRPCError({
         code: 'PRECONDITION_FAILED',
         message:

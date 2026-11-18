@@ -785,6 +785,41 @@ describe('Kilo Pass organization agreement service', () => {
     });
   });
 
+  it('rejects setup when the latest seat purchase ended after an earlier active one', async () => {
+    const owner = await insertTestUser();
+    const parent = await createOrganization(`kpo-canceled-${crypto.randomUUID()}`, owner.id);
+    organizationIds.push(parent.id);
+    const subscriptionId = `sub_${crypto.randomUUID()}`;
+    await db.insert(organization_seats_purchases).values([
+      {
+        organization_id: parent.id,
+        subscription_stripe_id: subscriptionId,
+        seat_count: 3,
+        amount_usd: 54,
+        expires_at: '2026-09-01T00:00:00.000Z',
+        starts_at: '2026-08-01T00:00:00.000Z',
+        subscription_status: 'active',
+        billing_cycle: 'monthly',
+        created_at: '2026-08-01T00:00:00.000Z',
+      },
+      {
+        organization_id: parent.id,
+        subscription_stripe_id: subscriptionId,
+        seat_count: 0,
+        amount_usd: 0,
+        expires_at: '2026-09-01T00:00:00.000Z',
+        starts_at: '2026-08-01T00:00:00.000Z',
+        subscription_status: 'ended',
+        billing_cycle: 'monthly',
+        created_at: '2026-08-15T00:00:00.000Z',
+      },
+    ]);
+
+    await expect(
+      organizationKiloPassService.getSetup({ organizationId: parent.id })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+
   it('creates a new agreement on the same provider subscription after the earlier one ends', async () => {
     const owner = await insertTestUser();
     const parent = await createOrganization(`kpo-repurchase-${crypto.randomUUID()}`, owner.id);

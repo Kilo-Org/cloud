@@ -24,7 +24,6 @@ import { resetFormDraftsForTests } from '@/lib/form-draft';
 import {
   COMMAND_ROW_FIELD_GAP_CLASS,
   LINE_ACTION_BOX_CLASS,
-  LINE_ACTION_HIT_SLOP,
   LINE_ACTION_OVERLAY_CLASS,
   LINE_ACTION_REACH_DP,
 } from '@/lib/a11y/tap-target';
@@ -342,15 +341,13 @@ describe('ProfileCommandsScreen', () => {
     // name them; the two cards below it keep their own.
     expect(controls.map(node => node.props.accessibilityLabel)).toEqual(labels);
 
-    // The band is the controls' parent, and the band's frame carries the
-    // whole slop reach: React Native confines a control's touch area to its
-    // parent's bounds, so the band's own height (LINE_ACTION_REACH_DP = box
-    // + top slop + bottom slop) and its padded width are what make both axes
-    // reach the 44 dp target. The mounted suite renders no layout engine, so
-    // it holds the contract at the tree's shape; the gate's frame dumps
-    // measure the rendered numbers. The test renderer keeps the wrapper
-    // components in the tree, so the walk climbs to the nearest host node,
-    // whose bounds are what Android clips the touch area to.
+    // The band is the controls' parent, and each control's box is the whole
+    // touch target on its own node: 46 dp past the 44 dp requirement on both
+    // axes, with no `hitSlop` whose outer side a row's end cannot dispatch.
+    // The mounted suite renders no layout engine, so it holds the contract
+    // at the tree's shape; the gate's frame dumps measure the rendered
+    // numbers. The test renderer keeps the wrapper components in the tree,
+    // so the walk climbs to the nearest host node.
     for (const control of controls) {
       let ancestor: ReactTestInstance | null = control.parent;
       while (ancestor !== null && typeof ancestor.type !== 'string') {
@@ -361,11 +358,9 @@ describe('ProfileCommandsScreen', () => {
       for (const token of LINE_ACTION_BOX_CLASS.split(' ')) {
         expect(String(control.props.className)).toContain(token);
       }
-      expect(control.props.hitSlop).toBe(LINE_ACTION_HIT_SLOP);
-      // The icon is 20dp, below the audit floor, so the rect keeps a 36dp
-      // width, which measures 35.81dp on Android and still reaches 44dp
-      // across with its 5dp side slop inside the band.
-      expect(String(control.props.className)).toContain('min-w-[36px]');
+      expect(control.props.hitSlop).toBeUndefined();
+      expect(String(control.props.className)).toContain('h-[46px]');
+      expect(String(control.props.className)).toContain('w-[46px]');
     }
 
     // Each band is the card's child and the field block's sibling, so the

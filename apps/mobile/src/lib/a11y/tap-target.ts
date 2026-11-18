@@ -521,36 +521,39 @@ export const LINE_ACTION_BOX_CLASS = 'min-h-[28px] -my-[7px]';
 export const LINE_ACTION_HIT_SLOP = { top: 9, bottom: 9, left: 5, right: 5 } as const;
 
 /**
- * The full vertical reach of a {@link LINE_ACTION_BOX_CLASS} control with its
- * {@link LINE_ACTION_HIT_SLOP}: `28 + 9 + 9 = 46dp`, past the 44pt target.
+ * The full vertical reach of a {@link LINE_ACTION_BOX_CLASS} control: the
+ * `h-[46px]` box the command card's controls render as, past the 44pt
+ * target. The reach is the box itself, not `box + hitSlop`: the box is the
+ * target on its own node, and React Native's parent-bounds rule makes any
+ * slop past a control's frame unreliable at a row's outer side (measured:
+ * the vertical slop band reorders, a tap past the outer edge does nothing).
  */
 export const LINE_ACTION_REACH_DP = 46;
 
 /**
  * The overlay a command card renders its reorder and delete controls in, as
- * the absolutely positioned row the card itself parents. React Native
- * confines a control's touch area to its parent's bounds (the repo's note at
- * `analysis-capacity-notice.tsx:49`): inside a one-text-line label row the
- * vertical `hitSlop` is clipped to the ~17.5dp line, far under the 44pt
- * target. This row is the controls' parent instead: `h-[46px]`
- * ({@link LINE_ACTION_REACH_DP}) holds the whole vertical band, and its
- * `px-[5px]` holds each control's outer side slop, so the slop extends inside
- * the row's frame on every side. The row's own parent is the card, whose
- * height carries the band.
+ * the absolutely positioned row the card itself parents. Each control's box
+ * is the whole touch target ({@link LINE_ACTION_REACH_DP} tall and wide on
+ * its own node), so the parent-bounds rule cannot clip either axis and no
+ * `hitSlop` is involved; the band is the boxes' parent and exactly their
+ * height.
  *
- * `top-0` pins the band to the card's top edge, so it reaches into the card's
- * top padding: the box centred on the 17.5dp label line of a `p-4` card has
- * its band from the card's top edge down 46dp. The glyphs keep the reviewed
- * alignment: the box centre (23dp) sits a quarter dp from the label line's
- * centre (22.75dp). `end-[9px]` puts the boxes' outer edge on the card's
- * content edge (`p-4` = 14dp, less the row's own 5dp padding), `px-[5px]`
- * pads the band to the slop's outer reach (14 - 5 = 9dp from the card's
- * edge), and `gap-3` keeps the neighbouring 5dp slop bands apart. The row
- * covers the label's tail horizontally, so `box-none` keeps the row itself
- * touch-transparent and only its control boxes take taps.
+ * `top-0` pins the band to the card's top edge, so the boxes reach into the
+ * card's top padding: the glyph centres at the band's 23dp midpoint, a
+ * quarter dp from the one-text-line label row's centre (22.75dp). The band's
+ * bottom edge (46dp from the card's top) stops above the field, whose gap
+ * from the label row the card widens with {@link COMMAND_ROW_FIELD_GAP_CLASS}
+ * (field top 47.5dp), so a tap aimed at the field's top strip lands on the
+ * field. `end-[14px]` puts the boxes' outer edge on the card's content edge
+ * (`p-4` = 14dp), so the delete control's whole 46dp width is tappable where
+ * the old slop past its box was dead. `gap-3` keeps a 10.5dp band between
+ * neighbouring boxes that the boxes do not cover, so a tap beside one control
+ * cannot reach the next. The row covers the label's tail horizontally, so
+ * `box-none` keeps the band itself touch-transparent and the label under it
+ * stays pressable.
  */
 export const LINE_ACTION_OVERLAY_CLASS =
-  'absolute end-[9px] top-0 flex-row items-center gap-3 px-[5px] h-[46px]';
+  'absolute end-[14px] top-0 flex-row items-center gap-3 h-[46px]';
 
 /**
  * The gap between a command card's label row and its field, as a literal

@@ -106,6 +106,7 @@ function SessionTodoCandidatesSheet({
     body = (
       <QueryError
         placement="static"
+        inset="gutter"
         onRetry={() => void candidates.refetch()}
         isRetrying={candidates.isFetching}
       />

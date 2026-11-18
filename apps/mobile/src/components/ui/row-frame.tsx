@@ -265,7 +265,13 @@ export function RowFrame({
       accessibilityRole={accessibilityRole ?? 'button'}
       accessibilityLabel={accessibilityLabel}
       accessibilityHint={accessibilityHint}
-      accessibilityState={accessibilityState ?? { disabled }}
+      // The caller's states (expanded, busy, selected) belong to the row, so
+      // they merge instead of being replaced: a disabled row that is expanded
+      // still reports both. The row's own `disabled` wins when it is set.
+      accessibilityState={{
+        ...accessibilityState,
+        disabled: disabled || accessibilityState?.disabled === true,
+      }}
       accessibilityValue={accessibilityValue}
       hitSlop={hitSlop}
       onLayout={onLayout}

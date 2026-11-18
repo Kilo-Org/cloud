@@ -597,9 +597,20 @@ const SCROLL_BODIES = new Set([
 const CENTERED_BODIES = new Set(['CenteredState']);
 const HEADER_TAGS = new Set(['ScreenHeader', 'SheetHeader']);
 
+/**
+ * The utility part of one class token, with any variant prefix removed. A
+ * variant (`md:`, `landscape:`, `ios:`) selects when the utility applies, not
+ * what it does, so the inset rules read the same padding a bare token writes —
+ * the same way L12's lookbehind sees a variant-prefixed `px-6`.
+ */
+function utilityOf(token) {
+  const segments = token.split(':');
+  return segments[segments.length - 1].replace(/^!/, '');
+}
+
 /** True when one class token writes a horizontal page inset other than `px-4`. */
 function wrongGutter(token) {
-  const match = /^-?(p|px|ps|pe|pl|pr)-(.+)$/.exec(token);
+  const match = /^-?(p|px|ps|pe|pl|pr)-(.+)$/.exec(utilityOf(token));
   if (match === null) {
     return false;
   }
@@ -608,7 +619,7 @@ function wrongGutter(token) {
 
 /** True when a class token writes an all-side or horizontal padding at all. */
 function anyPadding(token) {
-  return /^-?(?:p|px|ps|pe|pl|pr)-/.test(token);
+  return /^-?(?:p|px|ps|pe|pl|pr)-/.test(utilityOf(token));
 }
 
 function checkScrollGutters(relative, program, text, lineOf) {
@@ -844,6 +855,54 @@ const SHEET_ALLOWLIST = new Set([
   'apps/mobile/src/components/todos/todo-link-session-sheet.tsx',
 ]);
 
+/**
+ * The components one file defines, by name, so the sheet rule can follow a
+ * sheet that renders a local component owning its title row: `<Sheet><Body /></Sheet>`
+ * where `Body` draws the `SheetHeader` reads as a header even though the tag is
+ * outside the sheet's own JSX.
+ */
+function localComponents(program) {
+  const components = new Map();
+  walk(program, node => {
+    if (node.type === 'FunctionDeclaration' && node.id !== null) {
+      components.set(node.id.name, node);
+    } else if (
+      node.type === 'VariableDeclarator' &&
+      node.id.type === 'Identifier' &&
+      node.init !== null &&
+      (node.init.type === 'ArrowFunctionExpression' || node.init.type === 'FunctionExpression')
+    ) {
+      components.set(node.id.name, node.init);
+    }
+  });
+  return components;
+}
+
+/** Whether one local component — or a local component it renders — draws a header. */
+function localComponentDrawsHeader(name, text, components, visited) {
+  const body = components.get(name);
+  if (body === undefined || visited.has(name)) {
+    return false;
+  }
+  visited.add(name);
+  let header = false;
+  const children = [];
+  walk(body, node => {
+    if (node.type !== 'JSXOpeningElement') {
+      return;
+    }
+    const tag = tagName(node, text);
+    if (tag === 'SheetHeader') {
+      header = true;
+    } else if (components.has(tag)) {
+      children.push(tag);
+    }
+  });
+  return (
+    header || children.some(child => localComponentDrawsHeader(child, text, components, visited))
+  );
+}
+
 function checkSheetHeader(relative, program, text, lineOf) {
   if (SHEET_ALLOWLIST.has(relative)) {
     return [];
@@ -870,22 +929,50 @@ function checkSheetHeader(relative, program, text, lineOf) {
     return [];
   }
   const problems = [];
-  let sheetLine = null;
-  let header = false;
+  const components = localComponents(program);
   walk(program, node => {
-    if (node.type !== 'JSXOpeningElement') {
+    if (node.type !== 'JSXElement') {
       return;
     }
-    const name = tagName(node, text);
-    if (name === 'SheetHeader') {
-      header = true;
-    } else if (sheetLine === null && sheetNames.has(name)) {
-      sheetLine = lineOf(node.start);
+    const name = tagName(node.openingElement, text);
+    if (!sheetNames.has(name)) {
+      return;
+    }
+    // The header belongs to this sheet's own subtree. A file-level flag would
+    // let a second, headerless sheet pass on the first one's header; a nested
+    // sheet's header must not count for the sheet that contains it either.
+    const headers = [];
+    const nested = [];
+    const candidates = [];
+    walk(node, descendant => {
+      if (descendant === node) {
+        return;
+      }
+      if (
+        descendant.type === 'JSXElement' &&
+        sheetNames.has(tagName(descendant.openingElement, text))
+      ) {
+        nested.push(descendant);
+      } else if (descendant.type === 'JSXOpeningElement') {
+        const tag = tagName(descendant, text);
+        if (tag === 'SheetHeader') {
+          headers.push(descendant.start);
+        } else if (components.has(tag)) {
+          candidates.push(tag);
+        }
+      }
+    });
+    const header =
+      headers.some(start => !nested.some(child => start > child.start && start < child.end)) ||
+      // A sheet whose body is a local component (`<SessionFilterContent />`)
+      // can draw its header there; follow the component it renders.
+      candidates.some(candidate =>
+        localComponentDrawsHeader(candidate, text, components, new Set())
+      );
+    if (!header) {
+      problems.push(layoutProblem(relative, lineOf(node.start), 'L11', `<${name}>`));
     }
   });
-  if (sheetLine !== null && !header) {
-    problems.push(layoutProblem(relative, sheetLine, 'L11', `<${[...sheetNames][0]}>`));
-  }
   return problems;
 }
 

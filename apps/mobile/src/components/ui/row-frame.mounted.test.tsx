@@ -132,6 +132,21 @@ describe('RowFrame interaction', () => {
     expect(classesOf(row)).not.toContain('active:opacity-70');
   });
 
+  it('keeps the caller states on a disabled row instead of replacing them', () => {
+    const root = renderFrame({
+      title: 'Advanced',
+      onPress: () => undefined,
+      disabled: true,
+      accessibilityState: { expanded: true, busy: true },
+    });
+
+    expect(pressableOf(root).props.accessibilityState).toEqual({
+      expanded: true,
+      busy: true,
+      disabled: true,
+    });
+  });
+
   it('passes hitSlop, onLayout, the hint and the caller name through', () => {
     const onLayout = vi.fn();
     const row = pressableOf(

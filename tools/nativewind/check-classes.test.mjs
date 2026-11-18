@@ -703,6 +703,34 @@ test('flags a scroll body whose content container is not the px-4 gutter', () =>
   }
 });
 
+test('reads a variant-prefixed inset as the utility it applies', () => {
+  for (const classes of ['md:px-6', 'landscape:px-6', 'ios:pl-2', 'md:pe-6', 'md:p-3']) {
+    const found = layoutProblems(
+      SCREEN_FILE,
+      screen(`<DetailScreenScrollView contentContainerClassName="${classes}" />`)
+    );
+    const gutters = found.filter(problem => problem.includes('[L2]'));
+    assert.equal(gutters.length, 1, classes);
+    assert.match(gutters[0], new RegExp(`\\[L2\\] "${classes.replace(/[[\]]/g, '\\$&')} on`));
+  }
+  for (const classes of ['md:px-4', 'landscape:px-4']) {
+    assert.deepEqual(
+      layoutProblems(
+        SCREEN_FILE,
+        screen(`<DetailScreenScrollView contentContainerClassName="${classes}" />`)
+      ),
+      [],
+      classes
+    );
+  }
+  for (const classes of ['md:px-6', 'ios:pl-2', 'landscape:px-4']) {
+    assert.match(
+      layoutProblems(SCREEN_FILE, screen(`<ScreenHeader className="${classes}" />`)).join('\n'),
+      new RegExp(`\\[L2\\] "${classes.replace(/[[\]]/g, '\\$&')} on <ScreenHeader> className"`)
+    );
+  }
+});
+
 test('accepts px-4 and vertical padding on a scroll body', () => {
   assert.deepEqual(
     layoutProblems(
@@ -986,6 +1014,80 @@ test('accepts a Sheet with its header, an allowlisted sheet and a local Sheet', 
     layoutProblems(
       SCREEN_FILE,
       "import { Sheet } from './local-sheet';\n" + screen('<Sheet visible onClose={onClose} />')
+    ),
+    []
+  );
+});
+
+test('flags each sheet that lacks its own header', () => {
+  const found = layoutProblems(
+    SCREEN_FILE,
+    "import { Sheet } from '@/components/ui/sheet';\n" +
+      screen(
+        '<>',
+        '<Sheet visible onClose={onClose}>',
+        '<SheetHeader title="Environment" onDone={onClose} />',
+        '</Sheet>',
+        '<Sheet visible={other} onClose={onClose}>',
+        '<Text>body</Text>',
+        '</Sheet>',
+        '</>'
+      )
+  );
+  assert.equal(found.length, 1);
+  assert.match(found.join('\n'), /screen\.tsx:8: \[L11\] "<Sheet>"/);
+  // A header inside the sibling sheet says nothing about this one.
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        screen(
+          '<>',
+          '<Sheet visible onClose={onClose}>',
+          '<SheetHeader title="Environment" onDone={onClose} />',
+          '</Sheet>',
+          '<Sheet visible={other} onClose={onClose}>',
+          '<SheetHeader title="Advanced" onDone={onClose} />',
+          '</Sheet>',
+          '</>'
+        )
+    ),
+    []
+  );
+  // A nested sheet's header does not serve the sheet around it.
+  assert.match(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        screen(
+          '<>',
+          '<Sheet visible onClose={onClose}>',
+          '<Sheet visible={other} onClose={onClose}>',
+          '<SheetHeader title="Advanced" onDone={onClose} />',
+          '</Sheet>',
+          '</Sheet>',
+          '</>'
+        )
+    ).join('\n'),
+    /screen\.tsx:5: \[L11\] "<Sheet>"/
+  );
+});
+
+test('follows a local component that draws the sheet header', () => {
+  assert.deepEqual(
+    layoutProblems(
+      SCREEN_FILE,
+      "import { Sheet } from '@/components/ui/sheet';\n" +
+        'function FilterContent() {\n' +
+        '  return <SheetHeader title="Filters" onDone={onClose} />;\n' +
+        '}\n' +
+        'export function Screen() {\n' +
+        '  return (\n' +
+        '    <Sheet visible onClose={onClose}>\n' +
+        '      <FilterContent />\n' +
+        '    </Sheet>\n' +
+        '  );\n' +
+        '}'
     ),
     []
   );

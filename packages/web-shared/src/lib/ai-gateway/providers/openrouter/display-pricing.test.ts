@@ -1,4 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
+import { EndpointPricingSchema } from '@kilocode/db/schema-types';
 import {
   getModelDisplayPricing,
   getPeakPricing,
@@ -194,20 +195,95 @@ describe('getPeakPricing', () => {
     ).toEqual({ prompt: '0.000002', completion: '0.000004' });
   });
 
-  it('applies the Vercel peak multiplier to the first-tier price only', () => {
+  it('ignores Vercel price tiers beyond the first and drops them', () => {
     const pricing = {
       prompt: '0.000001',
       completion: '0.000002',
       prompt_tiers: [
-        { min: 0, price: '0.000001' },
-        { min: 200000, price: '0.000005' },
+        { cost: '0.000001', min: 0, max: 200000 },
+        { cost: '0.000005', min: 200000 },
       ],
-      peak_pricing: { multiplier: 2 },
+      completion_tiers: [
+        { cost: '0.000002', min: 0, max: 200000 },
+        { cost: '0.00001', min: 200000 },
+      ],
     };
-    expect(getPeakPricing(pricing)).toMatchObject({
-      prompt: '0.000002000000',
-      completion: '0.000004000000',
+    expect(getPeakPricing(pricing)).toEqual({ prompt: '0.000001', completion: '0.000002' });
+  });
+
+  it('applies the Vercel peak multiplier to the first-tier price only', () => {
+    expect(
+      getPeakPricing({
+        prompt: '0.000001',
+        completion: '0.000002',
+        prompt_tiers: [
+          { cost: '0.000001', min: 0, max: 200000 },
+          { cost: '0.000005', min: 200000 },
+        ],
+        peak_pricing: { multiplier: 2 },
+      })
+    ).toEqual({ prompt: '0.000002000000', completion: '0.000004000000' });
+  });
+
+  it('takes the highest Vercel price tier of each price in the worst case', () => {
+    expect(
+      getWorstCasePeakPricing({
+        prompt: '0.000001',
+        completion: '0.000002',
+        input_cache_read: '0.0000001',
+        input_cache_write: '0.00000125',
+        prompt_tiers: [
+          { cost: '0.000001', min: 0, max: 128000 },
+          { cost: '0.0000025', min: 128000, max: 256000 },
+          { cost: '0.000002', min: 256000 },
+        ],
+        completion_tiers: [
+          { cost: '0.000002', min: 0, max: 128000 },
+          { cost: '0.00001', min: 128000 },
+        ],
+        input_cache_read_tiers: [
+          { cost: '0.0000001', min: 0, max: 128000 },
+          { cost: '0.0000003', min: 128000 },
+        ],
+        input_cache_write_tiers: [
+          { cost: '0.00000125', min: 0, max: 128000 },
+          { cost: '0.0000025', min: 128000 },
+        ],
+      })
+    ).toEqual({
+      prompt: '0.0000025',
+      completion: '0.00001',
+      input_cache_read: '0.0000003',
+      input_cache_write: '0.0000025',
     });
+  });
+
+  it('multiplies the highest Vercel price tier by the peak multiplier in the worst case', () => {
+    expect(
+      getWorstCasePeakPricing({
+        prompt: '0.000001',
+        completion: '0.000002',
+        prompt_tiers: [
+          { cost: '0.000001', min: 0, max: 200000 },
+          { cost: '0.000005', min: 200000 },
+        ],
+        peak_pricing: { multiplier: 2 },
+      })
+    ).toEqual({ prompt: '0.000010000000', completion: '0.000004000000' });
+  });
+
+  it('undoes a discount on the highest Vercel price tier in the worst case', () => {
+    expect(
+      getWorstCaseModelPricing({
+        prompt: '0.0000005',
+        completion: '0.000001',
+        discount: 0.5,
+        prompt_tiers: [
+          { cost: '0.0000005', min: 0, max: 200000 },
+          { cost: '0.000002', min: 200000 },
+        ],
+      })
+    ).toEqual({ prompt: '0.000004000000', completion: '0.000002000000' });
   });
 
   it('combines a long-context override with the Vercel multiplier only in the worst case', () => {
@@ -224,6 +300,64 @@ describe('getPeakPricing', () => {
     expect(getWorstCasePeakPricing(pricing)).toEqual({
       prompt: '0.000006000000',
       completion: '0.000012000000',
+    });
+  });
+});
+
+describe("Vercel's endpoints pricing payload", () => {
+  // The pricing of an endpoint in Vercel's `/v1/models/{id}/endpoints` response, unmodified.
+  const pricing = EndpointPricingSchema.parse({
+    prompt: '0.0000005',
+    prompt_tiers: [
+      { cost: '0.0000005', min: 0, max: 256000 },
+      { cost: '0.000002', min: 256000 },
+    ],
+    completion: '0.000003',
+    completion_tiers: [
+      { cost: '0.000003', min: 0, max: 256000 },
+      { cost: '0.000006', min: 256000 },
+    ],
+    image: '0',
+    image_output: '0',
+    web_search: '0',
+    internal_reasoning: '0',
+    input_cache_read: '0.00000005',
+    input_cache_read_tiers: [
+      { cost: '0.00000005', min: 0, max: 256000 },
+      { cost: '0.0000002', min: 256000 },
+    ],
+    input_cache_write: '0.000000625',
+    input_cache_write_tiers: [
+      { cost: '0.000000625', min: 0, max: 256000 },
+      { cost: '0.0000025', min: 256000 },
+    ],
+    discount: 0,
+  });
+  const basePrices = {
+    image: '0',
+    web_search: '0',
+    internal_reasoning: '0',
+  };
+
+  it('displays the first tier', () => {
+    expect(getModelDisplayPricing(pricing)).toEqual({
+      ...basePrices,
+      prompt: '0.0000005',
+      completion: '0.000003',
+      input_cache_read: '0.00000005',
+      input_cache_write: '0.000000625',
+      discount: 0,
+    });
+  });
+
+  it('bounds spending at the highest tier', () => {
+    expect(getWorstCaseModelPricing(pricing)).toEqual({
+      ...basePrices,
+      prompt: '0.000002',
+      completion: '0.000006',
+      input_cache_read: '0.0000002',
+      input_cache_write: '0.0000025',
+      discount: 0,
     });
   });
 });

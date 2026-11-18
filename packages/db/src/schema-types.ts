@@ -2589,8 +2589,9 @@ export type SecurityFindingAnalysis = {
  * Gateway multiplies its token prices by `peak_pricing.multiplier` during peak windows.
  *
  * An `overrides` entry with `min_prompt_tokens` is not a time-of-day window: it applies to requests
- * whose prompt exceeds that many tokens (a long-context surcharge). Vercel's `*_tiers` fields are
- * not part of this schema; the base price fields are their first (short-context) tier.
+ * whose prompt exceeds that many tokens (a long-context surcharge). Vercel's long-context prices
+ * are `EndpointPricingSchema`'s `*_tiers`; the base price fields are their first (short-context)
+ * tier.
  */
 export const PriceOverrideSchema = z.looseObject({
   min_prompt_tokens: z.number().optional().catch(undefined),
@@ -3655,6 +3656,15 @@ export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 
 export const VercelModelsSchema = z.object({ data: z.array(VercelModelSchema) });
 
+/**
+ * Vercel AI Gateway's context-length price tiers of one token price: the price per token for
+ * prompts of `min` up to `max` tokens. The first tier equals the base price field.
+ */
+export const PriceTiersSchema = z
+  .array(z.looseObject({ cost: z.string() }))
+  .optional()
+  .catch(undefined);
+
 export const EndpointPricingSchema = z.object({
   prompt: z.string(),
   completion: z.string(),
@@ -3665,6 +3675,10 @@ export const EndpointPricingSchema = z.object({
   web_search: z.string().optional(),
   internal_reasoning: z.string().optional(),
   discount: z.number().optional(),
+  prompt_tiers: PriceTiersSchema,
+  completion_tiers: PriceTiersSchema,
+  input_cache_read_tiers: PriceTiersSchema,
+  input_cache_write_tiers: PriceTiersSchema,
   ...TimeOfDayPricingFields,
 });
 

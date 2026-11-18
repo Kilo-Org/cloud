@@ -96,9 +96,9 @@ export function TriggerFormBasics({
         </View>
       )}
 
-      <View className="gap-2">
-        <FormFieldLabel label={t('cloudAgent.triggers.fieldActivation')} />
-        {mode === 'create' ? (
+      {mode === 'create' ? (
+        <View className="gap-2">
+          <FormFieldLabel label={t('cloudAgent.triggers.fieldActivation')} />
           <SegmentedControl
             options={ACTIVATION_OPTIONS.map(option => ({
               value: option.value,
@@ -108,12 +108,15 @@ export function TriggerFormBasics({
             onChange={activate}
             accessibilityLabel={t('cloudAgent.triggers.fieldActivation')}
           />
-        ) : (
+        </View>
+      ) : (
+        <View className="gap-1">
+          <FormFieldLabel label={t('cloudAgent.triggers.fieldActivation')} />
           <Text>
             {isScheduled ? t('common.scheduled') : t('cloudAgent.triggers.activationWebhook')}
           </Text>
-        )}
-      </View>
+        </View>
+      )}
 
       {isScheduled && (
         <View className="gap-4">

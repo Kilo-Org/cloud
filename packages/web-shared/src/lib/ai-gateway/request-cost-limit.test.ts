@@ -398,6 +398,57 @@ describe('request cost admission', () => {
     );
     await expect(enforceRequestCostLimit('10000', id, body, 2_000_000)).resolves.toBeNull();
   });
+  it("bounds spending at Vercel's highest context-length price tier", async () => {
+    const id = 'test/vercel-tiers';
+    const routeModel: GatewayModelWithEndpoints = {
+      id,
+      name: 'Vercel tiers model',
+      endpoints: [{ tag: 'novita/fp8', pricing: { prompt: '0.000001', completion: '0.000002' } }],
+    };
+    const vercelModel: GatewayModelWithEndpoints = {
+      id,
+      name: 'Vercel tiers model',
+      endpoints: [
+        {
+          provider_name: 'novita',
+          pricing: {
+            prompt: '0.000001',
+            prompt_tiers: [
+              { cost: '0.000001', min: 0, max: 256000 },
+              { cost: '0.000004', min: 256000 },
+            ],
+            completion: '0.000002',
+            completion_tiers: [
+              { cost: '0.000002', min: 0, max: 256000 },
+              { cost: '0.000008', min: 256000 },
+            ],
+          },
+        },
+      ],
+    };
+    const catalogEntry = catalogModel(id, { prompt: '0.000001', completion: '0.000002' });
+    const preferredOrder = { rules: [{ includes: ['test/'], providers: ['novita'] }] };
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({ [id]: routeModel });
+    jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({ [id]: vercelModel });
+    jest.mocked(getRawOpenRouterModels).mockResolvedValue({ data: [catalogEntry] });
+    jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue(preferredOrder);
+    const vercel = await getVercelPricingMetadata();
+
+    expect(
+      pickerModelPricing(catalogEntry, { [id]: routeModel }, preferredOrder, vercel, 'shortContext')
+    ).toEqual({
+      prompt: '0.000001',
+      completion: '0.000002',
+    });
+    expect(
+      pickerModelPricing(catalogEntry, { [id]: routeModel }, preferredOrder, vercel, 'worstCase')
+    ).toEqual({ prompt: '0.000004', completion: '0.000008' });
+    // The bound is about 2200 microdollars at the first tier and about 8700 at the highest
+    await expect(enforceRequestCostLimit('4000', id, body, 2_000_000)).resolves.toMatch(
+      /spend safeguard/
+    );
+    await expect(enforceRequestCostLimit('10000', id, body, 2_000_000)).resolves.toBeNull();
+  });
   it('refuses a managed provider that cannot enforce the quoted route price', async () => {
     const decision = await enforceRequestCostLimitDecision(
       '2000000',

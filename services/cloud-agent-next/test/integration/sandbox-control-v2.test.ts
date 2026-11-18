@@ -3069,6 +3069,23 @@ describe('SandboxControlV2 allocation egress policy', () => {
     expect(provider.createCalls).toBe(0);
   });
 
+  it('rejects an unknown ensure provider as an invalid configuration without pinning it', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await configureEgressSandbox(provider);
+    const before = await readState(stub);
+    const pin = await readProviderPin(stub);
+    await expect(
+      startAllocation(provider, {
+        sandboxId,
+        // A provider id that a newer deployment knows.
+        provider: 'newer-provider' as StoredProviderPin['provider'],
+      })
+    ).rejects.toThrow('Sandbox configuration is invalid or unsupported');
+    expect(await readState(stub)).toEqual(before);
+    expect(await readProviderPin(stub)).toBe(pin);
+    expect(provider.createCalls).toBe(0);
+  });
+
   it.each(
     [
       { provider: 'cloudflare' as const, sandboxKind: undefined },
@@ -3113,8 +3130,6 @@ describe('SandboxControlV2 allocation egress policy', () => {
     { provider: 'vercel', sandboxKind: undefined },
     { provider: 'cloudflare-containers', sandboxKind: 'shared' },
     { provider: 'cloudflare-containers', sandboxKind: 'code-review' },
-    // A pin that a newer deployment wrote, read after a rollback.
-    { provider: 'newer-provider', sandboxKind: undefined },
   ])('rejects unsupported audited unrestricted provider pins on reload: %j', async placement => {
     const provider = createFakeProvider();
     const { stub } = await configureEgressSandbox(provider);

@@ -3185,7 +3185,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (!sandboxKindMatchesKey(this.sandboxId, input.sandboxKind)) {
       throw new Error('Sandbox selection kind does not match the sandbox key');
     }
-    const provider = input.provider ?? 'cloudflare-containers';
+    // `ensureAllocation` forwards its input unparsed, so an unknown id must
+    // fail as a creation error rather than a descriptor lookup `TypeError`.
+    const parsedProvider = agentSandboxProviderSchema.safeParse(
+      input.provider ?? 'cloudflare-containers'
+    );
+    if (!parsedProvider.success) throw new ProviderCreationError('invalid_configuration');
+    const provider = parsedProvider.data;
     if (
       (policy.data.egressMode === 'allowlist' || policy.data.egressAudit === true) &&
       !this.egressPolicyAllowed(provider, input.sandboxKind)

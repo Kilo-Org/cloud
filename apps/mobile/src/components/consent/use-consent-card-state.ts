@@ -26,8 +26,11 @@ const STORED_LOAD_TIMEOUT_MS = 15_000;
  * from a settled card, so repeated taps read as a dead button. The reserved
  * footer status line names the wait, the read is bounded
  * (`STORED_LOAD_TIMEOUT_MS`), and a timeout or failed read becomes `failed`
- * with its own Retry. `failed` never re-enables the primary: accepting would
- * write the default over a stored decision the read could not see.
+ * — carrying its own failure copy inside the union, with a Retry that stays
+ * rendered for the whole phase. `failed` never re-enables the primary:
+ * accepting would write the default over a stored decision the read could
+ * not see. The action-error slot (`error`) is a separate channel the load
+ * never writes, so a load transition cannot hide a live action failure.
  */
 export function useConsentCardState(mode: ConsentMode) {
   const router = useRouter();

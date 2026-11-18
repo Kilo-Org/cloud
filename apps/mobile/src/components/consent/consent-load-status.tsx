@@ -33,9 +33,12 @@ type ConsentLoadStatusLineProps = {
  * The reserved footer status slot of the consent card (see the card's footer
  * comment for why the slot is reserved). While the stored read is in flight
  * the line names the wait, so a disabled-looking primary has its reason on
- * screen instead of reading as a dead control; when the read fails or times
- * out the line becomes the latest failure with its own Retry, because the
- * primary must stay disabled until the read answers.
+ * screen instead of reading as a dead control. In the `failed` phase the
+ * load failure carries its own Retry (the primary stays disabled until the
+ * read answers), and the newest failure wins the visible copy: an action
+ * failure that arrived after the load failure hides the load copy while it
+ * is live, but the Retry — which re-runs the read that blocks the primary —
+ * stays for the whole phase.
  */
 export function ConsentLoadStatusLine({ load, error, onRetry, t }: ConsentLoadStatusLineProps) {
   if (load.status === 'loading') {

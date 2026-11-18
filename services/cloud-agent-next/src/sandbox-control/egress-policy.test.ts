@@ -144,4 +144,27 @@ describe('active deployed egress pins', () => {
       false
     );
   });
+
+  const tokenStored = {
+    ...stored,
+    egressAllowlist: [...stored.egressAllowlist, 'token-provider.example.com'].sort(),
+  };
+  it('accepts an old baseline pinned from a token-encoded provider', () => {
+    const kiloToken = 'https://token-provider.example.com/api:session-token';
+    expect(
+      matchesActiveEgressPolicy({ stored: tokenStored, selected, request, env, kiloToken })
+    ).toBe(true);
+  });
+  it.each([
+    { kiloToken: 'https://other-provider.example.com/api:session-token' },
+    { kiloToken: undefined },
+  ])('rejects a token-encoded old baseline for a different provider: %j', ({ kiloToken }) => {
+    expect(
+      matchesActiveEgressPolicy({ stored: tokenStored, selected, request, env, kiloToken })
+    ).toBe(false);
+  });
+  it('rejects an old baseline after a Worker upstream URL changes', () => {
+    const changedEnv = { ...env, KILOCODE_BACKEND_BASE_URL: 'https://backend.example.com' };
+    expect(matchesActiveEgressPolicy({ stored, selected, request, env: changedEnv })).toBe(false);
+  });
 });

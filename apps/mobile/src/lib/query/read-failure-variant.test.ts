@@ -90,6 +90,21 @@ describe('classifyReadFailureVariant', () => {
     ).toBe('server');
   });
 
+  it('names the connection for a client-side failure that carries a bare code', () => {
+    // The Expo fetch cancellation names itself in `code`, and other transport
+    // errors can too: a bare top-level `code` is not a server answer.
+    expect(
+      variantFor({
+        errors: [
+          Object.assign(new Error('Aborted'), {
+            name: 'FetchRequestCanceledException',
+            code: 'FetchRequestCanceledException',
+          }),
+        ],
+      })
+    ).toBe('offline');
+  });
+
   it('names the connection when the caller also pauses a coded failure', () => {
     expect(variantFor({ errors: [serverError('FORBIDDEN')], isPaused: true })).toBe('offline');
   });

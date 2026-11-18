@@ -1,5 +1,5 @@
 import { type BannerState } from '@/lib/offline-banner-state';
-import { readTrpcErrorField } from '@/lib/trpc-error';
+import { isTrpcClientError, readTrpcErrorField } from '@/lib/trpc-error';
 import { z } from 'zod';
 
 /** The presentation of a failed first load: who the failure blames. */
@@ -35,7 +35,11 @@ export function classifyReadFailureVariant({
 }
 
 function servedAnswer(error: unknown): boolean {
-  if (readTrpcErrorField(error, 'code') !== undefined) {
+  // A bare top-level `code` is not a server answer on its own: transport and
+  // abort errors carry one too (the Expo fetch cancellation names itself in
+  // `code`). Only a real tRPC error envelope, or a status the answer carried,
+  // proves the server answered.
+  if (isTrpcClientError(error) && readTrpcErrorField(error, 'code') !== undefined) {
     return true;
   }
   return readHttpStatus(error) !== undefined;

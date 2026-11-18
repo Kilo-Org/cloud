@@ -102,19 +102,23 @@ export function SettingsOverviewScreen({
   } else if (repositoriesError) {
     recoveryError = t('common.couldNotLoadRepositories');
   }
-  // The failed read determines the branch, so each failure reads only its own error.
+  // The failed read determines the branch, so each failure reads only its own
+  // error. A capability retry clears its error while it runs: an empty error
+  // list must not classify as "never reached the server", so the variant stays
+  // on the branch's earlier answer until the attempt settles.
   const configFailure = {
     errors: [config.error],
     isPaused: config.fetchStatus === 'paused',
     connectivity,
   } as const;
+  const capabilityFailure = {
+    errors: capability.error ? [capability.error] : [],
+    isPaused: capability.fetchStatus === 'paused',
+    connectivity,
+  } as const;
   const variant = configUnavailable
     ? classifyReadFailureVariant(configFailure)
-    : classifyReadFailureVariant({
-        errors: [capability.error],
-        isPaused: capability.fetchStatus === 'paused',
-        connectivity,
-      });
+    : classifyReadFailureVariant(capabilityFailure);
   if (configUnavailable || capabilityUnavailable) {
     return (
       <PlatformErrorScreen

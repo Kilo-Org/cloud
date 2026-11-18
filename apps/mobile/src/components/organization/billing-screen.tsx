@@ -114,7 +114,10 @@ export function OrganizationBillingScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={screenTitle} backFallback={ORGANIZATION_HUB_PATH} />
-        <PermissionDenied description={t('organization.billing.permissionDenied')} />
+        <PermissionDenied
+          description={t('organization.billing.permissionDenied')}
+          showBack={false}
+        />
       </View>
     );
   }

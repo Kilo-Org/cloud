@@ -166,7 +166,10 @@ export function OrganizationAuditLogScreen() {
           title={t('organization.auditLog.title')}
           backFallback={ORGANIZATION_HUB_PATH}
         />
-        <PermissionDenied description={t('organization.auditLog.permissionDenied')} />
+        <PermissionDenied
+          description={t('organization.auditLog.permissionDenied')}
+          showBack={false}
+        />
       </View>
     );
   }

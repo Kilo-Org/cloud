@@ -63,7 +63,10 @@ export function OrganizationGroupFormScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('organization.settingsOnWeb.groups')} />
-        <PermissionDenied description={t('organization.groups.permissionDenied')} />
+        <PermissionDenied
+          description={t('organization.groups.permissionDenied')}
+          showBack={false}
+        />
       </View>
     );
   }

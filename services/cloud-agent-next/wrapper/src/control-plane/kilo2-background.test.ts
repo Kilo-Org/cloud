@@ -121,6 +121,42 @@ test('drops sibling inventory even if the native filter returns it', async () =>
   expect(result.sessions.map(session => session.id)).not.toContain('ses_sibling');
 });
 
+test('keeps subagents and waits when the shell inventory read fails', async () => {
+  const api = apiFor([shell, agent]);
+  const data = api.data;
+  api.data = async (path, options) => {
+    if (path.startsWith('/api/shell?')) throw new Error('shell inventory unavailable');
+    return data(path, options);
+  };
+  const result = await readKilo2BackgroundActivity(
+    api,
+    'ses_root',
+    '/workspace/app',
+    new AbortController().signal
+  );
+  expect(result.jobs).toEqual([agent]);
+  expect(result.waits).toEqual([{ sessionID: 'ses_child', kind: 'question' }]);
+});
+
+test('propagates caller cancellation during the shell inventory read', async () => {
+  const api = apiFor([shell, agent]);
+  const controller = new AbortController();
+  const cancelled = new Error('background read cancelled');
+  const data = api.data;
+  api.data = async (path, options) => {
+    if (path.startsWith('/api/shell?')) {
+      controller.abort(cancelled);
+      throw cancelled;
+    }
+    return data(path, options);
+  };
+  expect(
+    await readKilo2BackgroundActivity(api, 'ses_root', '/workspace/app', controller.signal).catch(
+      (error: unknown) => error
+    )
+  ).toBe(cancelled);
+});
+
 test('drops an agent whose child does not belong to its owning chat', async () => {
   const result = await readKilo2BackgroundActivity(
     apiFor([agent, { ...shell, sessionID: 'ses_root' }], 'ses_sibling'),

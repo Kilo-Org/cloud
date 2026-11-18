@@ -16,27 +16,38 @@ export async function readKilo2BackgroundActivity(
   signal: AbortSignal
 ) {
   const { reads, session } = createKilo2Reads(api, directory);
-  const query = new URLSearchParams({ sessionID, descendants: 'true', status: 'running' });
-  const [raw, questions, permissions] = await Promise.all([
-    api.data(`/api/experimental/job?${query}`, { signal }),
+  async function readJobs() {
+    const query = new URLSearchParams({ sessionID, descendants: 'true', status: 'running' });
+    const raw = await api.data(`/api/experimental/job?${query}`, { signal });
+    const jobs = z
+      .array(z.unknown())
+      .parse(raw)
+      .flatMap(entry => {
+        const job = backgroundJobSchema.safeParse(entry);
+        return job.success ? [job.data] : [];
+      });
+    if (!jobs.some(job => job.kind === 'shell')) return jobs;
+
+    let shells: z.infer<typeof shellListSchema>;
+    try {
+      shells = shellListSchema.parse(
+        await api.data(`/api/shell?${kilo2LocationQuery(directory)}`, { signal })
+      );
+    } catch {
+      signal.throwIfAborted();
+      return jobs.filter(job => job.kind !== 'shell');
+    }
+    const liveShells = new Set(
+      shells.filter(shell => shell.status === 'running').map(shell => shell.id)
+    );
+    return jobs.filter(job => job.kind !== 'shell' || liveShells.has(job.shellID));
+  }
+
+  const [readable, questions, permissions] = await Promise.all([
+    readJobs(),
     reads.getQuestions(directory, signal),
     reads.getPermissions(directory, signal),
   ]);
-  const readable = z
-    .array(z.unknown())
-    .parse(raw)
-    .flatMap(entry => {
-      const job = backgroundJobSchema.safeParse(entry);
-      return job.success && job.data.status === 'running' ? [job.data] : [];
-    });
-  const liveShells = new Set(
-    readable.some(job => job.kind === 'shell')
-      ? shellListSchema
-          .parse(await api.data(`/api/shell?${kilo2LocationQuery(directory)}`, { signal }))
-          .filter(shell => shell.status === 'running')
-          .map(shell => shell.id)
-      : []
-  );
   const sessions = new Map<string, Awaited<ReturnType<typeof session>>>();
   const root = await session(sessionID, signal);
   if (root.location.directory !== directory)
@@ -59,7 +70,6 @@ export async function readKilo2BackgroundActivity(
   const jobs = [];
   for (const job of readable) {
     if (jobs.length >= LIMIT) break;
-    if (job.kind === 'shell' && !liveShells.has(job.shellID)) continue;
     if (!(await owns(job.sessionID))) continue;
     if (
       job.kind === 'subagent' &&

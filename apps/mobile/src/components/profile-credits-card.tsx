@@ -8,7 +8,6 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
-import { AddCreditsRow } from '@/components/add-credits-row';
 import { BalanceBlock, type BalanceBlockState } from '@/components/profile-balance-block';
 import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
 import { PersonalCreditsLinks } from '@/components/credits/credits-links';
@@ -17,7 +16,9 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { SectionHeader } from '@/components/ui/section-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useCanLinkExternalPurchase } from '@/lib/billing/external-purchase-link';
 import { organizationBillingUrl } from '@/lib/credits/add-credits-destination';
+import { openExternalUrl } from '@/lib/external-link';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatPrefixedMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -61,6 +62,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const selectedOrgId = organizationId ?? undefined;
 
   const { hideBalance, hasLoaded: hideBalanceLoaded, setHideBalance } = useHideBalancePreference();
+  const canLinkExternalPurchase = useCanLinkExternalPurchase();
   const { userId, isError: userIdError, refetch: refetchUserId } = useCurrentUserId({ enabled });
   const hasUserId = userId !== undefined;
 
@@ -214,16 +216,29 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     </Pressable>
   );
 
-  // An organization's top-up is the external billing page, so it carries the
-  // row's App Store gate and opens for a member who can manage billing. The
-  // personal purchase is this section's header action, so it never drops to a
-  // row of its own in a narrow card.
-  const orgAddCreditsAction =
-    selectedOrgId != null && canManageOrgBilling ? (
-      <AddCreditsRow url={organizationBillingUrl(selectedOrgId)} inline={stackBalance} />
-    ) : null;
-
-  const addCreditsAction = selectedOrgId == null ? null : orgAddCreditsAction;
+  // One purchase entry for the section, whichever scope is selected: the
+  // personal one is the in-app purchase, and an organization's is its billing
+  // page, which only a storefront that may link to it can offer. It lives in the
+  // Credits header, so it never wraps to a row of its own in a narrow card and
+  // never reads as a muted label with nothing to press.
+  const orgBillingUrl =
+    selectedOrgId != null && canManageOrgBilling ? organizationBillingUrl(selectedOrgId) : null;
+  let purchase: Readonly<{ label: string; onPress: () => void }> | null = null;
+  if (selectedOrgId == null) {
+    purchase = {
+      label: t('addCredits.cta'),
+      onPress: () => {
+        router.push('/(app)/credits' as Href);
+      },
+    };
+  } else if (orgBillingUrl !== null && canLinkExternalPurchase) {
+    purchase = {
+      label: t('addCredits.cta'),
+      onPress: () => {
+        void openExternalUrl(orgBillingUrl, { label: t('addCredits.billingPage') });
+      },
+    };
+  }
 
   // The balance slot's state: one shell paints all three, so the card never
   // moves as the read answers, fails or retries.
@@ -249,14 +264,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       <SectionHeader
         label={t('profile.credits')}
         reserveLabelAir
-        actionLabel={selectedOrgId == null ? t('addCredits.cta') : undefined}
-        onActionPress={
-          selectedOrgId == null
-            ? () => {
-                router.push('/(app)/credits' as Href);
-              }
-            : undefined
-        }
+        actionLabel={purchase?.label}
+        onActionPress={purchase?.onPress}
       />
       {error === 'save' && (
         <View>
@@ -283,7 +292,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         toggle={visibilityToggle}
         note={expirySlot}
         failureLabel={t('profile.balanceLoadFailed')}
-        action={addCreditsAction}
         retryLabel={t('profile.failedToLoadBalance')}
         retryActionLabel={t('common.retry')}
         onRetry={retryBalance}

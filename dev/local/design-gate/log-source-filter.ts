@@ -68,7 +68,8 @@ export function logSourceFilterExpression(): string {
   };
   const findLogBox = () => {
     const registry = globalThis.__r;
-    if (typeof registry !== 'function' || typeof registry.getModules !== 'function') return null;
+    if (registry === null || registry === undefined) return null;
+    if (typeof registry.getModules !== 'function') return null;
     for (const entry of registry.getModules().values()) {
       const exported = entry && entry.publicModule && entry.publicModule.exports;
       for (const candidate of [exported, exported && exported.default]) {

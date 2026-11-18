@@ -123,12 +123,7 @@ export const PurchaseHistoryRow = memo(function PurchaseHistoryRow({
     : null;
 
   return (
-    <View
-      className={cn(
-        'gap-1.5 px-4 py-3',
-        !last && 'border-b-[0.5px] border-hair-soft'
-      )}
-    >
+    <View className={cn('gap-1.5 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}>
       <View className="flex-row items-center justify-between gap-3">
         <Text variant="small" className="min-w-0 flex-1" numberOfLines={1}>
           {title}
@@ -193,11 +188,7 @@ function LedgerLine({
   return (
     <View className={muted ? 'gap-1 pl-4' : 'gap-1'}>
       <View className="flex-row items-center justify-between gap-3">
-        <Text
-          variant={muted ? 'muted' : 'small'}
-          className="min-w-0 flex-1"
-          numberOfLines={1}
-        >
+        <Text variant={muted ? 'muted' : 'small'} className="min-w-0 flex-1" numberOfLines={1}>
           {title}
         </Text>
         <Text variant="small" className={amountMicrodollars >= 0 ? 'text-good' : undefined}>
@@ -232,9 +223,7 @@ export const LedgerHistoryRow = memo(function LedgerHistoryRow({
   const purchase = grantListed ? null : deduction.purchase;
 
   return (
-    <View
-      className={cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}
-    >
+    <View className={cn('gap-2 px-4 py-3', !last && 'border-b-[0.5px] border-hair-soft')}>
       <LedgerLine
         title={firstNonEmpty(
           purchase?.description,

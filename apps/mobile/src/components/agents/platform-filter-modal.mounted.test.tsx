@@ -108,9 +108,7 @@ function pressButton(renderer: RenderedView['renderer'], label: string) {
 
 /** The sheet's content column, above the sheet's own bottom-inset spacer. */
 function findSheetContent(renderer: RenderedView['renderer']) {
-  const content = renderer.root
-    .findAllByType(View)
-    .find(view => view.props.className === 'flex-1');
+  const content = renderer.root.findAllByType(View).find(view => view.props.className === 'flex-1');
   if (!content) {
     throw new Error('missing sheet content');
   }

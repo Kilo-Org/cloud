@@ -260,9 +260,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         </Section>
 
         <Section
-          label={
-            mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')
-          }
+          label={mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}
         >
           <RowGroup leadingTile>
             {/* Until the stored choice loads the row shows no switch: a switch
@@ -314,7 +312,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
 
       <ScreenFooter>
         <View className="gap-3">
-        {/* The error lives in the pinned footer, not the scroll content: the
+          {/* The error lives in the pinned footer, not the scroll content: the
             footer draws over the scroll tail, so a content-placed error was
             invisible behind the buttons (b911 vr2 device repro — staging
             error measured at y=792 under the Back/Revoke footer). The
@@ -322,38 +320,38 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             body the footer edge cut the sentence in half. Its font scale is
             capped so the pinned height stays bounded (see
             CONSENT_DISCLOSURE_MAX_FONT_SCALE). */}
-        <ConsentPolicySentence
-          prefix={t('consent.privacyPolicyPrefix')}
-          linkLabel={t('consent.privacyPolicy')}
-          maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
-          onOpenPolicy={handleOpenPrivacy}
-        />
-        <View className="min-h-5 justify-center">
-          <AccessibleStatus message={error ? t(error) : null} />
-        </View>
-        <Button
-          onPress={() => {
-            void handlePrimaryAction();
-          }}
-          size="lg"
-          accessibilityLabel={actions.primaryLabel}
-          // Accepting before the stored (or carried) choice has loaded would
-          // write the default over a decision the user already made.
-          disabled={pendingAction === 'secondary' || optionalControlPending}
-          loading={pendingAction === 'primary'}
-        >
-          <Text>{actions.primaryLabel}</Text>
-        </Button>
-        <Button
-          variant={mode === 'review' ? 'outline-destructive' : 'outline'}
-          size="lg"
-          onPress={handleSecondaryAction}
-          accessibilityLabel={actions.secondaryLabel}
-          disabled={pendingAction === 'primary'}
-          loading={pendingAction === 'secondary'}
-        >
-          <Text>{actions.secondaryLabel}</Text>
-        </Button>
+          <ConsentPolicySentence
+            prefix={t('consent.privacyPolicyPrefix')}
+            linkLabel={t('consent.privacyPolicy')}
+            maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
+            onOpenPolicy={handleOpenPrivacy}
+          />
+          <View className="min-h-5 justify-center">
+            <AccessibleStatus message={error ? t(error) : null} />
+          </View>
+          <Button
+            onPress={() => {
+              void handlePrimaryAction();
+            }}
+            size="lg"
+            accessibilityLabel={actions.primaryLabel}
+            // Accepting before the stored (or carried) choice has loaded would
+            // write the default over a decision the user already made.
+            disabled={pendingAction === 'secondary' || optionalControlPending}
+            loading={pendingAction === 'primary'}
+          >
+            <Text>{actions.primaryLabel}</Text>
+          </Button>
+          <Button
+            variant={mode === 'review' ? 'outline-destructive' : 'outline'}
+            size="lg"
+            onPress={handleSecondaryAction}
+            accessibilityLabel={actions.secondaryLabel}
+            disabled={pendingAction === 'primary'}
+            loading={pendingAction === 'secondary'}
+          >
+            <Text>{actions.secondaryLabel}</Text>
+          </Button>
         </View>
       </ScreenFooter>
       {dialog}

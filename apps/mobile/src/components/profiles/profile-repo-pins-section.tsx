@@ -126,7 +126,10 @@ export function ProfileRepoPinsSection({
             {/* One identity element, first, as the profile's bindings rows read:
                 the repository and its provider, then the control that unbinds it. */}
             <ProfileRowIdentity
-              label={profileRowLabel(binding.repoFullName, t(repoPlatformLabelKey(binding.platform)))}
+              label={profileRowLabel(
+                binding.repoFullName,
+                t(repoPlatformLabelKey(binding.platform))
+              )}
             >
               <Text variant="mono" className="text-xs" numberOfLines={1}>
                 {binding.repoFullName}

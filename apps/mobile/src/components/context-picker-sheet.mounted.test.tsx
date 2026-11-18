@@ -105,7 +105,8 @@ function rows(renderer: ReactTestRenderer) {
       typeof node.props.className === 'string' && node.props.className.includes('border-hair-soft'),
     // The mark holds its slot in every row: the check paints only for the
     // selected row and stays transparent otherwise.
-    check: node.findAll(child => child.type === Check && child.props.color !== 'transparent').length > 0,
+    check:
+      node.findAll(child => child.type === Check && child.props.color !== 'transparent').length > 0,
   }));
 }
 

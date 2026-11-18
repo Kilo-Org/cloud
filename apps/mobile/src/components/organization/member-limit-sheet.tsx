@@ -233,7 +233,5 @@ export function MemberLimitSheet({ memberId }: Readonly<{ memberId: string }>) {
     );
   }
 
-  return (
-    <MemberLimitForm memberId={memberId} organizationId={organizationId} member={member} />
-  );
+  return <MemberLimitForm memberId={memberId} organizationId={organizationId} member={member} />;
 }

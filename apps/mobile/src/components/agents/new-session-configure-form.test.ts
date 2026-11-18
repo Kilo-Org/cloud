@@ -1005,7 +1005,8 @@ describe('NewSessionConfigureForm', () => {
         ...collectElementsByType(row, 'Pressable'),
       ].filter(
         element =>
-          typeof element.className === 'string' && element.className.includes(FIELD_TRIGGER_FRAME_CLASS)
+          typeof element.className === 'string' &&
+          element.className.includes(FIELD_TRIGGER_FRAME_CLASS)
       );
       expect(frames).toHaveLength(1);
     }

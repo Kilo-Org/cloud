@@ -222,7 +222,9 @@ export function ProfilePickerSheet({
               </Text>
               {resolvedDefaultName === null ? null : (
                 <Text variant="muted" className="mt-0.5 text-xs" numberOfLines={1}>
-                  {t('agentChat.newSession.defaultProfileResolvesTo', { name: resolvedDefaultName })}
+                  {t('agentChat.newSession.defaultProfileResolvesTo', {
+                    name: resolvedDefaultName,
+                  })}
                 </Text>
               )}
             </View>

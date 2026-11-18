@@ -20,11 +20,7 @@ export function DismissFindingSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <SheetHeader
-        title={t('securityAgent.dismiss.title')}
-        onDone={() => undefined}
-        disabled
-      />
+      <SheetHeader title={t('securityAgent.dismiss.title')} onDone={() => undefined} disabled />
       <View className={SCREEN_BODY_CLASS}>
         {/* The identity card: the title and the two reference lines. */}
         <Skeleton className="h-24 w-full rounded-xl" />

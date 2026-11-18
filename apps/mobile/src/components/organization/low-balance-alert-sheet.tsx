@@ -190,9 +190,7 @@ function LowBalanceAlertForm({ organizationId, settings, onClose }: LowBalanceAl
                   clearSaveError();
                 }}
               />
-              <Text variant="caption">
-                {t('organization.lowBalanceAlert.separateEmailsHint')}
-              </Text>
+              <Text variant="caption">{t('organization.lowBalanceAlert.separateEmailsHint')}</Text>
               <AccessibleStatus
                 message={saveError?.field === 'emails' ? saveError.message : null}
                 className="text-sm"

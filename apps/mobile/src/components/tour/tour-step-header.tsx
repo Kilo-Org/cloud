@@ -33,7 +33,11 @@ export function TourStepHeader({ icon, eyebrow, title, body }: Readonly<TourStep
         <Eyebrow className="text-center" maxFontSizeMultiplier={TOUR_HEADER_MAX_FONT_SCALE}>
           {eyebrow}
         </Eyebrow>
-        <Text variant="heading" className="text-center" maxFontSizeMultiplier={TOUR_HEADER_MAX_FONT_SCALE}>
+        <Text
+          variant="heading"
+          className="text-center"
+          maxFontSizeMultiplier={TOUR_HEADER_MAX_FONT_SCALE}
+        >
           {title}
         </Text>
         <Text

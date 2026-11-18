@@ -79,9 +79,7 @@ function groupSurface(renderer: ReactTestRenderer) {
 
 /** The expanded body, whose frame the section owns. */
 function bodyNode(renderer: ReactTestRenderer) {
-  return animatedBoxes(renderer).find(node =>
-    String(node.props.className).includes(BODY_FRAME)
-  );
+  return animatedBoxes(renderer).find(node => String(node.props.className).includes(BODY_FRAME));
 }
 
 afterEach(() => {

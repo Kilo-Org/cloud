@@ -127,7 +127,9 @@ export function PickerField({
         <View className={FIELD_TRIGGER_BODY_CLASS}>
           <Text
             className={
-              value === null ? 'min-w-0 flex-1 text-sm text-muted-foreground' : 'min-w-0 flex-1 text-sm text-foreground'
+              value === null
+                ? 'min-w-0 flex-1 text-sm text-muted-foreground'
+                : 'min-w-0 flex-1 text-sm text-foreground'
             }
             numberOfLines={1}
           >

@@ -277,26 +277,23 @@ describe('EmailOtpForm action labels', () => {
   it.each([
     { language: 'en', isRTL: false },
     { language: 'ar', isRTL: true },
-  ])(
-    'keeps both stacked action labels on one line in $language',
-    async ({ language, isRTL }) => {
-      i18nManager.isRTL = isRTL;
-      await i18n.changeLanguage(language);
-      const { mounted } = mount();
+  ])('keeps both stacked action labels on one line in $language', async ({ language, isRTL }) => {
+    i18nManager.isRTL = isRTL;
+    await i18n.changeLanguage(language);
+    const { mounted } = mount();
 
-      const verify = actionLabel(mounted.root, i18n.t('login.verifyCode'));
-      const resend = actionLabel(mounted.root, i18n.t('login.resendCode'));
+    const verify = actionLabel(mounted.root, i18n.t('login.verifyCode'));
+    const resend = actionLabel(mounted.root, i18n.t('login.resendCode'));
 
-      // The row and its content width belong to the shared Button; each label
-      // stays on one line, so neither stacked action can outgrow the other
-      // (the Arabic resend copy once wrapped and orphaned "الرمز" on a second
-      // line).
-      expect(verify.props.children).toBe(i18n.t('login.verifyCode'));
-      expect(resend.props.children).toBe(i18n.t('login.resendCode'));
-      expect(verify.props.numberOfLines).toBe(1);
-      expect(resend.props.numberOfLines).toBe(1);
-    }
-  );
+    // The row and its content width belong to the shared Button; each label
+    // stays on one line, so neither stacked action can outgrow the other
+    // (the Arabic resend copy once wrapped and orphaned "الرمز" on a second
+    // line).
+    expect(verify.props.children).toBe(i18n.t('login.verifyCode'));
+    expect(resend.props.children).toBe(i18n.t('login.resendCode'));
+    expect(verify.props.numberOfLines).toBe(1);
+    expect(resend.props.numberOfLines).toBe(1);
+  });
 
   it('keeps both labels on one line while a send or verify is in flight', () => {
     const { mounted, props } = mount();

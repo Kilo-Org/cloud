@@ -519,9 +519,7 @@ export function SessionContextSheet({
               count: modelsSectionCount,
               displayCount: formatNumber(modelsSectionCount, i18n.language),
             })}
-            notice={
-              <Text variant="caption">{t('agentChat.contextUsage.tokenTotalsNote')}</Text>
-            }
+            notice={<Text variant="caption">{t('agentChat.contextUsage.tokenTotalsNote')}</Text>}
           >
             <RowGroup>
               {visibleModels.map(model => (
@@ -746,8 +744,14 @@ function ModelRow({
         <View className="pb-3">
           <TokenRow label={t('agentChat.messageDetails.input')} value={model.tokens.input} />
           <TokenRow label={t('agentChat.messageDetails.output')} value={model.tokens.output} />
-          <TokenRow label={t('agentChat.messageDetails.reasoning')} value={model.tokens.reasoning} />
-          <TokenRow label={t('agentChat.messageDetails.cacheRead')} value={model.tokens.cacheRead} />
+          <TokenRow
+            label={t('agentChat.messageDetails.reasoning')}
+            value={model.tokens.reasoning}
+          />
+          <TokenRow
+            label={t('agentChat.messageDetails.cacheRead')}
+            value={model.tokens.cacheRead}
+          />
           <TokenRow
             label={t('agentChat.messageDetails.cacheWrite')}
             value={model.tokens.cacheWrite}

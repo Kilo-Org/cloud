@@ -384,9 +384,11 @@ describe('IdleAuth provider chrome parity', () => {
     // Button holding its mark beside the label, and the busy state is the
     // button's own spinner rather than a slot the row reserves.
     const rows = providerRows(renderer.root);
-    expect(
-      rows.map(row => row.children.find(child => typeof child !== 'string')?.type)
-    ).toEqual(['AppleLogo', 'GoogleLogo', 'KeyRound']);
+    expect(rows.map(row => row.children.find(child => typeof child !== 'string')?.type)).toEqual([
+      'AppleLogo',
+      'GoogleLogo',
+      'KeyRound',
+    ]);
     for (const row of rows) {
       expect(labelText(row).props.children).toBe(row.props.accessibilityLabel);
     }
@@ -695,9 +697,7 @@ describe('IdleAuth provider label layout', () => {
     // the chrome do not move while the request runs.
     expect(busyButton.props.loading).toBe(true);
     expect(String(busyButton.props.className)).toBe(idleClasses);
-    expect(String(labelText(busyButton).props.children)).toBe(
-      busyButton.props.accessibilityLabel
-    );
+    expect(String(labelText(busyButton).props.children)).toBe(busyButton.props.accessibilityLabel);
 
     act(() => {
       busy.unmount();

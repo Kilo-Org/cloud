@@ -8,10 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { statusFilterLabelKey } from '@/components/agents/live-session-status-filter';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Text } from '@/components/ui/text';
-import {
-  COMPACT_CONTROL_BOX_CLASS,
-  COMPACT_CONTROL_HIT_SLOP_DP,
-} from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_BOX_CLASS, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -47,10 +44,7 @@ export function SessionStatusFilterBar({
   // Landscape side insets keep the chip clear of the sensor housing; portrait
   // insets are 0, keeping the fixed gutter unchanged.
   const { left, right } = useSafeAreaInsets();
-  const margins = useMemo(
-    () => ({ marginLeft: left, marginRight: right }),
-    [left, right]
-  );
+  const margins = useMemo(() => ({ marginLeft: left, marginRight: right }), [left, right]);
 
   return (
     <View style={margins} className="flex-row items-center gap-2 px-4 pb-1.5">

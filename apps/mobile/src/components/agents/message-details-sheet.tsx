@@ -244,11 +244,7 @@ export function MessageDetailsSheet({
               {content.costLabel && content.tokenRows ? (
                 <Section label={t('agentChat.messageDetails.costAndTokens')}>
                   <RowGroup>
-                    <KvRow
-                      label={t('common.cost')}
-                      value={content.costLabel}
-                      valueFace="numeric"
-                    />
+                    <KvRow label={t('common.cost')} value={content.costLabel} valueFace="numeric" />
                     {content.tokenRows.map(row => (
                       <TokenRow key={row.label} label={row.label} value={row.value} />
                     ))}

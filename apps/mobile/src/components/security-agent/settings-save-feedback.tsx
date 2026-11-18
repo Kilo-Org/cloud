@@ -13,7 +13,11 @@ import { useSurfaceFeedback } from '@/lib/hooks/use-surface-feedback';
 const REFUSAL_MAX_FONT_SCALE = 1.6;
 
 type SettingsSaveFeedback = {
-  /** Await a settings save, keep its refusal for the inline line, and rethrow it. */
+  /**
+   * Await a settings save, keep its refusal for the inline line, and rethrow
+   * it. Rejects with `SettingsSaveAdmissionRefused` before any save starts
+   * when another save is already in flight on this screen.
+   */
   run: (save: () => Promise<void>) => Promise<void>;
   /** The refusal line: `null` until a save is refused, then the parked refusal. */
   node: ReactElement | null;

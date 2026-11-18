@@ -4793,6 +4793,66 @@ describe('native session outcome transitions', () => {
 });
 
 describe('completion ownership and transport bounds', () => {
+  it.each(['late cancellation', 'confirmed retry', 'unconfirmed retry'] as const)(
+    'handles %s after quiet-drain expiry',
+    async scenario => {
+      const stopped = Promise.withResolvers<boolean>();
+      const h = createHarness();
+      const spec = routeSpec();
+      h.registerRoute(spec);
+      const client = h.client(spec);
+      client.setAbortImpl(() => stopped.promise);
+      client.setAutomaticDrainMarker(false);
+      client.setDrainImpl(() => new Promise(() => undefined));
+      h.setExecutionTree(KILO_SESSION, []);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      h.fireTimeout(SESSION_TIMERS.noProgressMs);
+      await settle();
+      expect(outcomeFrames(h.frames)).toMatchObject([
+        { status: 'failed', reason: 'completion_quiet_drain', lastMessageId: 'm1' },
+      ]);
+
+      if (scenario === 'late cancellation') {
+        h.manager.observeKiloEvent(
+          kiloEvent('session.error', {
+            sessionID: KILO_SESSION,
+            error: { name: 'MessageAbortedError' },
+          })
+        );
+        expect(eventFrames(h.frames).filter(event => event.type === 'session.error')).toEqual([]);
+        stopped.resolve(true);
+      } else {
+        h.manager.submit(SESSION_ID, promptPayload('m2'));
+        await settle();
+        expect(client.prompts).toHaveLength(1);
+        stopped.resolve(scenario === 'confirmed retry');
+        await settle();
+        if (scenario === 'confirmed retry') {
+          expect(client.prompts).toHaveLength(2);
+        } else {
+          expect(client.prompts).toHaveLength(1);
+          expect(outcomeFrames(h.frames)).toMatchObject([
+            { status: 'failed', reason: 'completion_quiet_drain', lastMessageId: 'm1' },
+            { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm2' },
+          ]);
+          expect(eventFrames(h.frames)).toContainEqual(
+            expect.objectContaining({
+              type: 'error',
+              properties: expect.objectContaining({
+                fatal: false,
+                error: 'Agent cancellation was not confirmed',
+              }),
+            })
+          );
+        }
+      }
+      h.manager.shutdown();
+    }
+  );
+
   it.each(['http', 'marker'] as const)(
     'bounds %s-only confirmation with exactly three paired attempts',
     async half => {
@@ -4827,6 +4887,7 @@ describe('completion ownership and transport bounds', () => {
       }
       expect(new Set(tokens).size).toBe(3);
       expect(client.drains).toHaveLength(3);
+      expect(client.aborts).toEqual([]);
       expect(outcomeFrames(h.frames)).toMatchObject([
         { status: 'failed', reason: 'completion_unconfirmed' },
       ]);
@@ -4863,39 +4924,73 @@ describe('completion ownership and transport bounds', () => {
     expect(next?.cancelled).toBe(true);
   });
 
-  it('fails a drain that stays unanswered without foreground work for the no-progress window', async () => {
-    const h = createHarness();
-    h.registerRoute(routeSpec());
-    const client = h.client(routeSpec());
-    client.setAutomaticDrainMarker(false);
-    client.setDrainImpl(() => new Promise(() => undefined));
-    h.manager.submit(SESSION_ID, promptPayload('m1'));
-    await settle();
-    h.manager.observeKiloEvent(completedKiloTurn());
-    await settle();
-    const quietTimers = () =>
-      h.timeouts.filter(timer => timer.ms === SESSION_TIMERS.noProgressMs && !timer.cancelled);
+  it.each(['idle', 'unconfirmed', 'busy', 'not ready', 'disabled'] as const)(
+    'interrupts a quiet drain and guards auto-commit when %s',
+    async condition => {
+      const stopped = Promise.withResolvers<boolean>();
+      const calls: string[] = [];
+      const h = createHarness({
+        runAutoCommit: async () => {
+          calls.push('auto-commit');
+          return { success: true };
+        },
+      });
+      h.registerRoute(routeSpec());
+      const client = h.client(routeSpec());
+      client.setAbortImpl(() => {
+        calls.push('interrupt');
+        return stopped.promise;
+      });
+      client.setAutomaticDrainMarker(false);
+      client.setDrainImpl(() => new Promise(() => undefined));
+      h.manager.submit(
+        SESSION_ID,
+        promptPayload('m1', { finalization: { autoCommit: condition !== 'disabled' } })
+      );
+      await settle();
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      const quietTimers = () =>
+        h.timeouts.filter(timer => timer.ms === SESSION_TIMERS.noProgressMs && !timer.cancelled);
 
-    // Foreground work pauses the bound; it restarts once the tree is quiet again.
-    h.setExecutionTree(KILO_SESSION, [1]);
-    h.manager.refreshActivity(DIRECTORY);
-    expect(quietTimers()).toEqual([]);
-    h.setExecutionTree(KILO_SESSION, []);
-    h.manager.refreshActivity(DIRECTORY);
-    expect(quietTimers()).toHaveLength(1);
-    h.manager.refreshActivity(DIRECTORY);
-    expect(quietTimers()).toHaveLength(1);
-    expect(h.manager.hasPendingWork()).toBe(true);
-    expect(outcomeFrames(h.frames)).toEqual([]);
+      // Foreground work pauses the bound; it restarts once the tree is quiet again.
+      h.setExecutionTree(KILO_SESSION, [1]);
+      h.manager.refreshActivity(DIRECTORY);
+      expect(quietTimers()).toEqual([]);
+      h.setExecutionTree(KILO_SESSION, []);
+      h.manager.refreshActivity(DIRECTORY);
+      expect(quietTimers()).toHaveLength(1);
+      h.manager.refreshActivity(DIRECTORY);
+      expect(quietTimers()).toHaveLength(1);
+      expect(h.manager.hasPendingWork()).toBe(true);
+      expect(outcomeFrames(h.frames)).toEqual([]);
 
-    h.fireTimeout(SESSION_TIMERS.noProgressMs);
-    await settle();
-    expect(client.drains).toHaveLength(1);
-    expect(outcomeFrames(h.frames)).toMatchObject([
-      { status: 'failed', reason: 'completion_unconfirmed' },
-    ]);
-    expect(h.manager.hasPendingWork()).toBe(false);
-  });
+      h.fireTimeout(SESSION_TIMERS.noProgressMs);
+      await settle();
+      expect(client.drains).toHaveLength(1);
+      expect(client.drains[0]?.signal?.aborted).toBe(true);
+      expect(client.aborts).toEqual([KILO_SESSION]);
+      expect(calls).toEqual(['interrupt']);
+      expect(outcomeFrames(h.frames)).toMatchObject([
+        { status: 'failed', reason: 'completion_quiet_drain', lastMessageId: 'm1' },
+      ]);
+
+      if (condition === 'busy') h.setState(KILO_SESSION, runningState);
+      if (condition === 'not ready') h.setFlags(routeSpec(), { suspected: true });
+      stopped.resolve(condition !== 'unconfirmed');
+      await settle();
+      expect(calls).toEqual(condition === 'idle' ? ['interrupt', 'auto-commit'] : ['interrupt']);
+      const warnings = eventFrames(h.frames).flatMap(event =>
+        event.type === 'error' && event.properties.fatal === false ? [event.properties.error] : []
+      );
+      if (condition === 'unconfirmed')
+        expect(warnings).toContain('Auto-commit skipped: agent cancellation was not confirmed');
+      if (condition === 'busy' || condition === 'not ready')
+        expect(warnings).toContain('Auto-commit skipped: agent is not idle and available');
+      expect(outcomeFrames(h.frames)).toHaveLength(1);
+      expect(h.manager.hasPendingWork()).toBe(false);
+    }
+  );
 
   it.each(['http', 'marker'] as const)(
     'keeps the %s half deadline through a feed gap',

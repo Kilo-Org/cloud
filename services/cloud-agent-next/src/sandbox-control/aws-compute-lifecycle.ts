@@ -12,6 +12,7 @@ import {
   type ProviderStartup,
 } from './provider.js';
 import { uploadAwsLaunchDocument, type AwsLaunchEnvelope } from './aws-launch-document.js';
+import { logger } from '../logger.js';
 
 /** Replay is bounded; neither engine promises permanent idempotency-token retention. */
 export const AWS_LAUNCH_RECOVERY_MS = 5 * 60_000;
@@ -221,6 +222,19 @@ export function createAwsComputeLifecycle<
         return codec.write(transition(current));
       })
     );
+  }
+  /** The bucket's launch document expiry rule is the backstop; a confirmed stop stays terminal. */
+  async function deleteLaunchBestEffort(value: Operation) {
+    try {
+      await (
+        await deps.objects(value.config)
+      ).deleteLaunch(`kilo/launch/${value.ref.intentId}.json`);
+    } catch (error) {
+      logger
+        .withTags({ logTag: 'aws_launch_document_cleanup_failed', sandboxId: deps.sandboxId })
+        .withFields({ errorName: error instanceof Error ? error.name : 'unknown' })
+        .warn('AWS launch document cleanup failed after a confirmed stop');
+    }
   }
   async function recoverExpired(value: Operation): Promise<Operation> {
     if (awsRecoveryStep(value, now()) !== 'blocked') return value;
@@ -447,9 +461,7 @@ export function createAwsComputeLifecycle<
       try {
         let value = await operation(ref);
         if (value.phase === 'terminated') {
-          await (
-            await deps.objects(value.config)
-          ).deleteLaunch(`kilo/launch/${value.ref.intentId}.json`);
+          await deleteLaunchBestEffort(value);
           return 'terminal';
         }
         value = await change(value, current =>
@@ -467,9 +479,7 @@ export function createAwsComputeLifecycle<
         await change(value, current =>
           transitionAwsOperation(current, { type: 'terminated' }, now())
         );
-        await (
-          await deps.objects(value.config)
-        ).deleteLaunch(`kilo/launch/${value.ref.intentId}.json`);
+        await deleteLaunchBestEffort(value);
         return 'terminal';
       } catch (error) {
         const failure = normalizeAwsProviderFailure(error);
